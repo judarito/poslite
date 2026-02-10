@@ -1,5 +1,12 @@
 <template>
   <div>
+    <!-- Sesión de caja -->
+    <v-row>
+      <v-col cols="12">
+        <CashSessionCard />
+      </v-col>
+    </v-row>
+
     <v-row>
       <v-col cols="12">
         <v-card class="mb-4">
@@ -94,6 +101,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import CashSessionCard from '@/components/CashSessionCard.vue'
 
 const cards = ref([
   {

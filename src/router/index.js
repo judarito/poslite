@@ -21,6 +21,7 @@ import Reports from '@/views/Reports.vue'
 import TenantConfig from '@/views/TenantConfig.vue'
 import LayawayContracts from '@/views/LayawayContracts.vue'
 import LayawayDetail from '@/views/LayawayDetail.vue'
+import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
 
 const routes = [
   {
@@ -105,6 +106,12 @@ const routes = [
     path: '/cash-registers',
     name: 'CashRegisters',
     component: CashRegisters,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/cash-assignments',
+    name: 'CashRegisterAssignments',
+    component: CashRegisterAssignments,
     meta: { requiresAuth: true }
   },
   {

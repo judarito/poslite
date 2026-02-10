@@ -104,6 +104,14 @@
           {{ new Date().getFullYear() }} — <strong>Mi Aplicación Vue con Vuetify</strong>
         </v-col>
       </v-footer>
+
+      <!-- Snackbar global -->
+      <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
+        {{ snackbarMessage }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="snackbar = false">Cerrar</v-btn>
+        </template>
+      </v-snackbar>
     </template>
 
     <!-- Layout simple para rutas de autenticación -->
@@ -118,11 +126,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
+import { useNotification } from '@/composables/useNotification'
 
 const router = useRouter()
 const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
 const { clearTenant } = useTenant()
+const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 
 const drawer = ref(true)
 const windowWidth = ref(window.innerWidth)
@@ -173,6 +183,7 @@ const allMenuItems = [
     children: [
       { title: 'Sesiones de Caja', icon: 'mdi-cash-register', route: '/cash-sessions', permissions: ['CASH.SESSION.OPEN', 'CASH.SESSION.CLOSE'] },
       { title: 'Cajas Registradoras', icon: 'mdi-desktop-classic', route: '/cash-registers', permissions: ['CASH.REGISTER.MANAGE'] },
+      { title: 'Asignación de Cajas', icon: 'mdi-account-cash', route: '/cash-assignments', permissions: ['CASH.ASSIGN', 'SECURITY.USERS.MANAGE'] },
       { title: 'Métodos de Pago', icon: 'mdi-credit-card', route: '/payment-methods', permissions: ['SETTINGS.PAYMENT_METHODS.MANAGE'] },
     ]
   },

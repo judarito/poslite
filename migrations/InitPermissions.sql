@@ -26,6 +26,7 @@ insert into permissions(code, description) values
   ('CASH.VIEW','Ver caja'),
   ('CASH.ADJUST','Ajustes/arqueo avanzado'),
   ('CASH.REGISTER.MANAGE','Gestionar cajas registradoras'),
+  ('CASH.ASSIGN','Asignar cajas a cajeros'),
 
   -- Clientes / Crédito
   ('CUSTOMERS.CREATE','Crear cliente'),

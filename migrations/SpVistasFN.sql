@@ -834,3 +834,204 @@ create index if not exists ix_stock_balances_lookup on stock_balances(tenant_id,
 create index if not exists ix_inventory_moves_lookup on inventory_moves(tenant_id, location_id, variant_id, created_at desc);
 create index if not exists ix_sales_tenant_date on sales(tenant_id, sold_at desc);
 create index if not exists ix_sale_payments_session on sale_payments(tenant_id, cash_session_id);
+
+-- =========================
+-- 8) ASIGNACIÓN CAJERO→CAJA + SESIÓN ÚNICA
+-- =========================
+
+-- 8.1 Tabla de asignaciones cajero-caja
+create table if not exists cash_register_assignments (
+  assignment_id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(tenant_id) on delete cascade,
+  cash_register_id uuid not null references cash_registers(cash_register_id) on delete cascade,
+  user_id uuid not null references users(user_id) on delete cascade,
+  is_active boolean not null default true,
+  assigned_at timestamptz not null default now(),
+  assigned_by uuid not null references users(user_id),
+  note text,
+  unique (tenant_id, cash_register_id, user_id)
+);
+
+create index if not exists ix_cash_register_assignments_lookup
+on cash_register_assignments(tenant_id, user_id, cash_register_id, is_active);
+
+-- 8.2 Restricciones: un usuario solo puede tener 1 sesión OPEN, y una caja solo 1 sesión OPEN
+create unique index if not exists ux_cash_sessions_one_open_per_user
+on cash_sessions(tenant_id, opened_by)
+where status = 'OPEN';
+
+create unique index if not exists ux_cash_sessions_one_open_per_register
+on cash_sessions(tenant_id, cash_register_id)
+where status = 'OPEN';
+
+-- 8.3 Validar si usuario puede usar una caja
+create or replace function fn_user_can_use_cash_register(
+  p_tenant uuid,
+  p_user uuid,
+  p_cash_register uuid
+) returns boolean
+language sql
+as $$
+  select exists (
+    select 1
+    from cash_register_assignments a
+    where a.tenant_id = p_tenant
+      and a.user_id = p_user
+      and a.cash_register_id = p_cash_register
+      and a.is_active = true
+  );
+$$;
+
+-- 8.4 Obtener sesión abierta del usuario
+create or replace function fn_get_open_cash_session_for_user(
+  p_tenant uuid,
+  p_user uuid
+) returns uuid
+language sql
+as $$
+  select cs.cash_session_id
+  from cash_sessions cs
+  where cs.tenant_id = p_tenant
+    and cs.opened_by = p_user
+    and cs.status = 'OPEN'
+  order by cs.opened_at desc
+  limit 1;
+$$;
+
+-- 8.5 Vista de cajas asignadas al usuario
+create or replace view vw_user_cash_registers as
+select
+  a.tenant_id,
+  a.user_id,
+  u.full_name as user_name,
+  a.cash_register_id,
+  cr.name as cash_register_name,
+  cr.location_id,
+  l.name as location_name,
+  a.is_active,
+  a.assigned_at,
+  a.assigned_by
+from cash_register_assignments a
+join users u on u.user_id = a.user_id
+join cash_registers cr on cr.cash_register_id = a.cash_register_id
+join locations l on l.location_id = cr.location_id;
+
+-- 8.6 SP: Asignar caja a cajero (solo Admin)
+create or replace function sp_assign_cash_register_to_user(
+  p_tenant uuid,
+  p_cash_register uuid,
+  p_user uuid,
+  p_assigned_by uuid,
+  p_is_active boolean default true,
+  p_note text default null
+) returns void
+language plpgsql
+as $$
+begin
+  insert into cash_register_assignments(
+    tenant_id, cash_register_id, user_id, is_active, assigned_at, assigned_by, note
+  )
+  values(
+    p_tenant, p_cash_register, p_user, p_is_active, now(), p_assigned_by, p_note
+  )
+  on conflict (tenant_id, cash_register_id, user_id)
+  do update set
+    is_active = excluded.is_active,
+    assigned_at = now(),
+    assigned_by = excluded.assigned_by,
+    note = excluded.note;
+end;
+$$;
+
+-- 8.7 SP: Abrir sesión con validación de asignación
+create or replace function sp_open_cash_session(
+  p_tenant uuid,
+  p_cash_register uuid,
+  p_opened_by uuid,
+  p_opening_amount numeric(14,2)
+) returns uuid
+language plpgsql
+as $$
+declare
+  v_session uuid;
+  v_existing uuid;
+begin
+  if not fn_user_can_use_cash_register(p_tenant, p_opened_by, p_cash_register) then
+    raise exception 'User is not assigned to this cash register';
+  end if;
+
+  v_existing := fn_get_open_cash_session_for_user(p_tenant, p_opened_by);
+  if v_existing is not null then
+    return v_existing;
+  end if;
+
+  insert into cash_sessions(
+    tenant_id, cash_register_id, opened_by, opened_at, opening_amount, status
+  )
+  values(
+    p_tenant, p_cash_register, p_opened_by, now(), coalesce(p_opening_amount,0), 'OPEN'
+  )
+  returning cash_session_id into v_session;
+
+  return v_session;
+exception
+  when unique_violation then
+    v_existing := fn_get_open_cash_session_for_user(p_tenant, p_opened_by);
+    if v_existing is not null then
+      return v_existing;
+    end if;
+    raise;
+end;
+$$;
+
+-- 8.8 SP: Cerrar sesión con validación de dueño
+create or replace function sp_close_cash_session_secure(
+  p_tenant uuid,
+  p_cash_session uuid,
+  p_closed_by uuid,
+  p_counted_amount numeric(14,2)
+) returns void
+language plpgsql
+as $$
+begin
+  perform 1
+  from cash_sessions cs
+  where cs.tenant_id = p_tenant
+    and cs.cash_session_id = p_cash_session
+    and cs.status = 'OPEN'
+    and cs.opened_by = p_closed_by
+  for update;
+
+  if not found then
+    raise exception 'Cash session not found/OPEN or not owned by user';
+  end if;
+
+  perform sp_close_cash_session(p_tenant, p_cash_session, p_closed_by, p_counted_amount);
+end;
+$$;
+
+-- 8.9 Función: Contexto POS para Home (qué mostrar al login)
+create or replace function fn_pos_home_context(
+  p_tenant uuid,
+  p_user uuid
+) returns table(
+  open_cash_session_id uuid,
+  assigned_registers_count int,
+  single_cash_register_id uuid
+)
+language sql
+as $$
+  with open_s as (
+    select fn_get_open_cash_session_for_user(p_tenant, p_user) as sid
+  ),
+  regs as (
+    select a.cash_register_id
+    from cash_register_assignments a
+    where a.tenant_id=p_tenant and a.user_id=p_user and a.is_active=true
+  )
+  select
+    (select sid from open_s) as open_cash_session_id,
+    (select count(*)::int from regs) as assigned_registers_count,
+    (case when (select count(*) from regs)=1 then (select cash_register_id from regs limit 1) else null end) as single_cash_register_id;
+$$;
+

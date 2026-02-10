@@ -71,8 +71,8 @@ import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
-import * as cashService from '@/services/cash.service'
-import * as locationsService from '@/services/locations.service'
+import cashService from '@/services/cash.service'
+import locationsService from '@/services/locations.service'
 
 const { tenantId } = useTenant()
 const { hasPermission } = useAuth()
