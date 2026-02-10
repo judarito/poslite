@@ -1,0 +1,227 @@
+import supabaseService from './supabase.service'
+
+const layawayService = {
+  /**
+   * Obtener lista de contratos de plan separe
+   */
+  async getLayawayContracts(tenantId, page = 1, pageSize = 10, status = null) {
+    try {
+      let query = supabaseService.client
+        .from('vw_layaway_summary')
+        .select('*', { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+
+      if (status) {
+        query = query.eq('status', status)
+      }
+
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+
+      const { data, error, count } = await query.range(from, to)
+
+      if (error) throw error
+
+      return { success: true, data: data || [], total: count || 0 }
+    } catch (error) {
+      console.error('Error loading layaway contracts:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Obtener detalle de un contrato específico
+   */
+  async getLayawayDetail(tenantId, layawayId) {
+    try {
+      // Contrato principal
+      const { data: contract, error: contractError } = await supabaseService.client
+        .from('layaway_contracts')
+        .select(`
+          *,
+          location:location_id(location_id, name),
+          customer:customer_id(customer_id, full_name, document, phone, email),
+          created_by_user:created_by(user_id, full_name),
+          sale:sale_id(sale_id, sale_number)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('layaway_id', layawayId)
+        .single()
+
+      if (contractError) throw contractError
+
+      // Items del contrato
+      const { data: items, error: itemsError } = await supabaseService.client
+        .from('layaway_items')
+        .select(`
+          *,
+          variant:variant_id(
+            variant_id,
+            sku,
+            variant_name,
+            price,
+            product:product_id(product_id, name)
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('layaway_id', layawayId)
+
+      if (itemsError) throw itemsError
+
+      // Pagos/Abonos
+      const { data: payments, error: paymentsError } = await supabaseService.client
+        .from('vw_layaway_payments')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('layaway_id', layawayId)
+        .order('paid_at', { ascending: false })
+
+      if (paymentsError) throw paymentsError
+
+      // Cuotas (si existen)
+      const { data: installments, error: installmentsError } = await supabaseService.client
+        .from('layaway_installments')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('layaway_id', layawayId)
+        .order('due_date', { ascending: true })
+
+      if (installmentsError) throw installmentsError
+
+      return {
+        success: true,
+        data: {
+          ...contract,
+          items: items || [],
+          payments: payments || [],
+          installments: installments || []
+        }
+      }
+    } catch (error) {
+      console.error('Error loading layaway detail:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Crear nuevo contrato de plan separe
+   */
+  async createLayaway(tenantId, contractData) {
+    try {
+      const { data, error } = await supabaseService.client
+        .rpc('sp_create_layaway', {
+          p_tenant: tenantId,
+          p_location: contractData.location_id,
+          p_customer: contractData.customer_id,
+          p_created_by: contractData.created_by,
+          p_items: contractData.items, // jsonb array
+          p_due_date: contractData.due_date || null,
+          p_note: contractData.note || null,
+          p_initial_payment: contractData.initial_payment || null, // jsonb object
+          p_installments: contractData.installments || null // jsonb array
+        })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error creating layaway:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Registrar abono/pago parcial
+   */
+  async addPayment(tenantId, layawayId, paymentData) {
+    try {
+      const { error } = await supabaseService.client
+        .rpc('sp_add_layaway_payment', {
+          p_tenant: tenantId,
+          p_layaway: layawayId,
+          p_payment_method_code: paymentData.payment_method_code,
+          p_amount: paymentData.amount,
+          p_paid_by: paymentData.paid_by,
+          p_cash_session: paymentData.cash_session_id || null,
+          p_reference: paymentData.reference || null
+        })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error adding layaway payment:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Completar contrato (convertir a factura/venta)
+   */
+  async completeLayaway(tenantId, layawayId, soldBy, note = null) {
+    try {
+      const { data, error } = await supabaseService.client
+        .rpc('sp_complete_layaway_to_sale', {
+          p_tenant: tenantId,
+          p_layaway: layawayId,
+          p_sold_by: soldBy,
+          p_note: note
+        })
+
+      if (error) throw error
+
+      return { success: true, data } // retorna sale_id
+    } catch (error) {
+      console.error('Error completing layaway:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Cancelar o expirar contrato
+   */
+  async cancelLayaway(tenantId, layawayId, cancelledBy, status = 'CANCELLED', note = null) {
+    try {
+      const { error } = await supabaseService.client
+        .rpc('sp_cancel_layaway', {
+          p_tenant: tenantId,
+          p_layaway: layawayId,
+          p_cancelled_by: cancelledBy,
+          p_status: status, // 'CANCELLED' o 'EXPIRED'
+          p_note: note
+        })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error cancelling layaway:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Obtener stock disponible (on_hand - reserved)
+   */
+  async getStockAvailable(tenantId, locationId, variantId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('vw_stock_available')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('location_id', locationId)
+        .eq('variant_id', variantId)
+        .single()
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error getting stock available:', error)
+      return { success: false, error: error.message }
+    }
+  }
+}
+
+export default layawayService
