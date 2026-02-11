@@ -1,24 +1,44 @@
 <template>
   <div>
-    <!-- Botón de Sugerencias IA -->
-    <div class="d-flex ga-2 mb-3">
-      <v-btn color="primary" prepend-icon="mdi-cart-plus" @click="openCreateDialog">Nueva Compra</v-btn>
-      <v-btn color="purple" prepend-icon="mdi-lightbulb-on" variant="tonal" @click="openSuggestionsDialog" :loading="loadingSuggestions">
-        Sugerencias IA
-        <v-badge v-if="criticalCount > 0" color="error" :content="criticalCount" inline></v-badge>
-      </v-btn>
-      <v-btn 
-        v-if="aiAvailable" 
-        color="deep-purple" 
-        prepend-icon="mdi-robot" 
-        variant="elevated" 
-        @click="openAIAnalysisDialog" 
-        :loading="loadingAIAnalysis"
-      >
-        Análisis IA Avanzado
-        <v-chip v-if="aiAnalysis" size="x-small" color="success" class="ml-2">✓</v-chip>
-      </v-btn>
-    </div>
+    <!-- Botones de acciones - Responsive -->
+    <v-row dense class="mb-3">
+      <v-col cols="12" sm="auto">
+        <v-btn 
+          color="primary" 
+          prepend-icon="mdi-cart-plus" 
+          @click="openCreateDialog"
+          :block="isMobile"
+        >
+          Nueva Compra
+        </v-btn>
+      </v-col>
+      <v-col cols="12" sm="auto">
+        <v-btn 
+          color="purple" 
+          prepend-icon="mdi-lightbulb-on" 
+          variant="tonal" 
+          @click="openSuggestionsDialog" 
+          :loading="loadingSuggestions"
+          :block="isMobile"
+        >
+          Sugerencias IA
+          <v-badge v-if="criticalCount > 0" color="error" :content="criticalCount" inline></v-badge>
+        </v-btn>
+      </v-col>
+      <v-col v-if="aiAvailable" cols="12" sm="auto">
+        <v-btn 
+          color="deep-purple" 
+          prepend-icon="mdi-robot" 
+          variant="elevated" 
+          @click="openAIAnalysisDialog" 
+          :loading="loadingAIAnalysis"
+          :block="isMobile"
+        >
+          Análisis IA Avanzado
+          <v-chip v-if="aiAnalysis" size="x-small" color="success" class="ml-2">✓</v-chip>
+        </v-btn>
+      </v-col>
+    </v-row>
 
     <ListView
       title="Compras"
