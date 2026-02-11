@@ -88,7 +88,8 @@
       <!-- Por Día -->
       <v-window-item value="daily">
         <v-card>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr><th>Fecha</th><th class="text-center">Ventas</th><th class="text-right">Bruto</th><th class="text-right">Devoluciones</th><th class="text-right">Neto</th></tr>
             </thead>
@@ -103,13 +104,41 @@
               <tr v-if="salesByDay.length === 0"><td colspan="5" class="text-center text-grey pa-4">Sin datos</td></tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="day in salesByDay" :key="day.date" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="text-body-2 font-weight-bold mb-2">{{ day.date }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Ventas:</span>
+                  <span class="font-weight-bold">{{ day.count }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Bruto:</span>
+                  <span>{{ formatMoney(day.gross_total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Devoluciones:</span>
+                  <span class="text-red">{{ formatMoney(day.returns_total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Neto:</span>
+                  <span class="font-weight-bold text-success">{{ formatMoney(day.net_total) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="salesByDay.length === 0" class="text-center text-grey pa-4">Sin datos</div>
+          </div>
         </v-card>
       </v-window-item>
 
       <!-- Top Productos -->
       <v-window-item value="products">
         <v-card>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr><th>#</th><th>Producto</th><th>SKU</th><th class="text-right">Cant.</th><th class="text-right">Ingresos</th><th class="text-right">Costo</th><th class="text-right">Utilidad</th></tr>
             </thead>
@@ -126,13 +155,48 @@
               <tr v-if="topProducts.length === 0"><td colspan="7" class="text-center text-grey pa-4">Sin datos</td></tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="(p, i) in topProducts" :key="p.variant_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center mb-2">
+                  <v-chip size="x-small" color="primary" class="mr-2">{{ i + 1 }}</v-chip>
+                  <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="text-body-2 font-weight-bold">{{ p.product_name }}</div>
+                    <div class="text-caption text-grey">{{ p.variant_name }}</div>
+                    <div class="text-caption text-grey">SKU: {{ p.sku }}</div>
+                  </div>
+                </div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Cantidad:</span>
+                  <span class="font-weight-bold">{{ p.total_qty }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Ingresos:</span>
+                  <span>{{ formatMoney(p.total_revenue) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Costo:</span>
+                  <span>{{ formatMoney(p.total_cost) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Utilidad:</span>
+                  <span class="font-weight-bold" :class="p.profit >= 0 ? 'text-success' : 'text-error'">{{ formatMoney(p.profit) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="topProducts.length === 0" class="text-center text-grey pa-4">Sin datos</div>
+          </div>
         </v-card>
       </v-window-item>
 
       <!-- Por Vendedor -->
       <v-window-item value="sellers">
         <v-card>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr><th>Vendedor</th><th class="text-center">Ventas</th><th class="text-right">Total</th></tr>
             </thead>
@@ -145,13 +209,33 @@
               <tr v-if="salesBySeller.length === 0"><td colspan="3" class="text-center text-grey pa-4">Sin datos</td></tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="s in salesBySeller" :key="s.user_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="text-body-2 font-weight-bold mb-2">{{ s.name }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Ventas:</span>
+                  <span class="font-weight-bold">{{ s.count }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Total:</span>
+                  <span class="font-weight-bold text-success">{{ formatMoney(s.total) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="salesBySeller.length === 0" class="text-center text-grey pa-4">Sin datos</div>
+          </div>
         </v-card>
       </v-window-item>
 
       <!-- Por Método de Pago -->
       <v-window-item value="payments">
         <v-card>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr><th>Método</th><th class="text-center">Transacciones</th><th class="text-right">Total</th></tr>
             </thead>
@@ -164,6 +248,25 @@
               <tr v-if="salesByPayment.length === 0"><td colspan="3" class="text-center text-grey pa-4">Sin datos</td></tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="p in salesByPayment" :key="p.code" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="text-body-2 font-weight-bold mb-2">{{ p.name }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Transacciones:</span>
+                  <span class="font-weight-bold">{{ p.count }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Total:</span>
+                  <span class="font-weight-bold text-success">{{ formatMoney(p.total) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="salesByPayment.length === 0" class="text-center text-grey pa-4">Sin datos</div>
+          </div>
         </v-card>
       </v-window-item>
 
@@ -200,7 +303,8 @@
               <v-btn value="EXPENSE" size="small" color="error">Gastos</v-btn>
             </v-btn-toggle>
           </v-card-title>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -231,6 +335,37 @@
               </tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="m in filteredMovements" :key="m.cash_movement_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption text-grey">{{ formatDateTime(m.created_at) }}</span>
+                  <v-chip :color="m.type === 'INCOME' ? 'success' : 'error'" size="x-small" variant="flat">
+                    {{ m.type === 'INCOME' ? 'Ingreso' : 'Gasto' }}
+                  </v-chip>
+                </div>
+                <div class="text-body-2 font-weight-bold mb-1">{{ m.category || 'Sin categoría' }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Caja:</span>
+                  <span>{{ m.session?.cash_register?.name || '-' }} ({{ m.session?.cash_register?.location?.name || '-' }})</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Registrado por:</span>
+                  <span>{{ m.created_by_user?.full_name || '-' }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Monto:</span>
+                  <span class="font-weight-bold" :class="m.type === 'INCOME' ? 'text-success' : 'text-error'">
+                    {{ m.type === 'INCOME' ? '+' : '-' }}{{ formatMoney(m.amount) }}
+                  </span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="filteredMovements.length === 0" class="text-center text-grey pa-4">Sin movimientos</div>
+          </div>
         </v-card>
       </v-window-item>
 
@@ -301,7 +436,8 @@
         <!-- Contratos -->
         <v-card class="mb-3">
           <v-card-title>Contratos por Estado</v-card-title>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr>
                 <th>Cliente</th>
@@ -352,12 +488,65 @@
               </tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="c in layawayContracts" :key="c.layaway_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <div class="text-body-2 font-weight-bold">{{ c.customer_name }}</div>
+                  <v-chip 
+                    :color="c.status === 'ACTIVE' ? 'green' : c.status === 'COMPLETED' ? 'blue' : c.status === 'CANCELLED' ? 'red' : 'grey'" 
+                    size="x-small" 
+                    variant="flat">
+                    {{ c.status_label }}
+                  </v-chip>
+                </div>
+                <div class="text-center my-2">
+                  <v-progress-circular
+                    :model-value="c.payment_percentage"
+                    :color="c.payment_percentage >= 100 ? 'green' : c.payment_percentage >= 50 ? 'orange' : 'red'"
+                    size="60"
+                    width="6">
+                    <span class="text-h6">{{ Math.round(c.payment_percentage) }}%</span>
+                  </v-progress-circular>
+                </div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Fecha Creación:</span>
+                  <span>{{ formatDate(c.created_at) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1" v-if="c.due_date">
+                  <span class="text-grey">Vencimiento:</span>
+                  <div>
+                    <span>{{ formatDate(c.due_date) }}</span>
+                    <v-chip v-if="c.due_status === 'Vencido'" color="red" size="x-small" class="ml-1">Vencido</v-chip>
+                    <v-chip v-else-if="c.due_status === 'Por vencer'" color="orange" size="x-small" class="ml-1">Por vencer</v-chip>
+                  </div>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Total:</span>
+                  <span>{{ formatMoney(c.total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Abonado:</span>
+                  <span class="text-success">{{ formatMoney(c.paid_total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Saldo:</span>
+                  <span class="font-weight-bold text-error">{{ formatMoney(c.balance) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="layawayContracts.length === 0" class="text-center text-grey pa-4">Sin contratos</div>
+          </div>
         </v-card>
 
         <!-- Abonos -->
         <v-card>
           <v-card-title>Historial de Abonos</v-card-title>
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -382,6 +571,33 @@
               </tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="p in layawayPayments" :key="p.layaway_payment_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption text-grey">{{ formatDateTime(p.paid_at) }}</span>
+                  <v-chip color="success" size="x-small">{{ formatMoney(p.amount) }}</v-chip>
+                </div>
+                <div class="text-body-2 font-weight-bold mb-1">{{ p.customer_name }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Método de Pago:</span>
+                  <span>{{ p.payment_method_name }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Recibido por:</span>
+                  <span>{{ p.paid_by_name || '-' }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption" v-if="p.reference">
+                  <span class="text-grey">Referencia:</span>
+                  <span>{{ p.reference }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="layawayPayments.length === 0" class="text-center text-grey pa-4">Sin abonos</div>
+          </div>
         </v-card>
       </v-window-item>
     </v-window>

@@ -48,6 +48,9 @@
           <v-chip size="small" variant="tonal" prepend-icon="mdi-currency-usd" color="primary">
             Total: {{ formatMoney(item.total) }}
           </v-chip>
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-calculator" color="info">
+            Impuestos: {{ formatMoney(item.tax_total) }}
+          </v-chip>
           <v-chip size="small" variant="tonal" prepend-icon="mdi-cash-check" color="success">
             Pagado: {{ formatMoney(item.paid_total) }}
           </v-chip>
@@ -507,6 +510,14 @@ const recalculateItem = (item) => {
 const createContract = async () => {
   const { valid } = await createForm.value.validate()
   if (!valid || formData.value.items.length === 0) return
+
+  // Validar que haya una caja abierta si hay abono inicial
+  if (hasInitialPayment.value && initialPayment.value.amount > 0 && !currentSession.value) {
+    snackbarMessage.value = 'Debe abrir una caja antes de registrar pagos'
+    snackbarColor.value = 'error'
+    snackbar.value = true
+    return
+  }
 
   creating.value = true
   try {

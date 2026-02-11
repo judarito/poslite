@@ -12,7 +12,7 @@
           @click="drawer = !drawer"
         ></v-app-bar-nav-icon>
 
-        <v-toolbar-title>Mi Aplicación Vue</v-toolbar-title>
+        <v-toolbar-title>POSLite</v-toolbar-title>
 
         <v-spacer></v-spacer>
 
@@ -94,14 +94,14 @@
       </v-navigation-drawer>
 
       <v-main>
-        <v-container fluid>
+        <v-container fluid class="pa-4">
           <router-view></router-view>
         </v-container>
       </v-main>
 
       <v-footer app color="grey-lighten-4" class="text-center">
         <v-col class="text-center" cols="12">
-          {{ new Date().getFullYear() }} — <strong>Mi Aplicación Vue con Vuetify</strong>
+          {{ new Date().getFullYear() }} — <strong>POSLite</strong>
         </v-col>
       </v-footer>
 
@@ -201,6 +201,7 @@ const allMenuItems = [
       { title: 'Empresa', icon: 'mdi-domain', route: '/tenant-config', permissions: ['SETTINGS.TENANT.MANAGE'] },
       { title: 'Sedes', icon: 'mdi-store', route: '/locations', permissions: ['SETTINGS.LOCATIONS.MANAGE'] },
       { title: 'Impuestos', icon: 'mdi-percent', route: '/taxes', permissions: ['SETTINGS.TAXES.MANAGE'] },
+      { title: 'Reglas de Impuestos', icon: 'mdi-file-tree', route: '/tax-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
       { title: 'Roles y Permisos', icon: 'mdi-shield-account', route: '/roles', permissions: ['SECURITY.ROLES.MANAGE'] },
       { title: 'Usuarios', icon: 'mdi-account-cog', route: '/auth', permissions: ['SECURITY.USERS.MANAGE'] },
     ]

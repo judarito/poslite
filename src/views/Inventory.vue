@@ -1,15 +1,15 @@
 <template>
-  <div>
+  <div class="fill-width">
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="stock">Stock Actual</v-tab>
       <v-tab value="kardex">Kardex / Movimientos</v-tab>
       <v-tab value="operations">Operaciones</v-tab>
     </v-tabs>
 
-    <v-window v-model="tab">
+    <v-window v-model="tab" class="fill-width">
       <!-- STOCK ACTUAL -->
       <v-window-item value="stock">
-        <v-card>
+        <v-card flat class="fill-width">
           <v-card-title class="d-flex align-center">
             <v-icon start color="blue">mdi-package-variant</v-icon>
             Stock por Sede
@@ -29,7 +29,8 @@
             ></v-select>
           </v-card-title>
 
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr>
                 <th>Producto</th>
@@ -62,6 +63,38 @@
             </tbody>
           </v-table>
 
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="item in stockItems" :key="`${item.location_id}-${item.variant_id}`" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center mb-2">
+                  <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="text-body-2 font-weight-bold">{{ item.variant?.product?.name }}</div>
+                    <div class="text-caption text-grey">{{ item.variant?.variant_name || '' }}</div>
+                    <div class="text-caption text-grey mt-1">SKU: {{ item.variant?.sku }}</div>
+                  </div>
+                  <v-chip :color="item.on_hand <= 0 ? 'error' : item.on_hand <= 5 ? 'warning' : 'success'" size="small" class="ml-2 flex-shrink-0">
+                    {{ item.on_hand }}
+                  </v-chip>
+                </div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Sede:</span>
+                  <span>{{ item.location?.name }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1">
+                  <span class="text-grey">Costo:</span>
+                  <span>{{ formatMoney(item.variant?.cost) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1">
+                  <span class="text-grey">Valor Total:</span>
+                  <span class="font-weight-bold">{{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="stockItems.length === 0" class="text-center text-grey pa-4">Sin registros de stock</div>
+          </div>
+
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-pagination v-model="stockPage" :length="Math.ceil(stockTotal / stockPageSize)" @update:model-value="loadStock" size="small"></v-pagination>
@@ -71,7 +104,7 @@
 
       <!-- KARDEX -->
       <v-window-item value="kardex">
-        <v-card>
+        <v-card flat class="fill-width">
           <v-card-title class="d-flex align-center flex-wrap ga-2">
             <v-icon start color="teal">mdi-history</v-icon>
             Kardex de Movimientos
@@ -80,7 +113,8 @@
             <v-select v-model="kardexTypeFilter" :items="moveTypes" item-title="label" item-value="value" label="Tipo" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
           </v-card-title>
 
-          <v-table density="compact">
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -116,6 +150,47 @@
               </tr>
             </tbody>
           </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="move in kardexItems" :key="move.inventory_move_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption text-grey">{{ formatDate(move.created_at) }}</span>
+                  <v-chip :color="moveTypeColor(move.move_type)" size="x-small" variant="flat">{{ moveTypeLabel(move.move_type) }}</v-chip>
+                </div>
+                <div class="text-body-2 font-weight-bold">{{ move.variant?.product?.name }}</div>
+                <div class="text-caption text-grey mb-2">{{ move.variant?.sku }} {{ move.variant?.variant_name || '' }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Sede:</span>
+                  <span>{{ move.location?.name }} {{ move.to_location ? '→ ' + move.to_location.name : '' }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Cantidad:</span>
+                  <span class="font-weight-bold" :class="isIncoming(move.move_type) ? 'text-success' : 'text-error'">
+                    {{ isIncoming(move.move_type) ? '+' : '-' }}{{ move.quantity }}
+                  </span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Costo Unit.:</span>
+                  <span>{{ formatMoney(move.unit_cost) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1" v-if="move.source">
+                  <span class="text-grey">Origen:</span>
+                  <span>{{ move.source }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1" v-if="move.created_by_user?.full_name">
+                  <span class="text-grey">Usuario:</span>
+                  <span>{{ move.created_by_user.full_name }}</span>
+                </div>
+                <div class="text-caption text-grey mt-1" v-if="move.note">
+                  <em>{{ move.note }}</em>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="kardexItems.length === 0" class="text-center text-grey pa-4">Sin movimientos</div>
+          </div>
 
           <v-card-actions>
             <v-spacer></v-spacer>

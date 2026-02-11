@@ -38,10 +38,18 @@
             Dif: {{ formatMoney(item.difference) }}
           </v-chip>
         </div>
+        <!-- Botones en móvil - debajo del contenido -->
+        <div v-if="item.status === 'OPEN'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
+          <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
+          <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+        </div>
       </template>
       <template #actions="{ item }">
-        <v-btn v-if="item.status === 'OPEN'" size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)" class="mr-1">Movimiento</v-btn>
-        <v-btn v-if="item.status === 'OPEN'" size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+        <!-- Botones en desktop - al lado derecho -->
+        <div class="d-none d-sm-flex ga-1">
+          <v-btn v-if="item.status === 'OPEN'" size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
+          <v-btn v-if="item.status === 'OPEN'" size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+        </div>
       </template>
     </ListView>
 

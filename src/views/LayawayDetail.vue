@@ -2,12 +2,13 @@
   <div v-if="contract">
     <!-- Encabezado -->
     <v-card class="mb-3">
-      <v-card-title class="d-flex align-center">
-        <v-btn icon="mdi-arrow-left" variant="text" @click="goBack" class="mr-2"></v-btn>
-        <v-icon class="mr-2" color="blue">mdi-calendar-clock</v-icon>
-        <span>Plan Separe - {{ contract.customer?.full_name }}</span>
-        <v-spacer></v-spacer>
-        <v-chip :color="getStatusColor(contract.status)" variant="flat">
+      <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
+        <div class="d-flex align-center mb-2 mb-sm-0" style="flex: 1; min-width: 0;">
+          <v-btn icon="mdi-arrow-left" variant="text" size="small" @click="goBack" class="mr-2 flex-shrink-0"></v-btn>
+          <v-icon class="mr-2 flex-shrink-0" color="blue">mdi-calendar-clock</v-icon>
+          <span class="text-truncate">Plan Separe - {{ contract.customer?.full_name }}</span>
+        </div>
+        <v-chip :color="getStatusColor(contract.status)" variant="flat" class="flex-shrink-0">
           {{ getStatusLabel(contract.status) }}
         </v-chip>
       </v-card-title>
@@ -85,15 +86,18 @@
 
         <!-- Abonos/Pagos -->
         <v-card class="mt-3">
-          <v-card-title class="d-flex align-center">
-            <v-icon start>mdi-cash-multiple</v-icon>
-            Historial de Abonos
-            <v-spacer></v-spacer>
+          <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
+            <div class="d-flex align-center mb-2 mb-sm-0">
+              <v-icon start>mdi-cash-multiple</v-icon>
+              <span>Historial de Abonos</span>
+            </div>
+            <v-spacer class="d-none d-sm-flex"></v-spacer>
             <v-btn 
               v-if="contract.status === 'ACTIVE' && canAddPayment" 
               color="success" 
               size="small" 
               prepend-icon="mdi-plus"
+              :block="$vuetify.display.xs"
               @click="openPaymentDialog"
             >
               Registrar Abono
@@ -405,6 +409,12 @@ const openPaymentDialog = () => {
 const savePayment = async () => {
   const { valid } = await paymentForm.value.validate()
   if (!valid) return
+
+  // Validar que haya una caja abierta
+  if (!currentSession.value) {
+    showMsg('Debe abrir una caja antes de registrar pagos', 'error')
+    return
+  }
 
   savingPayment.value = true
   try {

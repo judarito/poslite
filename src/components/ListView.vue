@@ -2,10 +2,12 @@
   <div class="list-view">
     <!-- Toolbar con acciones -->
     <v-card flat>
-      <v-card-title class="d-flex align-center">
-        <v-icon :icon="icon" class="mr-2"></v-icon>
-        {{ title }}
-        <v-spacer></v-spacer>
+      <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
+        <div class="d-flex align-center mb-2 mb-sm-0">
+          <v-icon :icon="icon" class="mr-2"></v-icon>
+          <span class="text-h6">{{ title }}</span>
+        </div>
+        <v-spacer class="d-none d-sm-flex"></v-spacer>
         
         <!-- Búsqueda -->
         <v-text-field
@@ -17,8 +19,9 @@
           prepend-inner-icon="mdi-magnify"
           single-line
           hide-details
-          class="mr-2"
-          style="max-width: 300px;"
+          class="mb-2 mb-sm-0 mr-sm-2"
+          style="max-width: 100%; width: 100%;"
+          :style="{ 'max-width': $vuetify.display.smAndUp ? '300px' : '100%' }"
           @update:model-value="debouncedSearch"
         ></v-text-field>
 
@@ -27,6 +30,7 @@
           v-if="showCreateButton"
           color="primary"
           prepend-icon="mdi-plus"
+          :block="$vuetify.display.xs"
           @click="$emit('create')"
         >
           {{ createButtonText }}
@@ -79,21 +83,23 @@
             <!-- Acciones -->
             <template v-slot:append v-if="showActions || $slots.actions">
               <slot name="actions" :item="item">
-                <v-btn
-                  v-if="editable"
-                  icon="mdi-pencil"
-                  variant="text"
-                  size="small"
-                  @click.stop="$emit('edit', item)"
-                ></v-btn>
-                <v-btn
-                  v-if="deletable"
-                  icon="mdi-delete"
-                  variant="text"
-                  size="small"
-                  color="error"
-                  @click.stop="$emit('delete', item)"
-                ></v-btn>
+                <div class="d-flex flex-column flex-sm-row ga-1">
+                  <v-btn
+                    v-if="editable"
+                    icon="mdi-pencil"
+                    variant="text"
+                    size="small"
+                    @click.stop="$emit('edit', item)"
+                  ></v-btn>
+                  <v-btn
+                    v-if="deletable"
+                    icon="mdi-delete"
+                    variant="text"
+                    size="small"
+                    color="error"
+                    @click.stop="$emit('delete', item)"
+                  ></v-btn>
+                </div>
               </slot>
             </template>
           </v-list-item>
@@ -111,17 +117,18 @@
       </v-card-text>
 
       <!-- Paginación -->
-      <v-card-actions v-if="totalPages > 1" class="justify-center">
+      <v-card-actions v-if="totalPages > 1" class="justify-center pa-2">
         <v-pagination
           v-model="currentPage"
           :length="totalPages"
-          :total-visible="7"
+          :total-visible="$vuetify.display.xs ? 5 : 7"
+          :size="$vuetify.display.xs ? 'small' : 'default'"
           @update:model-value="loadPage"
         ></v-pagination>
       </v-card-actions>
 
       <!-- Info de paginación -->
-      <v-card-text v-if="items.length > 0" class="text-center text-caption">
+      <v-card-text v-if="items.length > 0" class="text-center text-caption pa-2">
         Mostrando {{ startIndex + 1 }} - {{ endIndex }} de {{ totalItems }} registros
       </v-card-text>
     </v-card>

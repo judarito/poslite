@@ -75,7 +75,8 @@
               Guarde el producto primero, luego agregue variantes.
             </div>
 
-            <v-list v-if="isEditing && variants.length > 0" density="compact">
+            <!-- Desktop: List -->
+            <v-list v-if="isEditing && variants.length > 0" density="compact" class="d-none d-sm-block">
               <template v-for="(v, i) in variants" :key="v.variant_id || i">
                 <v-list-item>
                   <v-list-item-title>{{ v.variant_name || 'Default' }} — SKU: {{ v.sku }}</v-list-item-title>
@@ -88,6 +89,35 @@
                 <v-divider v-if="i < variants.length - 1"></v-divider>
               </template>
             </v-list>
+
+            <!-- Mobile: Cards -->
+            <div v-if="isEditing && variants.length > 0" class="d-sm-none">
+              <v-card v-for="(v, i) in variants" :key="v.variant_id || i" variant="outlined" class="mb-2">
+                <v-card-text>
+                  <div class="d-flex align-center justify-space-between mb-2">
+                    <div class="text-body-2 font-weight-bold">{{ v.variant_name || 'Default' }}</div>
+                    <v-chip size="x-small" color="primary">{{ v.sku }}</v-chip>
+                  </div>
+                  <v-divider class="my-2"></v-divider>
+                  <div class="d-flex justify-space-between text-caption mb-1">
+                    <span class="text-grey">Costo:</span>
+                    <span>{{ v.cost }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between text-caption mb-2">
+                    <span class="text-grey">Precio:</span>
+                    <span class="font-weight-bold">{{ v.price }}</span>
+                  </div>
+                  <div class="d-flex ga-2">
+                    <v-btn prepend-icon="mdi-pencil" size="small" variant="outlined" color="primary" flex @click="editVariant(v)">
+                      Editar
+                    </v-btn>
+                    <v-btn prepend-icon="mdi-delete" size="small" variant="outlined" color="error" flex @click="confirmDeleteVariant(v)">
+                      Eliminar
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </div>
           </v-form>
         </v-card-text>
         <v-card-actions>

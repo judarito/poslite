@@ -2,14 +2,21 @@
   <div class="pos-container">
     <!-- Barra Superior POS -->
     <v-card flat class="mb-2">
-      <v-card-title class="d-flex align-center pa-2">
-        <v-icon class="mr-2">mdi-point-of-sale</v-icon>
-        <span class="text-h6">Punto de Venta</span>
-        <v-spacer></v-spacer>
-        <v-chip v-if="currentSession" color="success" size="small" prepend-icon="mdi-cash-register" class="mr-2">
-          {{ currentSession.cash_register?.name || 'Caja' }}
+      <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2">
+        <div class="d-flex align-center mb-2 mb-sm-0">
+          <v-icon class="mr-2">mdi-point-of-sale</v-icon>
+          <span class="text-h6 d-none d-sm-inline">Punto de Venta</span>
+          <span class="text-subtitle-1 d-sm-none">POS</span>
+        </div>
+        <v-spacer class="d-none d-sm-flex"></v-spacer>
+        <v-chip v-if="currentSession" color="success" size="small" prepend-icon="mdi-cash-register">
+          <span class="d-none d-sm-inline">{{ currentSession.cash_register?.name || 'Caja' }}</span>
+          <span class="d-sm-none">{{ currentSession.cash_register?.name?.substring(0, 10) || 'Caja' }}</span>
         </v-chip>
-        <v-chip v-else color="warning" size="small" prepend-icon="mdi-alert">Sin caja abierta</v-chip>
+        <v-chip v-else color="warning" size="small" prepend-icon="mdi-alert">
+          <span class="d-none d-sm-inline">Sin caja abierta</span>
+          <span class="d-sm-none">Sin caja</span>
+        </v-chip>
       </v-card-title>
     </v-card>
 
@@ -53,7 +60,9 @@
 
           <!-- Líneas del carrito -->
           <v-divider></v-divider>
-          <v-table density="compact" v-if="cart.length > 0">
+          
+          <!-- Vista Desktop: Tabla -->
+          <v-table density="compact" v-if="cart.length > 0" class="d-none d-md-table">
             <thead>
               <tr>
                 <th>Producto</th>
@@ -78,7 +87,41 @@
               </tr>
             </tbody>
           </v-table>
-          <v-card-text v-else class="text-center text-grey">
+
+          <!-- Vista Mobile: Cards -->
+          <div v-if="cart.length > 0" class="d-md-none">
+            <v-card v-for="(line, i) in cart" :key="i" class="ma-2" variant="outlined">
+              <v-card-text class="pa-2">
+                <div class="d-flex justify-space-between align-start mb-2">
+                  <div style="flex: 1;">
+                    <div class="text-body-2 font-weight-medium">{{ line.productName }}</div>
+                    <div class="text-caption text-grey">{{ line.variantName }}</div>
+                    <div class="text-caption text-grey">SKU: {{ line.sku }}</div>
+                  </div>
+                  <v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn>
+                </div>
+                <div class="d-flex justify-space-between align-center">
+                  <v-text-field 
+                    v-model.number="line.quantity" 
+                    type="number" 
+                    variant="outlined" 
+                    density="compact" 
+                    hide-details 
+                    style="max-width:80px" 
+                    min="1" 
+                    label="Cant."
+                    @update:model-value="recalculate"
+                  ></v-text-field>
+                  <div class="text-right">
+                    <div class="text-caption text-grey">{{ formatMoney(line.unit_price) }} c/u</div>
+                    <div class="text-body-1 font-weight-bold">{{ formatMoney(line.line_total) }}</div>
+                  </div>
+                </div>
+              </v-card-text>
+            </v-card>
+          </div>
+
+          <v-card-text v-if="cart.length === 0" class="text-center text-grey py-8">
             <v-icon size="48">mdi-cart-outline</v-icon>
             <div>Agrega productos para iniciar la venta</div>
           </v-card-text>
@@ -130,14 +173,50 @@
           <v-divider></v-divider>
 
           <!-- Pagos -->
-          <v-card-text class="pa-3">
+          <v-card-text class="pa-2 pa-sm-3">
             <div class="text-subtitle-2 mb-2">Formas de Pago</div>
-            <div v-for="(payment, i) in payments" :key="i" class="d-flex ga-2 mb-2 align-center">
-              <v-select v-model="payment.method" :items="paymentMethods" item-title="name" item-value="code" variant="outlined" density="compact" hide-details style="max-width: 160px;"></v-select>
-              <v-text-field v-model.number="payment.amount" type="number" variant="outlined" density="compact" hide-details prefix="$" @update:model-value="recalcPayments"></v-text-field>
-              <v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removePayment(i)" :disabled="payments.length <= 1"></v-btn>
+            <div v-for="(payment, i) in payments" :key="i" class="mb-2">
+              <div class="d-flex flex-column flex-sm-row ga-2 align-stretch align-sm-center">
+                <v-select 
+                  v-model="payment.method" 
+                  :items="paymentMethods" 
+                  item-title="name" 
+                  item-value="code" 
+                  variant="outlined" 
+                  density="compact" 
+                  hide-details
+                  :style="{ 'max-width': $vuetify.display.smAndUp ? '160px' : '100%' }"
+                ></v-select>
+                <v-text-field 
+                  v-model.number="payment.amount" 
+                  type="number" 
+                  variant="outlined" 
+                  density="compact" 
+                  hide-details 
+                  prefix="$"
+                  @update:model-value="recalcPayments"
+                ></v-text-field>
+                <v-btn 
+                  icon="mdi-close" 
+                  size="small" 
+                  variant="text" 
+                  color="error" 
+                  @click="removePayment(i)" 
+                  :disabled="payments.length <= 1"
+                  class="align-self-center"
+                ></v-btn>
+              </div>
             </div>
-            <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addPayment" class="mb-2">Agregar pago</v-btn>
+            <v-btn 
+              size="small" 
+              variant="tonal" 
+              prepend-icon="mdi-plus" 
+              @click="addPayment" 
+              class="mb-2"
+              :block="$vuetify.display.xs"
+            >
+              Agregar pago
+            </v-btn>
 
             <div v-if="change > 0" class="d-flex justify-space-between text-h6 text-success mt-2">
               <span>Cambio:</span><span>{{ formatMoney(change) }}</span>
@@ -147,18 +226,40 @@
             </div>
           </v-card-text>
 
-          <v-card-text class="pa-3">
-            <v-textarea v-model="saleNote" label="Nota (opcional)" variant="outlined" rows="1" density="compact" hide-details></v-textarea>
+          <v-card-text class="pa-2 pa-sm-3">
+            <v-textarea 
+              v-model="saleNote" 
+              label="Nota (opcional)" 
+              variant="outlined" 
+              rows="1" 
+              density="compact" 
+              hide-details
+            ></v-textarea>
           </v-card-text>
 
-          <v-card-actions class="pa-3">
-            <v-btn block color="primary" size="large" prepend-icon="mdi-check-circle" :loading="processing" :disabled="cart.length === 0 || remaining > 0" @click="processSale">
+          <v-card-actions class="pa-2 pa-sm-3">
+            <v-btn 
+              block 
+              color="primary" 
+              :size="$vuetify.display.xs ? 'default' : 'large'" 
+              prepend-icon="mdi-check-circle" 
+              :loading="processing" 
+              :disabled="cart.length === 0 || remaining > 0" 
+              @click="processSale"
+            >
               Cobrar {{ formatMoney(totals.total) }}
             </v-btn>
           </v-card-actions>
 
-          <v-card-actions class="px-3 pb-3 pt-0">
-            <v-btn block variant="tonal" color="error" prepend-icon="mdi-trash-can" :disabled="cart.length === 0" @click="clearSale">
+          <v-card-actions class="px-2 px-sm-3 pb-2 pb-sm-3 pt-0">
+            <v-btn 
+              block 
+              variant="tonal" 
+              color="error" 
+              prepend-icon="mdi-trash-can" 
+              :disabled="cart.length === 0" 
+              @click="clearSale"
+            >
               Limpiar
             </v-btn>
           </v-card-actions>
@@ -179,6 +280,7 @@ import customersService from '@/services/customers.service'
 import salesService from '@/services/sales.service'
 import cashService from '@/services/cash.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
+import taxesService from '@/services/taxes.service'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -205,7 +307,11 @@ const searchingProduct = ref(false)
 
 const totals = computed(() => {
   let subtotal = 0, tax = 0
-  cart.value.forEach(l => { subtotal += l.line_total; tax += l.tax_amount })
+  cart.value.forEach(l => { 
+    const base = (l.quantity * l.unit_price) - (l.discount || 0)
+    subtotal += base
+    tax += l.tax_amount || 0
+  })
   return { subtotal, tax, total: subtotal + tax }
 })
 
@@ -272,13 +378,15 @@ const clearSearch = () => {
   }
 }
 
-const addToCart = (variant) => {
+const addToCart = async (variant) => {
   const existing = cart.value.find(l => l.variant_id === variant.variant_id)
   if (existing) {
     existing.quantity++
-    recalculate()
+    await recalculateTaxes(existing)
+    // Forzar actualización reactiva
+    cart.value = [...cart.value]
   } else {
-    cart.value.push({
+    const newLine = {
       variant_id: variant.variant_id,
       sku: variant.sku,
       productName: variant.product?.name || '',
@@ -288,19 +396,48 @@ const addToCart = (variant) => {
       unit_cost: parseFloat(variant.cost) || 0,
       discount: 0,
       tax_amount: 0,
+      tax_rate: 0,
       line_total: parseFloat(variant.price) || 0
-    })
+    }
+    
+    // Calcular impuestos ANTES de agregar al carrito
+    await recalculateTaxes(newLine)
+    cart.value.push(newLine)
   }
   // Auto-llenar primer pago
   if (payments.value.length === 1) payments.value[0].amount = totals.value.total
 }
 
+const recalculateTaxes = async (line) => {
+  if (!tenantId.value || !line.variant_id) return
+  
+  // Obtener tasa de impuesto
+  const taxResult = await taxesService.getTaxRateForVariant(tenantId.value, line.variant_id)
+  console.log('Tax result:', taxResult, 'for variant:', line.variant_id)
+  
+  if (taxResult.success && taxResult.rate) {
+    line.tax_rate = taxResult.rate
+    // Calcular impuesto sobre (qty * precio - descuento)
+    const base = (line.quantity * line.unit_price) - (line.discount || 0)
+    line.tax_amount = Math.round(base * line.tax_rate)
+    line.line_total = Math.round(base + line.tax_amount)
+    console.log('Tax calculated - rate:', line.tax_rate, 'base:', base, 'tax:', line.tax_amount, 'total:', line.line_total)
+  } else {
+    console.warn('No tax rate found or error:', taxResult)
+    // Sin impuesto
+    const base = (line.quantity * line.unit_price) - (line.discount || 0)
+    line.tax_amount = 0
+    line.tax_rate = 0
+    line.line_total = Math.round(base)
+  }
+}
+
 const removeFromCart = (i) => { cart.value.splice(i, 1); recalcPayments() }
 
-const recalculate = () => {
-  cart.value.forEach(l => {
-    l.line_total = (l.quantity || 0) * (l.unit_price || 0) - (l.discount || 0)
-  })
+const recalculate = async () => {
+  for (const line of cart.value) {
+    await recalculateTaxes(line)
+  }
   recalcPayments()
 }
 
@@ -325,6 +462,14 @@ const removePayment = (i) => { payments.value.splice(i, 1) }
 const processSale = async () => {
   if (cart.value.length === 0 || remaining.value > 0) return
   if (!tenantId.value || !userProfile.value) return
+
+  // Validar que haya una caja abierta
+  if (!currentSession.value) {
+    snackbarMessage.value = 'Debe abrir una caja antes de realizar ventas'
+    snackbarColor.value = 'error'
+    snackbar.value = true
+    return
+  }
 
   processing.value = true
   try {

@@ -37,12 +37,21 @@
           <template #content="{ item }">
             <div class="mt-2 d-flex flex-wrap ga-2">
               <v-chip :color="statusColor(item.status)" size="small" variant="flat">{{ statusLabel(item.status) }}</v-chip>
-              <v-chip size="small" variant="tonal" prepend-icon="mdi-cash" color="success">{{ formatMoney(item.total) }}</v-chip>
+              <v-chip size="small" variant="tonal" prepend-icon="mdi-cash" color="success">Total: {{ formatMoney(item.total) }}</v-chip>
+              <v-chip size="small" variant="tonal" prepend-icon="mdi-calculator" color="info">Impuestos: {{ formatMoney(item.tax_total) }}</v-chip>
+            </div>
+            <!-- Botones en móvil - debajo del contenido -->
+            <div v-if="item.status === 'COMPLETED'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
+              <v-btn size="small" color="warning" variant="tonal" @click.stop="openReturnDialog(item)">Devolver</v-btn>
+              <v-btn size="small" color="error" variant="tonal" @click.stop="confirmVoid(item)">Anular</v-btn>
             </div>
           </template>
           <template #actions="{ item }">
-            <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="warning" variant="tonal" @click.stop="openReturnDialog(item)">Devolver</v-btn>
-            <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="error" variant="tonal" class="ml-1" @click.stop="confirmVoid(item)">Anular</v-btn>
+            <!-- Botones en desktop - al lado derecho -->
+            <div class="d-none d-sm-flex ga-1">
+              <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="warning" variant="tonal" @click.stop="openReturnDialog(item)">Devolver</v-btn>
+              <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="error" variant="tonal" @click.stop="confirmVoid(item)">Anular</v-btn>
+            </div>
           </template>
         </ListView>
       </v-window-item>
@@ -135,29 +144,107 @@
     </v-dialog>
 
     <!-- Dialog Devolución -->
-    <v-dialog v-model="returnDialog" max-width="600" scrollable>
+    <v-dialog v-model="returnDialog" max-width="700" scrollable>
       <v-card>
-        <v-card-title><v-icon start color="warning">mdi-undo</v-icon>Crear Devolución</v-card-title>
-        <v-card-text v-if="returnSale">
+        <v-card-title class="pa-3">
+          <v-icon start color="warning">mdi-undo</v-icon>
+          Crear Devolución
+        </v-card-title>
+        <v-card-text v-if="returnSale" class="pa-3">
           <v-form ref="returnForm">
-            <v-textarea v-model="returnReason" label="Motivo de devolución" variant="outlined" rows="2" :rules="[rules.required]" class="mb-2"></v-textarea>
-            <div class="text-subtitle-2 mb-1">Seleccione los productos a devolver:</div>
-            <v-table density="compact">
-              <thead><tr><th></th><th>Producto</th><th class="text-center">Cant. vendida</th><th class="text-center">Cant. devolver</th></tr></thead>
+            <v-textarea 
+              v-model="returnReason" 
+              label="Motivo de devolución" 
+              variant="outlined" 
+              rows="2" 
+              :rules="[rules.required]" 
+              class="mb-3"
+            ></v-textarea>
+            
+            <div class="text-subtitle-2 mb-2">Seleccione los productos a devolver:</div>
+            
+            <!-- Vista Desktop: Tabla -->
+            <v-table density="comfortable" class="d-none d-sm-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px;"></th>
+                  <th>Producto</th>
+                  <th class="text-center" style="width: 100px;">Vendida</th>
+                  <th class="text-center" style="width: 120px;">Devolver</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="line in returnSale.sale_lines" :key="line.sale_line_id">
-                  <td><v-checkbox-btn v-model="line.selected" hide-details></v-checkbox-btn></td>
-                  <td>{{ line.variant?.product?.name }} {{ line.variant?.variant_name || '' }}</td>
+                  <td>
+                    <v-checkbox-btn v-model="line.selected" hide-details density="compact"></v-checkbox-btn>
+                  </td>
+                  <td>
+                    <div class="text-body-2">{{ line.variant?.product?.name }}</div>
+                    <div class="text-caption text-grey">{{ line.variant?.variant_name || '' }}</div>
+                  </td>
                   <td class="text-center">{{ line.quantity }}</td>
                   <td class="text-center">
-                    <v-text-field v-model.number="line.return_qty" type="number" variant="outlined" density="compact" hide-details style="width:70px" :min="0" :max="line.quantity" :disabled="!line.selected"></v-text-field>
+                    <v-text-field 
+                      v-model.number="line.return_qty" 
+                      type="number" 
+                      variant="outlined" 
+                      density="compact" 
+                      hide-details 
+                      style="width:90px; margin: 0 auto;" 
+                      :min="0" 
+                      :max="line.quantity" 
+                      :disabled="!line.selected"
+                    ></v-text-field>
                   </td>
                 </tr>
               </tbody>
             </v-table>
+
+            <!-- Vista Mobile: Cards -->
+            <div class="d-sm-none">
+              <v-card 
+                v-for="line in returnSale.sale_lines" 
+                :key="line.sale_line_id" 
+                class="mb-2" 
+                variant="outlined"
+              >
+                <v-card-text class="pa-3">
+                  <div class="d-flex align-start mb-2">
+                    <v-checkbox-btn 
+                      v-model="line.selected" 
+                      hide-details 
+                      density="compact"
+                      class="mr-2"
+                    ></v-checkbox-btn>
+                    <div style="flex: 1;">
+                      <div class="text-body-2 font-weight-medium">{{ line.variant?.product?.name }}</div>
+                      <div class="text-caption text-grey">{{ line.variant?.variant_name || '' }}</div>
+                    </div>
+                  </div>
+                  <div class="d-flex justify-space-between align-center">
+                    <div class="text-caption">
+                      <span class="text-grey">Vendida:</span> 
+                      <span class="font-weight-bold">{{ line.quantity }}</span>
+                    </div>
+                    <v-text-field 
+                      v-model.number="line.return_qty" 
+                      type="number" 
+                      variant="outlined" 
+                      density="compact" 
+                      hide-details 
+                      label="Devolver"
+                      style="max-width: 100px;" 
+                      :min="0" 
+                      :max="line.quantity" 
+                      :disabled="!line.selected"
+                    ></v-text-field>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </div>
           </v-form>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn @click="returnDialog = false">Cancelar</v-btn>
           <v-btn color="warning" :loading="processingReturn" @click="processReturn">Procesar Devolución</v-btn>

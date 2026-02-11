@@ -52,7 +52,8 @@
           </v-col>
         </v-row>
 
-        <v-table density="compact">
+        <!-- Desktop: Table -->
+        <v-table density="comfortable" class="d-none d-sm-table w-100">
           <thead>
             <tr>
               <th>Cajero</th>
@@ -98,6 +99,56 @@
             </tr>
           </tbody>
         </v-table>
+
+        <!-- Mobile: Cards -->
+        <div class="d-sm-none pa-2">
+          <v-card v-for="item in assignments" :key="item.assignment_id" variant="outlined" class="mb-2">
+            <v-card-text>
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="text-body-2 font-weight-bold">{{ item.user_name }}</div>
+                <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="flat">
+                  {{ item.is_active ? 'Activa' : 'Inactiva' }}
+                </v-chip>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="text-grey">Caja:</span>
+                <span>{{ item.cash_register_name }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="text-grey">Sede:</span>
+                <span>{{ item.location_name }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-caption mb-2">
+                <span class="text-grey">Asignado:</span>
+                <span>{{ formatDate(item.assigned_at) }}</span>
+              </div>
+              <v-btn
+                v-if="item.is_active"
+                prepend-icon="mdi-close"
+                size="small"
+                variant="outlined"
+                color="error"
+                block
+                @click="deactivateAssignment(item)"
+              >
+                Desactivar
+              </v-btn>
+              <v-btn
+                v-else
+                prepend-icon="mdi-check"
+                size="small"
+                variant="outlined"
+                color="success"
+                block
+                @click="activateAssignment(item)"
+              >
+                Activar
+              </v-btn>
+            </v-card-text>
+          </v-card>
+          <div v-if="assignments.length === 0" class="text-center text-grey pa-4">Sin asignaciones</div>
+        </div>
       </v-card-text>
     </v-card>
 
