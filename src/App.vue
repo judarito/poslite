@@ -20,6 +20,10 @@
           <v-icon>mdi-magnify</v-icon>
         </v-btn>
 
+        <v-btn icon @click="toggleTheme">
+          <v-icon>{{ isDark ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
+        </v-btn>
+
         <v-btn icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
@@ -105,7 +109,7 @@
         </v-container>
       </v-main>
 
-      <v-footer app color="grey-lighten-4" class="text-center">
+      <v-footer app class="text-center" :class="isDark ? 'bg-grey-darken-4' : 'bg-grey-lighten-4'" elevation="2">
         <v-col class="text-center" cols="12">
           {{ new Date().getFullYear() }} — <strong>POSLite</strong>
         </v-col>
@@ -455,6 +459,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useTheme } from '@/composables/useTheme'
+import { useDisplay } from 'vuetify'
 import alertsService from '@/services/alerts.service'
 import locationsService from '@/services/locations.service'
 
@@ -463,6 +469,8 @@ const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
 const { tenantId, clearTenant } = useTenant()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
+const { isDark, toggleTheme } = useTheme()
+const { mobile: isMobile } = useDisplay()
 
 const drawer = ref(true)
 const windowWidth = ref(window.innerWidth)
@@ -660,8 +668,6 @@ const menuSections = computed(() => {
   
   return filterItems(JSON.parse(JSON.stringify(allMenuItems)))
 })
-
-const isMobile = computed(() => windowWidth.value < 960)
 
 const handleResize = () => {
   windowWidth.value = window.innerWidth

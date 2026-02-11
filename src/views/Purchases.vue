@@ -1,168 +1,91 @@
 <template>
   <div>
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title class="d-flex align-center">
-            <v-icon class="mr-2">mdi-cart-plus</v-icon>
-            <span>Compras</span>
-            <v-spacer></v-spacer>
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">
-              Nueva Compra
-            </v-btn>
-          </v-card-title>
-
-          <!-- Filtros -->
-          <v-card-text>
-            <v-row dense>
-              <v-col cols="12" sm="6" md="3">
-                <v-select
-                  v-model="selectedLocation"
-                  :items="locations"
-                  item-title="name"
-                  item-value="location_id"
-                  label="Sede"
-                  prepend-inner-icon="mdi-store"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @update:model-value="loadPurchases"
-                ></v-select>
-              </v-col>
-              <v-col cols="12" sm="6" md="3">
-                <v-text-field
-                  v-model="dateFrom"
-                  label="Fecha desde"
-                  type="date"
-                  prepend-inner-icon="mdi-calendar"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @update:model-value="loadPurchases"
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6" md="3">
-                <v-text-field
-                  v-model="dateTo"
-                  label="Fecha hasta"
-                  type="date"
-                  prepend-inner-icon="mdi-calendar"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @update:model-value="loadPurchases"
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6" md="3">
-                <v-text-field
-                  v-model="search"
-                  label="Buscar producto o SKU"
-                  prepend-inner-icon="mdi-magnify"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @keyup.enter="loadPurchases"
-                ></v-text-field>
-              </v-col>
-            </v-row>
-          </v-card-text>
-
-          <v-divider></v-divider>
-
-          <!-- Tabla Desktop -->
-          <v-card-text v-if="!isMobile" class="pa-0">
-            <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
-            <div v-else-if="purchases.length === 0" class="text-center pa-8 text-grey">
-              <v-icon size="64">mdi-cart-off</v-icon>
-              <p class="mt-4">No hay compras registradas</p>
-            </div>
-            <v-table v-else density="compact" fixed-header height="500">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Sede</th>
-                  <th>Producto</th>
-                  <th>SKU</th>
-                  <th class="text-right">Cantidad</th>
-                  <th class="text-right">Costo Unit.</th>
-                  <th class="text-right">Total</th>
-                  <th class="text-right">Costo Prom.</th>
-                  <th class="text-right">Precio Actual</th>
-                  <th>Comprador</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="purchase in purchases" :key="purchase.purchase_id + purchase.variant_id">
-                  <td>{{ formatDate(purchase.purchased_at) }}</td>
-                  <td>{{ purchase.location_name }}</td>
-                  <td>
-                    <div>{{ purchase.product_name }}</div>
-                    <div v-if="purchase.variant_name" class="text-caption text-grey">{{ purchase.variant_name }}</div>
-                  </td>
-                  <td>{{ purchase.sku }}</td>
-                  <td class="text-right">{{ purchase.quantity }}</td>
-                  <td class="text-right">{{ formatMoney(purchase.unit_cost) }}</td>
-                  <td class="text-right font-weight-bold">{{ formatMoney(purchase.line_total) }}</td>
-                  <td class="text-right text-info">{{ formatMoney(purchase.current_avg_cost) }}</td>
-                  <td class="text-right text-success">{{ formatMoney(purchase.current_price) }}</td>
-                  <td>{{ purchase.purchased_by_name }}</td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card-text>
-
-          <!-- Cards Mobile -->
-          <v-card-text v-else class="pa-2" style="max-height: 500px; overflow-y: auto;">
-            <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
-            <div v-else-if="purchases.length === 0" class="text-center pa-8 text-grey">
-              <v-icon size="64">mdi-cart-off</v-icon>
-              <p class="mt-4">No hay compras registradas</p>
-            </div>
-            <v-card
-              v-else
-              v-for="purchase in purchases"
-              :key="purchase.purchase_id + purchase.variant_id"
-              class="mb-2"
+    <ListView
+      title="Compras"
+      icon="mdi-cart-plus"
+      :items="purchases"
+      :total-items="totalPurchases"
+      :loading="loading"
+      item-key="purchase_id"
+      avatar-icon="mdi-truck-delivery"
+      avatar-color="teal"
+      empty-message="No hay compras registradas"
+      :show-create-button="true"
+      create-button-text="Nueva Compra"
+      :editable="false"
+      :deletable="false"
+      @create="openCreateDialog"
+      @load-page="loadPurchasesPage"
+      @search="handleSearch"
+    >
+      <!-- Filtros personalizados -->
+      <template #filters>
+        <v-row dense>
+          <v-col cols="12" sm="6" md="3">
+            <v-select
+              v-model="selectedLocation"
+              :items="locations"
+              item-title="name"
+              item-value="location_id"
+              label="Sede"
+              prepend-inner-icon="mdi-store"
               variant="outlined"
-            >
-              <v-card-text>
-                <div class="d-flex justify-space-between align-start mb-2">
-                  <div>
-                    <div class="text-body-2 font-weight-bold">{{ purchase.product_name }}</div>
-                    <div v-if="purchase.variant_name" class="text-caption text-grey">{{ purchase.variant_name }}</div>
-                    <div class="text-caption text-grey">SKU: {{ purchase.sku }}</div>
-                  </div>
-                  <v-chip size="small" color="primary">{{ formatDate(purchase.purchased_at) }}</v-chip>
-                </div>
-                <v-divider class="my-2"></v-divider>
-                <v-row dense class="text-caption">
-                  <v-col cols="6">
-                    <div class="text-grey">Cantidad:</div>
-                    <div class="font-weight-bold">{{ purchase.quantity }}</div>
-                  </v-col>
-                  <v-col cols="6">
-                    <div class="text-grey">Costo Unit:</div>
-                    <div class="font-weight-bold">{{ formatMoney(purchase.unit_cost) }}</div>
-                  </v-col>
-                  <v-col cols="6">
-                    <div class="text-grey">Total:</div>
-                    <div class="font-weight-bold text-primary">{{ formatMoney(purchase.line_total) }}</div>
-                  </v-col>
-                  <v-col cols="6">
-                    <div class="text-grey">Precio Actual:</div>
-                    <div class="font-weight-bold text-success">{{ formatMoney(purchase.current_price) }}</div>
-                  </v-col>
-                </v-row>
-                <v-divider class="my-2"></v-divider>
-                <div class="text-caption text-grey">
-                  {{ purchase.location_name }} • {{ purchase.purchased_by_name }}
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+              density="compact"
+              clearable
+              hide-details
+              @update:model-value="loadPurchases"
+            ></v-select>
+          </v-col>
+          <v-col cols="12" sm="6" md="3">
+            <v-text-field
+              v-model="dateFrom"
+              label="Fecha desde"
+              type="date"
+              prepend-inner-icon="mdi-calendar"
+              variant="outlined"
+              density="compact"
+              clearable
+              hide-details
+              @update:model-value="loadPurchases"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" sm="6" md="3">
+            <v-text-field
+              v-model="dateTo"
+              label="Fecha hasta"
+              type="date"
+              prepend-inner-icon="mdi-calendar"
+              variant="outlined"
+              density="compact"
+              clearable
+              hide-details
+              @update:model-value="loadPurchases"
+            ></v-text-field>
+          </v-col>
+        </v-row>
+      </template>
+
+      <!-- Título del item -->
+      <template #title="{ item }">
+        {{ item.product_name }}{{ item.variant_name ? ' - ' + item.variant_name : '' }}
+      </template>
+
+      <!-- Subtítulo -->
+      <template #subtitle="{ item }">
+        {{ formatDate(item.purchased_at) }} • {{ item.purchased_by_name }} • {{ item.location_name }}
+      </template>
+
+      <!-- Contenido -->
+      <template #content="{ item }">
+        <div class="mt-2 d-flex flex-wrap ga-2">
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-barcode">SKU: {{ item.sku }}</v-chip>
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-numeric" color="info">Cant: {{ item.quantity }}</v-chip>
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-cash" color="primary">Costo: {{ formatMoney(item.unit_cost) }}</v-chip>
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-currency-usd" color="success">Total: {{ formatMoney(item.line_total) }}</v-chip>
+          <v-chip size="small" variant="tonal" prepend-icon="mdi-tag" color="orange">Precio: {{ formatMoney(item.current_price) }}</v-chip>
+        </div>
+      </template>
+    </ListView>
 
     <!-- Dialog Nueva Compra -->
     <v-dialog v-model="dialog" max-width="800" scrollable>
@@ -276,11 +199,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import supabaseService from '@/services/supabase.service'
+import ListView from '@/components/ListView.vue'
 
 const { isMobile } = useDisplay()
 const { tenantId } = useTenant()
@@ -295,6 +219,7 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const purchases = ref([])
+const totalPurchases = ref(0)
 const locations = ref([])
 const variants = ref([])
 const searchingVariants = ref(false)
@@ -337,7 +262,7 @@ const loadPurchases = async () => {
   try {
     let query = supabaseService.client
       .from('vw_purchases_summary')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('tenant_id', tenantId.value)
       .order('purchased_at', { ascending: false })
       .limit(100)
@@ -355,14 +280,25 @@ const loadPurchases = async () => {
       query = query.or(`product_name.ilike.%${search.value}%,sku.ilike.%${search.value}%`)
     }
 
-    const { data, error } = await query
+    const { data, error, count } = await query
     if (error) throw error
     purchases.value = data || []
+    totalPurchases.value = count || 0
   } catch (error) {
     showMsg('Error al cargar compras: ' + error.message, 'error')
   } finally {
     loading.value = false
   }
+}
+
+const loadPurchasesPage = (page, pageSize) => {
+  // Por ahora solo recargamos todo - puedes implementar paginación después
+  loadPurchases()
+}
+
+const handleSearch = (searchTerm) => {
+  search.value = searchTerm
+  loadPurchases()
 }
 
 const loadInitialVariants = async () => {
