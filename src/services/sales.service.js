@@ -1,4 +1,5 @@
 import supabaseService from './supabase.service'
+import salesForecastService from './sales-forecast.service'
 
 class SalesService {
   constructor() {
@@ -146,6 +147,90 @@ class SalesService {
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
       return { success: false, error: error.message, data: [], total: 0 }
+    }
+  }
+
+  /**
+   * Obtiene histórico de ventas para análisis de pronóstico
+   * @param {string} tenantId - ID del tenant
+   * @param {string} locationId - ID de la sede (opcional)
+   * @param {number} daysBack - Días hacia atrás (default: 90)
+   * @returns {Promise<Object>} Datos históricos formateados
+   */
+  async getSalesForecastData(tenantId, locationId = null, daysBack = 90) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('fn_get_sales_forecast_data', {
+        p_tenant_id: tenantId,
+        p_location_id: locationId,
+        p_days_back: daysBack
+      })
+
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      console.error('Error obteniendo datos de pronóstico:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Genera pronóstico de ventas usando IA (DeepSeek)
+   * @param {string} tenantId - ID del tenant
+   * @param {string} locationId - ID de la sede (opcional)
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<Object>} Pronóstico con insights y recomendaciones
+   */
+  async generateSalesForecast(tenantId, locationId = null, options = {}) {
+    try {
+      // 1. Obtener datos históricos
+      const historicalResult = await this.getSalesForecastData(tenantId, locationId, options.daysBack || 90)
+      
+      if (!historicalResult.success) {
+        throw new Error(historicalResult.error)
+      }
+
+      const historicalData = historicalResult.data
+
+      // Validar que haya suficientes datos
+      if (!historicalData || historicalData.length < 14) {
+        return {
+          success: false,
+          error: 'No hay suficientes datos históricos (se requieren al menos 14 días)',
+          data: null
+        }
+      }
+
+      // 2. Verificar si IA está disponible
+      if (!salesForecastService.isAvailable()) {
+        console.warn('IA no disponible, generando pronóstico fallback')
+        const fallbackResult = salesForecastService.generateFallbackForecast(historicalData)
+        return {
+          success: true,
+          data: fallbackResult.forecast,
+          is_fallback: true
+        }
+      }
+
+      // 3. Generar pronóstico con IA
+      const forecastResult = await salesForecastService.generateForecast(
+        tenantId,
+        locationId,
+        historicalData,
+        options
+      )
+
+      return {
+        success: true,
+        data: forecastResult.forecast,
+        raw_response: forecastResult.raw_response
+      }
+    } catch (error) {
+      console.error('Error generando pronóstico:', error)
+      return {
+        success: false,
+        error: error.message,
+        data: null
+      }
     }
   }
 }

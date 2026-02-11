@@ -1560,3 +1560,329 @@ join users u on u.user_id = im.created_by
 where im.move_type = 'PURCHASE_IN'
 order by im.created_at desc;
 
+-- ==========================================
+-- SISTEMA DE SUGERENCIAS INTELIGENTES DE COMPRA
+-- ==========================================
+
+-- Vista: Análisis de rotación de inventario y demanda
+create or replace view vw_inventory_rotation_analysis as
+with sales_last_30_days as (
+  select 
+    sl.variant_id,
+    count(distinct s.sale_id) as sales_count,
+    sum(sl.quantity) as total_sold,
+    avg(sl.quantity) as avg_qty_per_sale,
+    max(s.sold_at) as last_sale_date,
+    min(s.sold_at) as first_sale_date
+  from sale_lines sl
+  join sales s on s.sale_id = sl.sale_id
+  where s.sold_at >= current_date - interval '30 days'
+    and s.status = 'COMPLETED'
+  group by sl.variant_id
+),
+sales_last_90_days as (
+  select 
+    sl.variant_id,
+    sum(sl.quantity) as total_sold_90d
+  from sale_lines sl
+  join sales s on s.sale_id = sl.sale_id
+  where s.sold_at >= current_date - interval '90 days'
+    and s.status = 'COMPLETED'
+  group by sl.variant_id
+),
+current_stock as (
+  select 
+    sb.tenant_id,
+    sb.variant_id,
+    sum(sb.on_hand) as total_stock,
+    array_agg(distinct sb.location_id) as locations,
+    count(distinct sb.location_id) as num_locations
+  from stock_balances sb
+  group by sb.tenant_id, sb.variant_id
+)
+select 
+  cs.tenant_id,
+  pv.variant_id,
+  p.product_id,
+  p.name as product_name,
+  pv.variant_name,
+  pv.sku,
+  coalesce(cs.total_stock, 0) as current_stock,
+  coalesce(s30.total_sold, 0) as sold_last_30d,
+  coalesce(s90.total_sold_90d, 0) as sold_last_90d,
+  coalesce(s30.sales_count, 0) as transactions_30d,
+  coalesce(s30.avg_qty_per_sale, 0) as avg_qty_per_sale,
+  s30.last_sale_date,
+  -- Calcular días desde última venta
+  case 
+    when s30.last_sale_date is not null then 
+      current_date - s30.last_sale_date::date
+    else null
+  end as days_since_last_sale,
+  -- Calcular velocidad de rotación (días promedio entre ventas)
+  case 
+    when s30.sales_count > 1 and s30.first_sale_date is not null then
+      (s30.last_sale_date::date - s30.first_sale_date::date) / nullif(s30.sales_count - 1, 0)
+    else null
+  end as avg_days_between_sales,
+  -- Demanda diaria promedio (últimos 30 días)
+  round(coalesce(s30.total_sold, 0) / 30.0, 2) as avg_daily_demand,
+  -- Días de inventario restante (stock / demanda diaria)
+  case 
+    when coalesce(s30.total_sold, 0) > 0 then
+      round((coalesce(cs.total_stock, 0) * 30.0) / s30.total_sold, 1)
+    else null
+  end as days_of_stock_remaining,
+  -- Tendencia (comparar 30d vs 90d)
+  case 
+    when s90.total_sold_90d > 0 then
+      round(((s30.total_sold * 3.0) / s90.total_sold_90d - 1) * 100, 1)
+    else null
+  end as trend_percentage,
+  pv.cost as unit_cost,
+  pv.price as unit_price,
+  pv.min_stock,
+  pv.allow_backorder,
+  cs.locations,
+  cs.num_locations,
+  p.is_active
+from product_variants pv
+join products p on p.product_id = pv.product_id
+left join current_stock cs on cs.variant_id = pv.variant_id
+left join sales_last_30_days s30 on s30.variant_id = pv.variant_id
+left join sales_last_90_days s90 on s90.variant_id = pv.variant_id
+where p.is_active = true
+  and pv.is_active = true;
+
+-- Función: Generar sugerencias inteligentes de compra
+create or replace function fn_get_purchase_suggestions(
+  p_tenant_id uuid,
+  p_min_priority integer default 1, -- 1=Crítico, 2=Alto, 3=Medio
+  p_limit integer default 50
+)
+returns table(
+  variant_id uuid,
+  product_name text,
+  variant_name text,
+  sku text,
+  current_stock numeric,
+  min_stock numeric,
+  suggested_order_qty numeric,
+  priority integer,
+  priority_label text,
+  reason text,
+  days_of_stock numeric,
+  avg_daily_demand numeric,
+  sold_last_30d numeric,
+  unit_cost numeric,
+  estimated_cost numeric,
+  last_sale_date timestamp with time zone
+)
+language plpgsql
+as $$
+begin
+  return query
+  with suggestions as (
+    select 
+      ira.variant_id,
+      ira.product_name,
+      ira.variant_name,
+      ira.sku,
+      ira.current_stock,
+      ira.min_stock,
+      -- Calcular cantidad sugerida de pedido
+      case
+        -- Si está agotado y tiene ventas, pedir para 30 días
+        when ira.current_stock <= 0 and ira.avg_daily_demand > 0 then
+          ceil(ira.avg_daily_demand * 30)
+        -- Si está bajo mínimo, completar hasta 30 días de stock
+        when ira.current_stock < coalesce(ira.min_stock, 0) and ira.avg_daily_demand > 0 then
+          greatest(
+            coalesce(ira.min_stock, 0) - ira.current_stock,
+            ceil(ira.avg_daily_demand * 30 - ira.current_stock)
+          )
+        -- Si tiene menos de 7 días de stock, pedir para 30 días
+        when ira.days_of_stock_remaining < 7 and ira.avg_daily_demand > 0 then
+          ceil(ira.avg_daily_demand * 30 - ira.current_stock)
+        -- Si tiene entre 7 y 15 días, pedir para 20 días
+        when ira.days_of_stock_remaining < 15 and ira.avg_daily_demand > 0 then
+          ceil(ira.avg_daily_demand * 20)
+        else 0
+      end as suggested_qty,
+      -- Determinar prioridad
+      case
+        -- CRÍTICO: Agotado con ventas recientes (últimos 7 días)
+        when ira.current_stock <= 0 
+          and ira.sold_last_30d > 0 
+          and ira.days_since_last_sale <= 7 then 1
+        -- ALTO: Bajo mínimo o menos de 7 días de stock
+        when ira.current_stock < coalesce(ira.min_stock, 0)
+          or (ira.days_of_stock_remaining < 7 and ira.avg_daily_demand > 0) then 2
+        -- MEDIO: Menos de 15 días de stock con demanda creciente
+        when ira.days_of_stock_remaining < 15 
+          and ira.trend_percentage > 10 then 3
+        else 4
+      end as priority_level,
+      -- Razón de la sugerencia
+      case
+        when ira.current_stock <= 0 and ira.sold_last_30d > 0 then
+          'AGOTADO con demanda activa (última venta hace ' || ira.days_since_last_sale || ' días)'
+        when ira.current_stock < coalesce(ira.min_stock, 0) then
+          'Stock bajo mínimo (' || coalesce(ira.min_stock, 0) || ' unidades)'
+        when ira.days_of_stock_remaining < 7 then
+          'Quedan solo ' || round(ira.days_of_stock_remaining, 1) || ' días de stock'
+        when ira.days_of_stock_remaining < 15 and ira.trend_percentage > 10 then
+          'Demanda creciente (+' || ira.trend_percentage || '%), ' || round(ira.days_of_stock_remaining, 1) || ' días de stock'
+        else 'Stock preventivo'
+      end as reason_text,
+      ira.days_of_stock_remaining,
+      ira.avg_daily_demand,
+      ira.sold_last_30d,
+      ira.unit_cost,
+      ira.last_sale_date
+    from vw_inventory_rotation_analysis ira
+    where ira.tenant_id = p_tenant_id
+      and ira.is_active = true
+      -- Solo productos con ventas o bajo mínimo
+      and (
+        ira.sold_last_30d > 0 
+        or ira.current_stock < coalesce(ira.min_stock, 0)
+      )
+  )
+  select 
+    s.variant_id,
+    s.product_name,
+    s.variant_name,
+    s.sku,
+    s.current_stock,
+    s.min_stock,
+    s.suggested_qty,
+    s.priority_level,
+    case s.priority_level
+      when 1 then 'CRÍTICO'
+      when 2 then 'ALTO'
+      when 3 then 'MEDIO'
+      else 'BAJO'
+    end,
+    s.reason_text,
+    s.days_of_stock_remaining,
+    s.avg_daily_demand,
+    s.sold_last_30d,
+    s.unit_cost,
+    round(s.suggested_qty * s.unit_cost, 2),
+    s.last_sale_date
+  from suggestions s
+  where s.priority_level <= p_min_priority
+    and s.suggested_qty > 0
+  order by 
+    s.priority_level asc,
+    s.days_of_stock_remaining asc nulls last,
+    s.sold_last_30d desc
+  limit p_limit;
+end;
+$$;
+
+-- ==========================================
+-- SISTEMA DE PRONÓSTICO INTELIGENTE DE VENTAS
+-- ==========================================
+
+-- Vista: Histórico de ventas diarias (para análisis de IA)
+create or replace view vw_sales_daily_history as
+with daily_sales as (
+  select
+    s.tenant_id,
+    s.location_id,
+    l.name as location_name,
+    s.sold_at::date as sale_date,
+    extract(dow from s.sold_at) as day_of_week, -- 0=domingo, 6=sábado
+    extract(day from s.sold_at) as day_of_month,
+    extract(month from s.sold_at) as month,
+    extract(year from s.sold_at) as year,
+    to_char(s.sold_at, 'Day') as day_name,
+    to_char(s.sold_at, 'Month') as month_name,
+    count(distinct s.sale_id) as transactions_count,
+    sum(s.total) as total_sales,
+    avg(s.total) as avg_ticket_size,
+    sum(s.subtotal) as total_subtotal,
+    sum(s.tax_total) as total_tax,
+    sum(s.discount_total) as total_discounts
+  from sales s
+  join locations l on l.location_id = s.location_id
+  where s.status in ('COMPLETED', 'PARTIAL_RETURN')
+  group by 
+    s.tenant_id,
+    s.location_id,
+    l.name,
+    s.sold_at::date,
+    extract(dow from s.sold_at),
+    extract(day from s.sold_at),
+    extract(month from s.sold_at),
+    extract(year from s.sold_at),
+    to_char(s.sold_at, 'Day'),
+    to_char(s.sold_at, 'Month')
+)
+select
+  ds.*,
+  -- Calcular promedio móvil 7 días
+  avg(ds.total_sales) over (
+    partition by ds.tenant_id, ds.location_id
+    order by ds.sale_date
+    rows between 6 preceding and current row
+  ) as moving_avg_7d,
+  -- Calcular promedio móvil 30 días
+  avg(ds.total_sales) over (
+    partition by ds.tenant_id, ds.location_id
+    order by ds.sale_date
+    rows between 29 preceding and current row
+  ) as moving_avg_30d,
+  -- Calcular venta del mismo día semana anterior
+  lag(ds.total_sales, 7) over (
+    partition by ds.tenant_id, ds.location_id
+    order by ds.sale_date
+  ) as same_day_last_week,
+  -- Calcular tendencia (diferencia con semana anterior)
+  ds.total_sales - lag(ds.total_sales, 7) over (
+    partition by ds.tenant_id, ds.location_id
+    order by ds.sale_date
+  ) as week_over_week_diff
+from daily_sales ds
+order by ds.tenant_id, ds.location_id, ds.sale_date desc;
+
+-- Función: Obtener resumen de ventas para pronóstico
+create or replace function fn_get_sales_forecast_data(
+  p_tenant_id uuid,
+  p_location_id uuid default null,
+  p_days_back integer default 90
+)
+returns table(
+  sale_date date,
+  day_of_week integer,
+  day_name text,
+  transactions_count bigint,
+  total_sales numeric,
+  avg_ticket_size numeric,
+  moving_avg_7d numeric,
+  moving_avg_30d numeric,
+  same_day_last_week numeric
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    sdh.sale_date,
+    sdh.day_of_week::integer,
+    trim(sdh.day_name),
+    sdh.transactions_count,
+    sdh.total_sales,
+    sdh.avg_ticket_size,
+    round(sdh.moving_avg_7d, 2) as moving_avg_7d,
+    round(sdh.moving_avg_30d, 2) as moving_avg_30d,
+    sdh.same_day_last_week
+  from vw_sales_daily_history sdh
+  where sdh.tenant_id = p_tenant_id
+    and (p_location_id is null or sdh.location_id = p_location_id)
+    and sdh.sale_date >= current_date - (p_days_back || ' days')::interval
+  order by sdh.sale_date desc;
+end;
+$$;

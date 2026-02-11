@@ -159,7 +159,7 @@
           <v-divider></v-divider>
 
           <!-- Totales -->
-          <v-card-text class="pa-3">
+          <v-card-text class="pa-3 totals-sticky">
             <div class="d-flex justify-space-between mb-1">
               <span>Subtotal:</span><span>{{ formatMoney(totals.subtotal) }}</span>
             </div>
@@ -207,6 +207,17 @@
                   :disabled="payments.length <= 1"
                   class="align-self-center"
                 ></v-btn>
+              </div>
+              <!-- Botones rápidos de pago -->
+              <div v-if="i === 0" class="d-flex flex-wrap ga-1 mt-1">
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(1000)">$1k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(2000)">$2k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(5000)">$5k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(10000)">$10k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(20000)">$20k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(50000)">$50k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(100000)">$100k</v-btn>
+                <v-btn size="x-small" variant="tonal" color="primary" @click="setQuickAmount(totals.total)">Exacto</v-btn>
               </div>
             </div>
             <v-btn 
@@ -274,7 +285,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import productsService from '@/services/products.service'
@@ -457,6 +468,14 @@ const searchCustomer = async (search) => {
 }
 
 // Pagos
+const setQuickAmount = (amount) => {
+  if (payments.value.length > 0) {
+    payments.value[0].amount = amount
+    // Forzar actualización reactiva
+    payments.value = [...payments.value]
+  }
+}
+
 const addPayment = () => { payments.value.push({ method: paymentMethods.value[0]?.code || '', amount: remaining.value }) }
 const removePayment = (i) => { payments.value.splice(i, 1) }
 
@@ -546,7 +565,66 @@ onMounted(async () => {
       }
     }
   }
+
+  // Atajos de teclado
+  window.addEventListener('keydown', handleKeyboardShortcuts)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyboardShortcuts)
+})
+
+// Atajos de teclado
+const handleKeyboardShortcuts = (e) => {
+  // Solo si no está en un input/textarea (excepto el search)
+  const target = e.target
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+  const isSearchInput = target === searchInput.value?.$el?.querySelector('input')
+
+  // F2: Focus en búsqueda
+  if (e.key === 'F2') {
+    e.preventDefault()
+    searchInput.value?.focus()
+    return
+  }
+
+  // F9: Cobrar (si está habilitado)
+  if (e.key === 'F9') {
+    e.preventDefault()
+    if (cart.value.length > 0 && remaining.value === 0 && !processing.value) {
+      processSale()
+    }
+    return
+  }
+
+  // F10: Limpiar venta
+  if (e.key === 'F10') {
+    e.preventDefault()
+    if (cart.value.length > 0) {
+      clearSale()
+    }
+    return
+  }
+
+  // Solo permitir shortcuts de montos si NO está en un input (excepto search)
+  if (isInput && !isSearchInput) return
+
+  // Ctrl+1-7: Botones rápidos de pago
+  if (e.ctrlKey && ['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
+    e.preventDefault()
+    const amounts = [1000, 2000, 5000, 10000, 20000, 50000, 100000]
+    const idx = parseInt(e.key) - 1
+    setQuickAmount(amounts[idx])
+    return
+  }
+
+  // Ctrl+E: Monto exacto
+  if (e.ctrlKey && e.key.toLowerCase() === 'e') {
+    e.preventDefault()
+    setQuickAmount(totals.value.total)
+    return
+  }
+}
 </script>
 
 <style scoped>
@@ -556,5 +634,16 @@ onMounted(async () => {
 .cursor-pointer:hover {
   background-color: rgba(0, 0, 0, 0.04);
   cursor: pointer;
+}
+
+/* Total sticky en desktop */
+@media (min-width: 960px) {
+  .totals-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgb(var(--v-theme-surface));
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
 }
 </style>

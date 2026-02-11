@@ -7,6 +7,13 @@
       </v-col>
     </v-row>
 
+    <!-- Widget de Pronóstico de Ventas con IA -->
+    <v-row>
+      <v-col cols="12">
+        <SalesForecastWidget />
+      </v-col>
+    </v-row>
+
     <!-- Accesos directos -->
     <v-row>
       <v-col
@@ -42,6 +49,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCashSession } from '@/composables/useCashSession'
 import CashSessionCard from '@/components/CashSessionCard.vue'
+import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 
 const router = useRouter()
 const { hasOpenSession, loadPOSContext } = useCashSession()
