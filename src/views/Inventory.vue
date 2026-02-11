@@ -37,8 +37,10 @@
                 <th>SKU</th>
                 <th>Sede</th>
                 <th class="text-right">Stock</th>
+                <th class="text-right">Mínimo</th>
                 <th class="text-right">Costo</th>
                 <th class="text-right">Valor Total</th>
+                <th class="text-center">Alerta</th>
               </tr>
             </thead>
             <tbody>
@@ -50,22 +52,30 @@
                 <td>{{ item.variant?.sku }}</td>
                 <td>{{ item.location?.name }}</td>
                 <td class="text-right">
-                  <v-chip :color="item.on_hand <= 0 ? 'error' : item.on_hand <= 5 ? 'warning' : 'success'" size="small">
+                  <v-chip :color="getStockColor(item)" size="small">
                     {{ item.on_hand }}
                   </v-chip>
                 </td>
+                <td class="text-right">
+                  <span class="text-body-2">{{ item.variant?.min_stock || 0 }}</span>
+                </td>
                 <td class="text-right">{{ formatMoney(item.variant?.cost) }}</td>
                 <td class="text-right">{{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</td>
+                <td class="text-center">
+                  <v-icon v-if="getAlertLevel(item) === 'OUT_OF_STOCK'" color="error" size="small">mdi-alert-circle</v-icon>
+                  <v-icon v-else-if="getAlertLevel(item) === 'LOW_STOCK'" color="warning" size="small">mdi-alert</v-icon>
+                  <v-icon v-else color="success" size="small">mdi-check-circle</v-icon>
+                </td>
               </tr>
               <tr v-if="stockItems.length === 0">
-                <td colspan="6" class="text-center text-grey pa-4">Sin registros de stock</td>
+                <td colspan="8" class="text-center text-grey pa-4">Sin registros de stock</td>
               </tr>
             </tbody>
           </v-table>
 
           <!-- Mobile: Cards -->
           <div class="d-sm-none pa-2">
-            <v-card v-for="item in stockItems" :key="`${item.location_id}-${item.variant_id}`" variant="outlined" class="mb-2">
+            <v-card v-for="item in stockItems" :key="`${item.location_id}-${item.variant_id}`" variant="outlined" class="mb-2" :color="getAlertLevel(item) === 'OUT_OF_STOCK' ? 'error' : getAlertLevel(item) === 'LOW_STOCK' ? 'warning' : ''" :variant="getAlertLevel(item) !== 'OK' ? 'tonal' : 'outlined'">
               <v-card-text>
                 <div class="d-flex align-center mb-2">
                   <div class="flex-grow-1" style="min-width: 0;">
@@ -73,7 +83,7 @@
                     <div class="text-caption text-grey">{{ item.variant?.variant_name || '' }}</div>
                     <div class="text-caption text-grey mt-1">SKU: {{ item.variant?.sku }}</div>
                   </div>
-                  <v-chip :color="item.on_hand <= 0 ? 'error' : item.on_hand <= 5 ? 'warning' : 'success'" size="small" class="ml-2 flex-shrink-0">
+                  <v-chip :color="getStockColor(item)" size="small" class="ml-2 flex-shrink-0">
                     {{ item.on_hand }}
                   </v-chip>
                 </div>
@@ -83,6 +93,10 @@
                   <span>{{ item.location?.name }}</span>
                 </div>
                 <div class="d-flex justify-space-between text-caption mt-1">
+                  <span class="text-grey">Stock Mínimo:</span>
+                  <span class="font-weight-bold">{{ item.variant?.min_stock || 0 }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1">
                   <span class="text-grey">Costo:</span>
                   <span>{{ formatMoney(item.variant?.cost) }}</span>
                 </div>
@@ -90,6 +104,9 @@
                   <span class="text-grey">Valor Total:</span>
                   <span class="font-weight-bold">{{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</span>
                 </div>
+                <v-alert v-if="getAlertLevel(item) !== 'OK'" :type="getAlertLevel(item) === 'OUT_OF_STOCK' ? 'error' : 'warning'" density="compact" class="mt-2" variant="tonal">
+                  {{ getAlertMessage(item) }}
+                </v-alert>
               </v-card-text>
             </v-card>
             <div v-if="stockItems.length === 0" class="text-center text-grey pa-4">Sin registros de stock</div>
@@ -351,6 +368,28 @@ const moveTypeColor = (t) => ({
 const isIncoming = (t) => ['PURCHASE_IN', 'RETURN_IN', 'TRANSFER_IN', 'ADJUSTMENT'].includes(t)
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+// Helpers para stock y alertas
+const getStockColor = (item) => {
+  if (item.on_hand <= 0) return 'error'
+  const minStock = item.variant?.min_stock || 0
+  if (minStock > 0 && item.on_hand <= minStock) return 'warning'
+  return 'success'
+}
+
+const getAlertLevel = (item) => {
+  if (item.on_hand <= 0) return 'OUT_OF_STOCK'
+  const minStock = item.variant?.min_stock || 0
+  if (minStock > 0 && item.on_hand <= minStock) return 'LOW_STOCK'
+  return 'OK'
+}
+
+const getAlertMessage = (item) => {
+  if (item.on_hand <= 0) return 'Sin stock disponible'
+  const minStock = item.variant?.min_stock || 0
+  if (minStock > 0 && item.on_hand <= minStock) return `Stock bajo (mínimo: ${minStock})`
+  return ''
+}
 
 // Búsqueda de variantes genérica
 const doSearchVariant = async (search, resultsRef, loadingRef) => {

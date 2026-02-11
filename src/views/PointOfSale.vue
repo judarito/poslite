@@ -62,31 +62,33 @@
           <v-divider></v-divider>
           
           <!-- Vista Desktop: Tabla -->
-          <v-table density="compact" v-if="cart.length > 0" class="d-none d-md-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th class="text-center" style="width:80px">Cant.</th>
-                <th class="text-right" style="width:100px">Precio</th>
-                <th class="text-right" style="width:100px">Total</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(line, i) in cart" :key="i">
-                <td>
-                  <div class="text-body-2">{{ line.productName }}</div>
-                  <div class="text-caption text-grey">{{ line.variantName }} — {{ line.sku }}</div>
-                </td>
-                <td class="text-center">
-                  <v-text-field v-model.number="line.quantity" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="1" @update:model-value="recalculate"></v-text-field>
-                </td>
-                <td class="text-right">{{ formatMoney(line.unit_price) }}</td>
-                <td class="text-right font-weight-bold">{{ formatMoney(line.line_total) }}</td>
-                <td><v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn></td>
-              </tr>
-            </tbody>
-          </v-table>
+          <div v-if="cart.length > 0" class="d-none d-md-block" style="width: 100%; overflow-x: auto;">
+            <v-table density="compact" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="text-center" style="width:80px">Cant.</th>
+                  <th class="text-right" style="width:100px">Precio</th>
+                  <th class="text-right" style="width:100px">Total</th>
+                  <th style="width:40px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(line, i) in cart" :key="i">
+                  <td>
+                    <div class="text-body-2">{{ line.productName }}</div>
+                    <div class="text-caption text-grey">{{ line.variantName }} — {{ line.sku }}</div>
+                  </td>
+                  <td class="text-center">
+                    <v-text-field v-model.number="line.quantity" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="1" @update:model-value="recalculate"></v-text-field>
+                  </td>
+                  <td class="text-right">{{ formatMoney(line.unit_price) }}</td>
+                  <td class="text-right font-weight-bold">{{ formatMoney(line.line_total) }}</td>
+                  <td><v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn></td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
 
           <!-- Vista Mobile: Cards -->
           <div v-if="cart.length > 0" class="d-md-none">

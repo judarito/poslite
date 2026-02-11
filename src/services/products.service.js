@@ -17,7 +17,7 @@ class ProductsService {
         .select(`
           *,
           category:category_id(category_id, name),
-          product_variants(variant_id, sku, variant_name, cost, price, is_active)
+          product_variants(variant_id, sku, variant_name, cost, price, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active)
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)
         .order('name', { ascending: true })
@@ -43,7 +43,7 @@ class ProductsService {
           *,
           category:category_id(category_id, name),
           product_variants(
-            variant_id, sku, variant_name, attrs, cost, price, is_active,
+            variant_id, sku, variant_name, attrs, cost, price, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active,
             product_barcodes(barcode_id, barcode)
           )
         `)
@@ -114,6 +114,12 @@ class ProductsService {
         attrs: variant.attrs || null,
         cost: variant.cost || 0,
         price: variant.price || 0,
+        pricing_method: variant.pricing_method || 'MARKUP',
+        markup_percentage: variant.markup_percentage || 20,
+        price_rounding: variant.price_rounding || 'NONE',
+        rounding_to: variant.rounding_to || 1,
+        min_stock: variant.min_stock || 0,
+        allow_backorder: variant.allow_backorder || false,
         is_active: variant.is_active !== false
       })
       if (error) throw error
@@ -131,6 +137,12 @@ class ProductsService {
         attrs: updates.attrs || null,
         cost: updates.cost || 0,
         price: updates.price || 0,
+        pricing_method: updates.pricing_method || 'MARKUP',
+        markup_percentage: updates.markup_percentage || 20,
+        price_rounding: updates.price_rounding || 'NONE',
+        rounding_to: updates.rounding_to || 1,
+        min_stock: updates.min_stock || 0,
+        allow_backorder: updates.allow_backorder || false,
         is_active: updates.is_active
       }, { tenant_id: tenantId, variant_id: variantId })
       if (error) throw error

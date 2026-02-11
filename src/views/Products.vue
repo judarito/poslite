@@ -138,12 +138,113 @@
             <v-text-field v-model="variantData.variant_name" label="Nombre variante" prepend-inner-icon="mdi-text" variant="outlined" hint="Ej: Rojo / M" class="mb-2"></v-text-field>
             <v-row>
               <v-col cols="6">
-                <v-text-field v-model.number="variantData.cost" label="Costo" prepend-inner-icon="mdi-cash-minus" variant="outlined" type="number" :rules="[rules.required, rules.positive]"></v-text-field>
+                <v-text-field 
+                  v-model.number="variantData.cost" 
+                  label="Costo" 
+                  prepend-inner-icon="mdi-cash-minus" 
+                  variant="outlined" 
+                  type="number" 
+                  :rules="[rules.required, rules.positive]"
+                  :readonly="true"
+                  hint="Calculado automáticamente (promedio ponderado)"
+                  persistent-hint
+                ></v-text-field>
               </v-col>
               <v-col cols="6">
-                <v-text-field v-model.number="variantData.price" label="Precio" prepend-inner-icon="mdi-cash-plus" variant="outlined" type="number" :rules="[rules.required, rules.positive]"></v-text-field>
+                <v-text-field 
+                  v-model.number="variantData.price" 
+                  label="Precio" 
+                  prepend-inner-icon="mdi-cash-plus" 
+                  variant="outlined" 
+                  type="number" 
+                  :rules="[rules.required, rules.positive]"
+                  :readonly="variantData.pricing_method === 'MARKUP'"
+                  :hint="variantData.pricing_method === 'MARKUP' ? 'Calculado automáticamente según markup' : 'Precio manual'"
+                  persistent-hint
+                ></v-text-field>
               </v-col>
             </v-row>
+
+            <!-- Configuración de Precio -->
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-2 mb-3">Configuración de Precio</div>
+
+            <v-select
+              v-model="variantData.pricing_method"
+              label="Método de precio"
+              prepend-inner-icon="mdi-calculator"
+              variant="outlined"
+              :items="pricingMethods"
+              item-title="label"
+              item-value="value"
+              hint="MARKUP: precio automático con margen. FIXED: precio manual"
+              persistent-hint
+              class="mb-3"
+            ></v-select>
+
+            <v-row v-if="variantData.pricing_method === 'MARKUP'">
+              <v-col cols="12">
+                <v-text-field
+                  v-model.number="variantData.markup_percentage"
+                  label="% de Ganancia (Markup)"
+                  prepend-inner-icon="mdi-percent"
+                  variant="outlined"
+                  type="number"
+                  min="0"
+                  suffix="%"
+                  hint="Porcentaje de ganancia sobre el costo"
+                  persistent-hint
+                ></v-text-field>
+              </v-col>
+              <v-col cols="6">
+                <v-select
+                  v-model="variantData.price_rounding"
+                  label="Redondeo"
+                  prepend-inner-icon="mdi-circle-outline"
+                  variant="outlined"
+                  :items="roundingOptions"
+                  item-title="label"
+                  item-value="value"
+                  hint="Tipo de redondeo del precio calculado"
+                  persistent-hint
+                ></v-select>
+              </v-col>
+              <v-col cols="6">
+                <v-text-field
+                  v-model.number="variantData.rounding_to"
+                  label="Redondear a múltiplo de"
+                  prepend-inner-icon="mdi-numeric"
+                  variant="outlined"
+                  type="number"
+                  min="1"
+                  hint="Ej: 100 para redondear a centenas"
+                  persistent-hint
+                ></v-text-field>
+              </v-col>
+            </v-row>
+
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-2 mb-3">Control de Inventario</div>
+
+            <v-text-field 
+              v-model.number="variantData.min_stock" 
+              label="Stock mínimo" 
+              prepend-inner-icon="mdi-alert-circle-outline" 
+              variant="outlined" 
+              type="number" 
+              min="0"
+              hint="Genera alerta cuando stock en cualquier sede esté bajo este valor"
+              persistent-hint
+              class="mb-2"
+            ></v-text-field>
+            <v-switch 
+              v-model="variantData.allow_backorder" 
+              label="Permitir sobreventa" 
+              color="warning"
+              hint="Si está activo, permite vender aunque no haya stock (inventario negativo)"
+              persistent-hint
+              class="mb-2"
+            ></v-switch>
             <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
           </v-form>
         </v-card-text>
@@ -201,7 +302,19 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true })
-const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, is_active: true })
+const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, pricing_method: 'MARKUP', markup_percentage: 20, price_rounding: 'NONE', rounding_to: 1, min_stock: 0, allow_backorder: false, is_active: true })
+
+const pricingMethods = [
+  { label: 'MARKUP - Precio automático con margen', value: 'MARKUP' },
+  { label: 'FIXED - Precio manual', value: 'FIXED' }
+]
+
+const roundingOptions = [
+  { label: 'Sin redondeo', value: 'NONE' },
+  { label: 'Redondear hacia arriba', value: 'UP' },
+  { label: 'Redondear hacia abajo', value: 'DOWN' },
+  { label: 'Redondear al más cercano', value: 'NEAREST' }
+]
 
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
@@ -278,8 +391,38 @@ const doDelete = async () => {
 }
 
 // Variantes
-const addVariant = () => { editingVariant.value = false; variantData.value = { variant_id: null, product_id: formData.value.product_id, sku: '', variant_name: '', cost: 0, price: 0, is_active: true }; variantDialog.value = true }
-const editVariant = (v) => { editingVariant.value = true; variantData.value = { ...v }; variantDialog.value = true }
+const addVariant = () => { 
+  editingVariant.value = false
+  variantData.value = { 
+    variant_id: null, 
+    product_id: formData.value.product_id, 
+    sku: '', 
+    variant_name: '', 
+    cost: 0, 
+    price: 0, 
+    pricing_method: 'MARKUP', 
+    markup_percentage: 20, 
+    price_rounding: 'NONE', 
+    rounding_to: 1, 
+    min_stock: 0, 
+    allow_backorder: false, 
+    is_active: true 
+  }
+  variantDialog.value = true 
+}
+const editVariant = (v) => { 
+  editingVariant.value = true
+  variantData.value = { 
+    ...v, 
+    pricing_method: v.pricing_method || 'MARKUP',
+    markup_percentage: v.markup_percentage || 20,
+    price_rounding: v.price_rounding || 'NONE',
+    rounding_to: v.rounding_to || 1,
+    min_stock: v.min_stock || 0, 
+    allow_backorder: v.allow_backorder || false 
+  }
+  variantDialog.value = true 
+}
 
 const saveVariant = async () => {
   const { valid } = await variantForm.value.validate()

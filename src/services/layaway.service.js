@@ -221,6 +221,62 @@ const layawayService = {
       console.error('Error getting stock available:', error)
       return { success: false, error: error.message }
     }
+  },
+
+  /**
+   * Obtener alertas de plan separe (próximos a vencer, vencidos)
+   */
+  async getLayawayAlerts(tenantId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('layaway_contracts')
+        .select(`
+          layaway_id,
+          created_at,
+          due_date,
+          status,
+          total,
+          paid_total,
+          balance,
+          location:location_id(location_id, name),
+          customer:customer_id(customer_id, full_name, document, phone)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'ACTIVE')
+        .not('due_date', 'is', null)
+        .order('due_date', { ascending: true })
+
+      if (error) throw error
+
+      // Clasificar alertas
+      const now = new Date()
+      const sevenDaysFromNow = new Date()
+      sevenDaysFromNow.setDate(now.getDate() + 7)
+
+      const alerts = (data || []).map(contract => {
+        const dueDate = new Date(contract.due_date)
+        let alertLevel = 'UPCOMING'
+        
+        if (dueDate < now) {
+          alertLevel = 'EXPIRED'
+        } else if (dueDate <= sevenDaysFromNow) {
+          alertLevel = 'DUE_SOON'
+        }
+
+        const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24))
+
+        return {
+          ...contract,
+          alert_level: alertLevel,
+          days_until_due: daysUntilDue
+        }
+      }).filter(alert => alert.alert_level !== 'UPCOMING') // Solo mostrar vencidos y próximos a vencer
+
+      return { success: true, data: alerts }
+    } catch (error) {
+      console.error('Error getting layaway alerts:', error)
+      return { success: false, error: error.message }
+    }
   }
 }
 

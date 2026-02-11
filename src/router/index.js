@@ -23,6 +23,7 @@ import TenantConfig from '@/views/TenantConfig.vue'
 import LayawayContracts from '@/views/LayawayContracts.vue'
 import LayawayDetail from '@/views/LayawayDetail.vue'
 import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
+import Purchases from '@/views/Purchases.vue'
 
 const routes = [
   {
@@ -137,6 +138,12 @@ const routes = [
     path: '/inventory',
     name: 'Inventory',
     component: Inventory,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/purchases',
+    name: 'Purchases',
+    component: Purchases,
     meta: { requiresAuth: true }
   },
   {

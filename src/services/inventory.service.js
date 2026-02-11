@@ -189,6 +189,75 @@ class InventoryService {
       return { success: false, error: error.message }
     }
   }
+
+  // Actualizar stock mínimo
+  async updateMinStock(tenantId, variantId, minStock) {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_update_min_stock', {
+        p_tenant: tenantId,
+        p_variant: variantId,
+        p_min_stock: minStock
+      })
+
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Obtener productos bajo stock mínimo (con alertas)
+  async getStockAlerts(tenantId, filters = {}) {
+    try {
+      let query = supabaseService.client
+        .from('vw_stock_alerts')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .in('alert_level', ['OUT_OF_STOCK', 'LOW_STOCK', 'NO_AVAILABLE', 'LOW_AVAILABLE'])
+        .order('alert_level')
+        .order('on_hand')
+
+      if (filters.location_id) query = query.eq('location_id', filters.location_id)
+      if (filters.alert_level) query = query.eq('alert_level', filters.alert_level)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  // Obtener historial de alertas
+  async getAlertLog(tenantId, page = 1, pageSize = 50, filters = {}) {
+    try {
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+
+      let query = supabaseService.client
+        .from('stock_alert_log')
+        .select(`
+          *,
+          location:location_id(name),
+          variant:variant_id(
+            sku, variant_name,
+            product:product_id(name)
+          )
+        `, { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (filters.location_id) query = query.eq('location_id', filters.location_id)
+      if (filters.alert_level) query = query.eq('alert_level', filters.alert_level)
+
+      const { data, error, count } = await query
+      if (error) throw error
+      return { success: true, data: data || [], total: count || 0 }
+    } catch (error) {
+      return { success: false, error: error.message, data: [], total: 0 }
+    }
+  }
 }
 
 export default new InventoryService()

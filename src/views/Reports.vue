@@ -82,6 +82,12 @@
       <v-tab value="payments">Por Método de Pago</v-tab>
       <v-tab value="movements">Movimientos de Caja</v-tab>
       <v-tab value="layaway">Plan Separe</v-tab>
+      <v-tab value="stock-alerts">
+        <v-badge v-if="stockAlertsCount > 0" :content="stockAlertsCount" color="error">
+          Alertas de Stock
+        </v-badge>
+        <span v-else>Alertas de Stock</span>
+      </v-tab>
     </v-tabs>
 
     <v-window v-model="reportTab">
@@ -600,6 +606,139 @@
           </div>
         </v-card>
       </v-window-item>
+
+      <!-- Alertas de Stock -->
+      <v-window-item value="stock-alerts">
+        <v-card>
+          <v-card-title class="d-flex align-center">
+            <v-icon start color="warning">mdi-alert-circle</v-icon>
+            Alertas de Stock
+            <v-spacer></v-spacer>
+            <v-select
+              v-model="alertLevelFilter"
+              :items="alertLevelOptions"
+              item-title="label"
+              item-value="value"
+              label="Filtrar por nivel"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              style="max-width: 200px;"
+              class="mr-2"
+            ></v-select>
+            <v-btn color="primary" prepend-icon="mdi-refresh" @click="loadStockAlerts" :loading="loadingAlerts" size="small">Recargar</v-btn>
+          </v-card-title>
+
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
+            <thead>
+              <tr>
+                <th>Alerta</th>
+                <th>Producto</th>
+                <th>SKU</th>
+                <th>Sede</th>
+                <th class="text-right">Stock</th>
+                <th class="text-right">Reservado</th>
+                <th class="text-right">Disponible</th>
+                <th class="text-right">Mínimo</th>
+                <th class="text-right">Costo Unit.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in filteredStockAlerts" :key="`${item.location_id}-${item.variant_id}`">
+                <td>
+                  <v-chip :color="alertColor(item.alert_level)" size="small" variant="flat">
+                    <v-icon start size="x-small">{{ alertIcon(item.alert_level) }}</v-icon>
+                    {{ alertLabel(item.alert_level) }}
+                  </v-chip>
+                </td>
+                <td>
+                  <div class="text-body-2">{{ item.product_name }}</div>
+                  <div class="text-caption text-grey">{{ item.variant_name || '-' }}</div>
+                </td>
+                <td>{{ item.sku }}</td>
+                <td>{{ item.location_name }}</td>
+                <td class="text-right">
+                  <v-chip :color="item.on_hand <= 0 ? 'error' : 'grey'" size="small" variant="tonal">
+                    {{ item.on_hand }}
+                  </v-chip>
+                </td>
+                <td class="text-right text-grey">{{ item.reserved }}</td>
+                <td class="text-right">
+                  <v-chip :color="item.available <= 0 ? 'error' : item.available <= item.min_stock ? 'warning' : 'success'" size="small" variant="tonal">
+                    {{ item.available }}
+                  </v-chip>
+                </td>
+                <td class="text-right font-weight-bold">{{ item.min_stock }}</td>
+                <td class="text-right">{{ formatMoney(item.cost) }}</td>
+              </tr>
+              <tr v-if="filteredStockAlerts.length === 0">
+                <td colspan="9" class="text-center text-grey pa-4">
+                  <v-icon size="large" color="success">mdi-check-circle</v-icon>
+                  <div class="mt-2">No hay alertas de stock</div>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card 
+              v-for="item in filteredStockAlerts" 
+              :key="`${item.location_id}-${item.variant_id}`" 
+              :color="alertColor(item.alert_level)" 
+              variant="tonal" 
+              class="mb-2"
+            >
+              <v-card-text>
+                <div class="d-flex align-center mb-2">
+                  <v-chip :color="alertColor(item.alert_level)" size="small" variant="flat" class="mr-2">
+                    <v-icon start size="x-small">{{ alertIcon(item.alert_level) }}</v-icon>
+                    {{ alertLabel(item.alert_level) }}
+                  </v-chip>
+                  <v-chip :color="item.on_hand <= 0 ? 'error' : 'grey'" size="small" variant="flat">
+                    Stock: {{ item.on_hand }}
+                  </v-chip>
+                </div>
+                <div class="text-body-2 font-weight-bold mb-1">{{ item.product_name }}</div>
+                <div class="text-caption text-grey mb-2">{{ item.variant_name || '-' }}</div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">SKU:</span>
+                  <span>{{ item.sku }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Sede:</span>
+                  <span>{{ item.location_name }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Reservado:</span>
+                  <span>{{ item.reserved }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Disponible:</span>
+                  <v-chip :color="item.available <= 0 ? 'error' : item.available <= item.min_stock ? 'warning' : 'success'" size="x-small">
+                    {{ item.available }}
+                  </v-chip>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Mínimo:</span>
+                  <span class="font-weight-bold">{{ item.min_stock }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Costo:</span>
+                  <span>{{ formatMoney(item.cost) }}</span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="filteredStockAlerts.length === 0" class="text-center pa-4">
+              <v-icon size="large" color="success">mdi-check-circle</v-icon>
+              <div class="mt-2 text-grey">No hay alertas de stock</div>
+            </div>
+          </div>
+        </v-card>
+      </v-window-item>
     </v-window>
   </div>
 </template>
@@ -608,6 +747,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
+import inventoryService from '@/services/inventory.service'
 
 const { tenantId } = useTenant()
 
@@ -632,11 +772,51 @@ const movementTypeFilter = ref('ALL')
 
 const layawaySummary = ref(null)
 const layawayContracts = ref([])
+
+// Stock Alerts
+const stockAlerts = ref([])
+const loadingAlerts = ref(false)
+const alertLevelFilter = ref(null)
+const alertLevelOptions = [
+  { label: 'Sin stock', value: 'OUT_OF_STOCK' },
+  { label: 'Stock bajo', value: 'LOW_STOCK' },
+  { label: 'Sin disponible', value: 'NO_AVAILABLE' },
+  { label: 'Disponible bajo', value: 'LOW_AVAILABLE' }
+]
+
+const filteredStockAlerts = computed(() => {
+  if (!alertLevelFilter.value) return stockAlerts.value
+  return stockAlerts.value.filter(item => item.alert_level === alertLevelFilter.value)
+})
+
+const stockAlertsCount = computed(() => stockAlerts.value.length)
 const layawayPayments = ref([])
 
 const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
 const formatDateTime = (d) => d ? new Date(d).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : ''
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : ''
+
+// Helpers para alertas de stock
+const alertColor = (level) => ({
+  OUT_OF_STOCK: 'error',
+  LOW_STOCK: 'warning',
+  NO_AVAILABLE: 'error',
+  LOW_AVAILABLE: 'orange'
+}[level] || 'grey')
+
+const alertIcon = (level) => ({
+  OUT_OF_STOCK: 'mdi-alert-circle',
+  LOW_STOCK: 'mdi-alert',
+  NO_AVAILABLE: 'mdi-alert-circle-outline',
+  LOW_AVAILABLE: 'mdi-alert-outline'
+}[level] || 'mdi-information')
+
+const alertLabel = (level) => ({
+  OUT_OF_STOCK: 'Sin stock',
+  LOW_STOCK: 'Stock bajo',
+  NO_AVAILABLE: 'Sin disponible',
+  LOW_AVAILABLE: 'Disponible bajo'
+}[level] || level)
 
 const filteredMovements = computed(() => {
   if (movementTypeFilter.value === 'ALL') return cashMovements.value
@@ -686,8 +866,22 @@ const loadLocations = async () => {
   if (r.success) locations.value = r.data
 }
 
+const loadStockAlerts = async () => {
+  if (!tenantId.value) return
+  loadingAlerts.value = true
+  try {
+    const r = await inventoryService.getStockAlerts(tenantId.value, {
+      location_id: locationFilter.value || undefined
+    })
+    if (r.success) stockAlerts.value = r.data
+  } finally {
+    loadingAlerts.value = false
+  }
+}
+
 onMounted(async () => {
   await loadLocations()
   loadAllReports()
+  loadStockAlerts()
 })
 </script>

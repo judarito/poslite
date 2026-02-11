@@ -20,8 +20,14 @@
           <v-icon>mdi-magnify</v-icon>
         </v-btn>
 
-        <v-btn icon>
-          <v-icon>mdi-bell</v-icon>
+        <v-btn icon @click="alertsDialog = true">
+          <v-badge
+            :content="totalAlertsCount"
+            :color="totalAlertsCount > 0 ? 'error' : 'grey'"
+            :model-value="totalAlertsCount > 0"
+          >
+            <v-icon>mdi-bell</v-icon>
+          </v-badge>
         </v-btn>
 
         <v-btn icon>
@@ -112,6 +118,328 @@
           <v-btn variant="text" @click="snackbar = false">Cerrar</v-btn>
         </template>
       </v-snackbar>
+
+      <!-- Dialog de alertas -->
+      <v-dialog v-model="alertsDialog" max-width="1000" scrollable>
+        <v-card>
+          <v-card-title class="d-flex align-center pa-4">
+            <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
+            Alertas
+            <v-spacer></v-spacer>
+            <v-btn icon variant="text" @click="alertsDialog = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+
+          <v-divider></v-divider>
+
+          <v-tabs v-model="alertsTab" bg-color="primary">
+            <v-tab value="stock">
+              <v-badge
+                :content="stockAlertsCount"
+                :color="stockAlertsCount > 0 ? 'error' : 'grey'"
+                :model-value="stockAlertsCount > 0"
+                inline
+              >
+                Stock
+              </v-badge>
+            </v-tab>
+            <v-tab value="layaway">
+              <v-badge
+                :content="layawayAlertsCount"
+                :color="layawayAlertsCount > 0 ? 'warning' : 'grey'"
+                :model-value="layawayAlertsCount > 0"
+                inline
+              >
+                Plan Separe
+              </v-badge>
+            </v-tab>
+          </v-tabs>
+
+          <v-window v-model="alertsTab">
+            <!-- Tab de Stock -->
+            <v-window-item value="stock">
+              <!-- Filtros Stock -->
+              <v-card-text class="pa-4">
+                <v-row dense>
+                  <v-col cols="12" sm="6" md="3">
+                    <v-select
+                      v-model="stockFilters.alert_level"
+                      :items="stockAlertLevels"
+                      label="Nivel de alerta"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6" md="3">
+                    <v-select
+                      v-model="stockFilters.location_id"
+                      :items="locations"
+                      item-title="name"
+                      item-value="location_id"
+                      label="Sede"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="12" md="6">
+                    <v-text-field
+                      v-model="stockFilters.search"
+                      label="Buscar producto o SKU"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                      @keyup.enter="loadStockAlerts"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <!-- Lista Stock Mobile -->
+              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
+                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de stock</p>
+                </div>
+                <v-card
+                  v-else
+                  v-for="alert in stockAlerts"
+                  :key="alert.alert_id"
+                  class="mb-2"
+                  :color="getStockAlertColor(alert.alert_level) + '-lighten-5'"
+                  variant="outlined"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center mb-2">
+                      <v-chip :color="getStockAlertColor(alert.alert_level)" size="small" label>
+                        <v-icon start size="small">{{ getStockAlertIcon(alert.alert_level) }}</v-icon>
+                        {{ getStockAlertLabel(alert.alert_level) }}
+                      </v-chip>
+                      <v-spacer></v-spacer>
+                      <span class="text-caption text-grey">{{ alert.data.location_name }}</span>
+                    </div>
+                    <div class="mb-1">
+                      <strong>{{ alert.data.product_name }}</strong>
+                      <span v-if="alert.data.variant_name" class="text-caption ml-1">({{ alert.data.variant_name }})</span>
+                    </div>
+                    <div class="text-caption text-grey mb-2">SKU: {{ alert.data.sku }}</div>
+                    <v-row dense class="text-caption">
+                      <v-col cols="6">
+                        <div class="text-grey">En mano:</div>
+                        <div class="font-weight-bold">{{ alert.data.on_hand }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Disponible:</div>
+                        <div class="font-weight-bold">{{ alert.data.available }}</div>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+              </v-card-text>
+
+              <!-- Tabla Stock Desktop -->
+              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
+                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de stock</p>
+                </div>
+                <v-table v-else density="compact" fixed-header height="500">
+                  <thead>
+                    <tr>
+                      <th>Alerta</th>
+                      <th>Sede</th>
+                      <th>Producto</th>
+                      <th>SKU</th>
+                      <th class="text-right">En mano</th>
+                      <th class="text-right">Disponible</th>
+                      <th class="text-right">Mínimo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alert in stockAlerts" :key="alert.alert_id">
+                      <td>
+                        <v-chip :color="getStockAlertColor(alert.alert_level)" size="small" label>
+                          <v-icon start size="small">{{ getStockAlertIcon(alert.alert_level) }}</v-icon>
+                          {{ getStockAlertLabel(alert.alert_level) }}
+                        </v-chip>
+                      </td>
+                      <td>{{ alert.data.location_name }}</td>
+                      <td>
+                        <div>{{ alert.data.product_name }}</div>
+                        <div v-if="alert.data.variant_name" class="text-caption text-grey">{{ alert.data.variant_name }}</div>
+                      </td>
+                      <td>{{ alert.data.sku }}</td>
+                      <td class="text-right">{{ alert.data.on_hand }}</td>
+                      <td class="text-right">{{ alert.data.available }}</td>
+                      <td class="text-right">{{ alert.data.min_stock }}</td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-actions class="pa-4">
+                <v-btn color="primary" variant="text" @click="loadStockAlerts">
+                  <v-icon start>mdi-refresh</v-icon>
+                  Actualizar
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" variant="tonal" @click="goToInventory">
+                  <v-icon start>mdi-warehouse</v-icon>
+                  Ir a Inventario
+                </v-btn>
+              </v-card-actions>
+            </v-window-item>
+
+            <!-- Tab de Layaway -->
+            <v-window-item value="layaway">
+              <!-- Filtros Layaway -->
+              <v-card-text class="pa-4">
+                <v-row dense>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="layawayFilters.alert_level"
+                      :items="layawayAlertLevels"
+                      label="Estado"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field
+                      v-model="layawayFilters.search"
+                      label="Buscar cliente"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                      @keyup.enter="loadLayawayAlerts"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <!-- Lista Layaway Mobile -->
+              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
+                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de plan separe</p>
+                </div>
+                <v-card
+                  v-else
+                  v-for="alert in filteredLayawayAlerts"
+                  :key="alert.alert_id"
+                  class="mb-2"
+                  :color="getLayawayAlertColor(alert.alert_level) + '-lighten-5'"
+                  variant="outlined"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center mb-2">
+                      <v-chip :color="getLayawayAlertColor(alert.alert_level)" size="small" label>
+                        <v-icon start size="small">{{ getLayawayAlertIcon(alert.alert_level) }}</v-icon>
+                        {{ getLayawayAlertLabel(alert.alert_level) }}
+                      </v-chip>
+                      <v-spacer></v-spacer>
+                      <span class="text-caption">{{ formatDate(alert.data.due_date) }}</span>
+                    </div>
+                    <div class="mb-1"><strong>{{ alert.data.customer_name }}</strong></div>
+                    <div class="text-caption text-grey mb-2">{{ alert.data.customer_document || alert.data.customer_phone }}</div>
+                    <v-row dense class="text-caption">
+                      <v-col cols="6">
+                        <div class="text-grey">Total:</div>
+                        <div class="font-weight-bold">${{ formatMoney(alert.data.total) }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Saldo:</div>
+                        <div class="font-weight-bold text-error">${{ formatMoney(alert.data.balance) }}</div>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+              </v-card-text>
+
+              <!-- Tabla Layaway Desktop -->
+              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
+                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de plan separe</p>
+                </div>
+                <v-table v-else density="compact" fixed-header height="500">
+                  <thead>
+                    <tr>
+                      <th>Estado</th>
+                      <th>Cliente</th>
+                      <th>Sede</th>
+                      <th>Vencimiento</th>
+                      <th class="text-right">Total</th>
+                      <th class="text-right">Pagado</th>
+                      <th class="text-right">Saldo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alert in filteredLayawayAlerts" :key="alert.alert_id">
+                      <td>
+                        <v-chip :color="getLayawayAlertColor(alert.alert_level)" size="small" label>
+                          <v-icon start size="small">{{ getLayawayAlertIcon(alert.alert_level) }}</v-icon>
+                          {{ getLayawayAlertLabel(alert.alert_level) }}
+                        </v-chip>
+                      </td>
+                      <td>
+                        <div>{{ alert.data.customer_name }}</div>
+                        <div class="text-caption text-grey">{{ alert.data.customer_document || alert.data.customer_phone }}</div>
+                      </td>
+                      <td>{{ alert.data.location_name }}</td>
+                      <td>{{ formatDate(alert.data.due_date) }}</td>
+                      <td class="text-right">${{ formatMoney(alert.data.total) }}</td>
+                      <td class="text-right">${{ formatMoney(alert.data.paid_total) }}</td>
+                      <td class="text-right text-error font-weight-bold">${{ formatMoney(alert.data.balance) }}</td>
+                      <td>
+                        <v-btn
+                          size="small"
+                          color="primary"
+                          variant="text"
+                          icon
+                          @click="goToLayawayDetail(alert.data.layaway_id)"
+                        >
+                          <v-icon>mdi-eye</v-icon>
+                        </v-btn>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-actions class="pa-4">
+                <v-btn color="warning" variant="text" @click="loadLayawayAlerts">
+                  <v-icon start>mdi-refresh</v-icon>
+                  Actualizar
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="warning" variant="tonal" @click="goToLayaway">
+                  <v-icon start>mdi-calendar-clock</v-icon>
+                  Ir a Plan Separe
+                </v-btn>
+              </v-card-actions>
+            </v-window-item>
+          </v-window>
+        </v-card>
+      </v-dialog>
     </template>
 
     <!-- Layout simple para rutas de autenticación -->
@@ -122,20 +450,106 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import alertsService from '@/services/alerts.service'
+import locationsService from '@/services/locations.service'
 
 const router = useRouter()
 const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
-const { clearTenant } = useTenant()
+const { tenantId, clearTenant } = useTenant()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 
 const drawer = ref(true)
 const windowWidth = ref(window.innerWidth)
+
+// Alerts Dialog
+const alertsDialog = ref(false)
+const alertsTab = ref('stock')
+
+// System Alerts (realtime)
+const allAlerts = ref([])
+const loadingAlerts = ref(false)
+let alertsChannel = null
+
+// Stock Alerts
+const stockFilters = ref({
+  alert_level: null,
+  location_id: null,
+  search: ''
+})
+const locations = ref([])
+
+const stockAlertLevels = [
+  { title: 'Sin stock', value: 'OUT_OF_STOCK' },
+  { title: 'Stock bajo', value: 'LOW_STOCK' },
+  { title: 'Sin disponible', value: 'NO_AVAILABLE' },
+  { title: 'Disponible bajo', value: 'LOW_AVAILABLE' }
+]
+
+// Layaway Alerts
+const layawayFilters = ref({
+  alert_level: null,
+  search: ''
+})
+
+const layawayAlertLevels = [
+  { title: 'Vencido', value: 'EXPIRED' },
+  { title: 'Próximo a vencer', value: 'DUE_SOON' }
+]
+
+// Computed alerts from system_alerts table
+const stockAlerts = computed(() => {
+  let alerts = allAlerts.value.filter(a => a.alert_type === 'STOCK')
+  
+  if (stockFilters.value.alert_level) {
+    alerts = alerts.filter(a => a.alert_level === stockFilters.value.alert_level)
+  }
+  
+  if (stockFilters.value.location_id) {
+    alerts = alerts.filter(a => a.data.location_id === stockFilters.value.location_id)
+  }
+  
+  if (stockFilters.value.search) {
+    const search = stockFilters.value.search.toLowerCase()
+    alerts = alerts.filter(a => 
+      a.data.product_name?.toLowerCase().includes(search) ||
+      a.data.sku?.toLowerCase().includes(search)
+    )
+  }
+  
+  return alerts
+})
+
+const layawayAlerts = computed(() => {
+  let alerts = allAlerts.value.filter(a => a.alert_type === 'LAYAWAY')
+  
+  if (layawayFilters.value.alert_level) {
+    alerts = alerts.filter(a => a.alert_level === layawayFilters.value.alert_level)
+  }
+  
+  if (layawayFilters.value.search) {
+    const search = layawayFilters.value.search.toLowerCase()
+    alerts = alerts.filter(a => 
+      a.data.customer_name?.toLowerCase().includes(search) ||
+      a.data.customer_document?.toLowerCase().includes(search) ||
+      a.data.customer_phone?.toLowerCase().includes(search)
+    )
+  }
+  
+  return alerts
+})
+
+const stockAlertsCount = computed(() => stockAlerts.value.length)
+const layawayAlertsCount = computed(() => layawayAlerts.value.length)
+const totalAlertsCount = computed(() => stockAlertsCount.value + layawayAlertsCount.value)
+
+// Filtered layaway alerts (deprecated, usando computed ahora)
+const filteredLayawayAlerts = computed(() => layawayAlerts.value)
 
 // Verificar si estamos en una ruta de autenticación
 const isAuthRoute = computed(() => route.path === '/login')
@@ -174,6 +588,7 @@ const allMenuItems = [
     permissions: [], // Visible si tiene algún hijo visible
     children: [
       { title: 'Stock y Kardex', icon: 'mdi-clipboard-list', route: '/inventory', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
+      { title: 'Compras', icon: 'mdi-cart-plus', route: '/purchases', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
     ]
   },
   {
@@ -265,6 +680,182 @@ const handleLogout = async () => {
   }
 }
 
+// Alerts Functions
+const loadAlerts = async () => {
+  if (!tenantId.value) return
+  
+  loadingAlerts.value = true
+  try {
+    const result = await alertsService.getAlerts(tenantId.value)
+    if (result.success) {
+      allAlerts.value = result.data || []
+    }
+  } catch (error) {
+    console.error('Error loading alerts:', error)
+  } finally {
+    loadingAlerts.value = false
+  }
+}
+
+const loadLocations = async () => {
+  if (!tenantId.value) return
+  
+  try {
+    const result = await locationsService.getLocations(tenantId.value)
+    if (result.success) {
+      locations.value = result.data || []
+    }
+  } catch (error) {
+    console.error('Error loading locations:', error)
+  }
+}
+
+const handleAlertChange = (payload) => {
+  console.log('Alert change:', payload)
+  
+  const { eventType, new: newRecord, old: oldRecord } = payload
+  
+  if (eventType === 'INSERT') {
+    allAlerts.value.unshift(newRecord)
+  } else if (eventType === 'UPDATE') {
+    const index = allAlerts.value.findIndex(a => a.alert_id === newRecord.alert_id)
+    if (index !== -1) {
+      allAlerts.value[index] = newRecord
+    }
+  } else if (eventType === 'DELETE') {
+    allAlerts.value = allAlerts.value.filter(a => a.alert_id !== oldRecord.alert_id)
+  }
+}
+
+const subscribeToAlerts = () => {
+  if (!tenantId.value) return
+  
+  // Desuscribirse si ya existe
+  if (alertsChannel) {
+    alertsService.unsubscribe(alertsChannel)
+  }
+  
+  // Suscribirse a cambios
+  alertsChannel = alertsService.subscribeToAlerts(tenantId.value, handleAlertChange)
+}
+
+const unsubscribeFromAlerts = () => {
+  if (alertsChannel) {
+    alertsService.unsubscribe(alertsChannel)
+    alertsChannel = null
+  }
+}
+
+// Stock Alert Helpers
+const getStockAlertColor = (level) => {
+  const colors = {
+    OUT_OF_STOCK: 'error',
+    LOW_STOCK: 'warning',
+    NO_AVAILABLE: 'deep-orange',
+    LOW_AVAILABLE: 'orange'
+  }
+  return colors[level] || 'grey'
+}
+
+const getStockAlertIcon = (level) => {
+  const icons = {
+    OUT_OF_STOCK: 'mdi-alert-circle',
+    LOW_STOCK: 'mdi-alert',
+    NO_AVAILABLE: 'mdi-cancel',
+    LOW_AVAILABLE: 'mdi-alert-outline'
+  }
+  return icons[level] || 'mdi-information'
+}
+
+const getStockAlertLabel = (level) => {
+  const labels = {
+    OUT_OF_STOCK: 'Sin stock',
+    LOW_STOCK: 'Stock bajo',
+    NO_AVAILABLE: 'Sin disponible',
+    LOW_AVAILABLE: 'Disponible bajo'
+  }
+  return labels[level] || level
+}
+
+const loadStockAlerts = async () => {
+  // Trigger manual refresh of stock alerts
+  await alertsService.refreshStockAlerts()
+}
+
+const goToInventory = () => {
+  alertsDialog.value = false
+  router.push('/inventory')
+}
+
+// Layaway Alert Helpers
+const loadLayawayAlerts = async () => {
+  // Trigger manual refresh of layaway alerts
+  await alertsService.refreshLayawayAlerts()
+}
+
+const getLayawayAlertColor = (level) => {
+  const colors = {
+    EXPIRED: 'error',
+    DUE_SOON: 'warning'
+  }
+  return colors[level] || 'grey'
+}
+
+const getLayawayAlertIcon = (level) => {
+  const icons = {
+    EXPIRED: 'mdi-alert-circle',
+    DUE_SOON: 'mdi-clock-alert'
+  }
+  return icons[level] || 'mdi-information'
+}
+
+const getLayawayAlertLabel = (level) => {
+  const labels = {
+    EXPIRED: 'Vencido',
+    DUE_SOON: 'Próximo a vencer'
+  }
+  return labels[level] || level
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const formatMoney = (amount) => {
+  if (amount == null) return '0'
+  return new Intl.NumberFormat('es-CO').format(amount)
+}
+
+const goToLayaway = () => {
+  alertsDialog.value = false
+  router.push('/layaway')
+}
+
+const goToLayawayDetail = (layawayId) => {
+  alertsDialog.value = false
+  router.push(`/layaway/${layawayId}`)
+}
+
+// Cargar alertas y locations al abrir el dialog
+watch(alertsDialog, (newValue) => {
+  if (newValue && !locations.value.length) {
+    loadLocations()
+  }
+})
+
+// Iniciar/detener suscripción según tenant y ruta
+watch([tenantId, isAuthRoute], ([newTenantId, newIsAuthRoute]) => {
+  if (newTenantId && !newIsAuthRoute) {
+    loadAlerts()
+    subscribeToAlerts()
+  } else {
+    unsubscribeFromAlerts()
+    allAlerts.value = []
+  }
+}, { immediate: true })
+
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   handleResize()
@@ -272,6 +863,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  unsubscribeFromAlerts()
 })
 </script>
 

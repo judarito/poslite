@@ -161,6 +161,7 @@ declare
   v_paid_total numeric(14,2) := 0;
 
   v_on_hand numeric(14,3);
+  v_allow_backorder boolean;
 begin
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'Sale must have at least one line';
@@ -223,12 +224,25 @@ begin
       raise exception 'Variant not found/active: %', v_variant;
     end if;
 
-    -- Validar stock DISPONIBLE (on_hand - reserved) si existe fila materializada
-    select (sb.on_hand - sb.reserved) into v_on_hand
+    -- Obtener allow_backorder de la variante
+    select pv.allow_backorder
+      into v_allow_backorder
+      from product_variants pv
+     where pv.tenant_id = p_tenant and pv.variant_id = v_variant;
+
+    -- Obtener stock disponible (puede no existir registro)
+    select (sb.on_hand - sb.reserved)
+      into v_on_hand
       from stock_balances sb
      where sb.tenant_id = p_tenant and sb.location_id = p_location and sb.variant_id = v_variant;
 
-    if v_on_hand is not null and v_on_hand < v_qty then
+    -- Si no existe registro en stock_balances, considerar stock = 0
+    if v_on_hand is null then
+      v_on_hand := 0;
+    end if;
+
+    -- Si NO permite sobreventa (allow_backorder = false o NULL), validar stock disponible
+    if coalesce(v_allow_backorder, false) = false and v_on_hand < v_qty then
       raise exception 'Insufficient AVAILABLE stock for variant % (available=%, required=%)', v_variant, v_on_hand, v_qty;
     end if;
 
@@ -836,6 +850,257 @@ create index if not exists ix_sales_tenant_date on sales(tenant_id, sold_at desc
 create index if not exists ix_sale_payments_session on sale_payments(tenant_id, cash_session_id);
 
 -- =========================
+-- 7.5) SISTEMA DE ALERTAS EN TIEMPO REAL
+-- =========================
+
+-- Vista de alertas de stock (solo productos con problemas)
+drop view if exists vw_stock_alerts;
+create view vw_stock_alerts as
+select
+  sb.tenant_id,
+  sb.location_id,
+  l.name as location_name,
+  sb.variant_id,
+  pv.sku,
+  p.product_id,
+  p.name as product_name,
+  pv.variant_name,
+  sb.on_hand,
+  sb.reserved,
+  (sb.on_hand - sb.reserved) as available,
+  coalesce(pv.min_stock, 0) as min_stock,
+  case
+    when sb.on_hand <= 0 then 'OUT_OF_STOCK'
+    when (sb.on_hand - sb.reserved) <= 0 then 'NO_AVAILABLE'
+    when sb.on_hand <= coalesce(pv.min_stock, 0) then 'LOW_STOCK'
+    when (sb.on_hand - sb.reserved) <= coalesce(pv.min_stock, 0) then 'LOW_AVAILABLE'
+  end as alert_level
+from stock_balances sb
+join locations l on l.location_id = sb.location_id
+join product_variants pv on pv.variant_id = sb.variant_id
+join products p on p.product_id = pv.product_id
+where pv.is_active = true
+  and (
+    sb.on_hand <= 0 -- sin stock
+    or (sb.on_hand - sb.reserved) <= 0 -- sin disponible
+    or sb.on_hand <= coalesce(pv.min_stock, 0) -- stock bajo
+    or (sb.on_hand - sb.reserved) <= coalesce(pv.min_stock, 0) -- disponible bajo
+  );
+
+-- Tabla de alertas del sistema
+create table if not exists system_alerts (
+  alert_id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(tenant_id) on delete cascade,
+  alert_type text not null check (alert_type in ('STOCK', 'LAYAWAY')),
+  alert_level text not null,
+  reference_id uuid not null, -- variant_id para stock, layaway_id para separe
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id, alert_type, reference_id)
+);
+
+create index if not exists ix_system_alerts_tenant on system_alerts(tenant_id, alert_type, created_at desc);
+create index if not exists ix_system_alerts_reference on system_alerts(tenant_id, reference_id);
+
+-- Función para refrescar alertas de stock
+create or replace function fn_refresh_stock_alerts()
+returns void
+language plpgsql
+as $$
+begin
+  -- Eliminar alertas de stock que ya no aplican
+  delete from system_alerts
+  where alert_type = 'STOCK'
+    and reference_id not in (
+      select distinct variant_id
+      from vw_stock_alerts
+    );
+
+  -- Insertar o actualizar alertas de stock actuales
+  insert into system_alerts (tenant_id, alert_type, alert_level, reference_id, data)
+  select
+    tenant_id,
+    'STOCK' as alert_type,
+    alert_level,
+    variant_id as reference_id,
+    jsonb_build_object(
+      'location_id', location_id,
+      'location_name', location_name,
+      'variant_id', variant_id,
+      'sku', sku,
+      'product_name', product_name,
+      'variant_name', variant_name,
+      'on_hand', on_hand,
+      'reserved', reserved,
+      'available', available,
+      'min_stock', min_stock,
+      'alert_level', alert_level
+    ) as data
+  from vw_stock_alerts
+  on conflict (tenant_id, alert_type, reference_id)
+  do update set
+    alert_level = excluded.alert_level,
+    data = excluded.data,
+    updated_at = now();
+end;
+$$;
+
+-- Función para refrescar alertas de layaway
+create or replace function fn_refresh_layaway_alerts()
+returns void
+language plpgsql
+as $$
+begin
+  -- Eliminar alertas de layaway que ya no aplican (completados, cancelados o sin vencer pronto)
+  delete from system_alerts
+  where alert_type = 'LAYAWAY'
+    and reference_id not in (
+      select layaway_id
+      from layaway_contracts
+      where status = 'ACTIVE'
+        and due_date is not null
+        and due_date <= current_date + interval '7 days'
+    );
+
+  -- Insertar o actualizar alertas de layaway actuales
+  insert into system_alerts (tenant_id, alert_type, alert_level, reference_id, data)
+  select
+    lc.tenant_id,
+    'LAYAWAY' as alert_type,
+    case
+      when lc.due_date < current_date then 'EXPIRED'
+      when lc.due_date <= current_date + interval '7 days' then 'DUE_SOON'
+      else 'UPCOMING'
+    end as alert_level,
+    lc.layaway_id as reference_id,
+    jsonb_build_object(
+      'layaway_id', lc.layaway_id,
+      'location_id', lc.location_id,
+      'location_name', l.name,
+      'customer_id', lc.customer_id,
+      'customer_name', c.full_name,
+      'customer_document', c.document,
+      'customer_phone', c.phone,
+      'due_date', lc.due_date,
+      'total', lc.total,
+      'paid_total', lc.paid_total,
+      'balance', lc.balance,
+      'days_until_due', (lc.due_date - current_date),
+      'alert_level', case
+        when lc.due_date < current_date then 'EXPIRED'
+        when lc.due_date <= current_date + interval '7 days' then 'DUE_SOON'
+        else 'UPCOMING'
+      end
+    ) as data
+  from layaway_contracts lc
+  join locations l on l.location_id = lc.location_id
+  join customers c on c.customer_id = lc.customer_id
+  where lc.status = 'ACTIVE'
+    and lc.due_date is not null
+    and lc.due_date <= current_date + interval '7 days'
+  on conflict (tenant_id, alert_type, reference_id)
+  do update set
+    alert_level = excluded.alert_level,
+    data = excluded.data,
+    updated_at = now();
+end;
+$$;
+
+-- Trigger para actualizar alertas de stock cuando cambie stock_balances
+create or replace function trg_stock_balances_alert()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- Refrescar solo las alertas del tenant afectado
+  delete from system_alerts sa
+  where sa.alert_type = 'STOCK'
+    and sa.tenant_id = coalesce(new.tenant_id, old.tenant_id)
+    and sa.reference_id not in (
+      select distinct v.variant_id
+      from vw_stock_alerts v
+      where v.tenant_id = coalesce(new.tenant_id, old.tenant_id)
+    );
+
+  insert into system_alerts (tenant_id, alert_type, alert_level, reference_id, data)
+  select
+    v.tenant_id,
+    'STOCK' as alert_type,
+    v.alert_level,
+    v.variant_id as reference_id,
+    jsonb_build_object(
+      'location_id', v.location_id,
+      'location_name', v.location_name,
+      'variant_id', v.variant_id,
+      'sku', v.sku,
+      'product_name', v.product_name,
+      'variant_name', v.variant_name,
+      'on_hand', v.on_hand,
+      'reserved', v.reserved,
+      'available', v.available,
+      'min_stock', v.min_stock,
+      'alert_level', v.alert_level
+    ) as data
+  from vw_stock_alerts v
+  where v.tenant_id = coalesce(new.tenant_id, old.tenant_id)
+  on conflict (tenant_id, alert_type, reference_id)
+  do update set
+    alert_level = excluded.alert_level,
+    data = excluded.data,
+    updated_at = now();
+
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists trg_stock_balances_alert_after on stock_balances;
+create trigger trg_stock_balances_alert_after
+after insert or update or delete on stock_balances
+for each row
+execute function trg_stock_balances_alert();
+
+-- Trigger para actualizar alertas de stock cuando cambie product_variants (min_stock)
+create or replace function trg_product_variants_alert()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.min_stock is distinct from old.min_stock then
+    perform fn_refresh_stock_alerts();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_product_variants_alert_after on product_variants;
+create trigger trg_product_variants_alert_after
+after update on product_variants
+for each row
+execute function trg_product_variants_alert();
+
+-- Trigger para actualizar alertas de layaway cuando cambie layaway_contracts
+create or replace function trg_layaway_contracts_alert()
+returns trigger
+language plpgsql
+as $$
+begin
+  perform fn_refresh_layaway_alerts();
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists trg_layaway_contracts_alert_after on layaway_contracts;
+create trigger trg_layaway_contracts_alert_after
+after insert or update or delete on layaway_contracts
+for each row
+execute function trg_layaway_contracts_alert();
+
+-- Inicializar alertas existentes (ejecutar una vez al desplegar)
+-- select fn_refresh_stock_alerts();
+-- select fn_refresh_layaway_alerts();
+
+-- =========================
 -- 8) ASIGNACIÓN CAJERO→CAJA + SESIÓN ÚNICA
 -- =========================
 
@@ -1034,4 +1299,264 @@ as $$
     (select count(*)::int from regs) as assigned_registers_count,
     (case when (select count(*) from regs)=1 then (select cash_register_id from regs limit 1) else null end) as single_cash_register_id;
 $$;
+
+-- =========================
+-- 9) COSTO PROMEDIO PONDERADO
+-- =========================
+
+-- 9.0 Agregar columnas de configuración de precios a product_variants
+alter table product_variants
+  add column if not exists pricing_method text default 'MARKUP' check (pricing_method in ('MARKUP', 'FIXED')),
+  add column if not exists markup_percentage numeric(10,2) default 20,
+  add column if not exists price_rounding text default 'NONE' check (price_rounding in ('NONE', 'UP', 'DOWN', 'NEAREST')),
+  add column if not exists rounding_to numeric(14,2) default 1;
+
+comment on column product_variants.pricing_method is 'Método de cálculo de precio: MARKUP (automático con margen) o FIXED (manual)';
+comment on column product_variants.markup_percentage is 'Porcentaje de ganancia sobre el costo (usado solo en modo MARKUP)';
+comment on column product_variants.price_rounding is 'Tipo de redondeo del precio calculado';
+comment on column product_variants.rounding_to is 'Múltiplo para redondeo (ej: 100 para redondear a centenas)';
+
+-- 9.1 Función para calcular y actualizar costo promedio
+create or replace function fn_update_average_cost(
+  p_tenant uuid,
+  p_location uuid,
+  p_variant uuid,
+  p_qty_incoming numeric(14,3),
+  p_unit_cost_incoming numeric(14,2)
+) returns numeric(14,2)
+language plpgsql
+as $$
+declare
+  v_current_qty numeric(14,3);
+  v_current_cost numeric(14,2);
+  v_current_value numeric(14,2);
+  v_incoming_value numeric(14,2);
+  v_new_qty numeric(14,3);
+  v_new_avg_cost numeric(14,2);
+begin
+  -- Obtener stock y costo actual
+  select sb.on_hand, pv.cost
+    into v_current_qty, v_current_cost
+    from stock_balances sb
+    join product_variants pv on pv.variant_id = sb.variant_id and pv.tenant_id = sb.tenant_id
+   where sb.tenant_id = p_tenant
+     and sb.location_id = p_location
+     and sb.variant_id = p_variant;
+
+  -- Si no existe stock, usar el costo de entrada directamente
+  if v_current_qty is null or v_current_qty <= 0 then
+    v_new_avg_cost := p_unit_cost_incoming;
+  else
+    -- Calcular promedio ponderado
+    v_current_value := v_current_qty * v_current_cost;
+    v_incoming_value := p_qty_incoming * p_unit_cost_incoming;
+    v_new_qty := v_current_qty + p_qty_incoming;
+    
+    v_new_avg_cost := round((v_current_value + v_incoming_value) / v_new_qty, 2);
+  end if;
+
+  -- Actualizar el costo en product_variants
+  update product_variants
+     set cost = v_new_avg_cost
+   where tenant_id = p_tenant
+     and variant_id = p_variant;
+
+  return v_new_avg_cost;
+end;
+$$;
+
+-- 9.2 Función para calcular precio de venta según configuración
+create or replace function fn_calculate_sale_price(
+  p_tenant uuid,
+  p_variant uuid,
+  p_cost numeric(14,2)
+) returns numeric(14,2)
+language plpgsql
+as $$
+declare
+  v_pricing_method text;
+  v_markup_percentage numeric(10,2);
+  v_price_rounding text;
+  v_rounding_to numeric(14,2);
+  v_calculated_price numeric(14,2);
+begin
+  -- Obtener configuración de precio de la variante
+  select 
+    coalesce(pv.pricing_method, 'MARKUP') as pricing_method,
+    coalesce(pv.markup_percentage, 0) as markup_percentage,
+    coalesce(pv.price_rounding, 'NONE') as price_rounding,
+    coalesce(pv.rounding_to, 1) as rounding_to
+    into v_pricing_method, v_markup_percentage, v_price_rounding, v_rounding_to
+    from product_variants pv
+   where pv.tenant_id = p_tenant and pv.variant_id = p_variant;
+
+  -- Si el método es FIXED, mantener el precio actual
+  if v_pricing_method = 'FIXED' then
+    select pv.price into v_calculated_price
+      from product_variants pv
+     where pv.tenant_id = p_tenant and pv.variant_id = p_variant;
+    
+    return v_calculated_price;
+  end if;
+
+  -- Calcular precio con markup
+  v_calculated_price := p_cost * (1 + (v_markup_percentage / 100));
+
+  -- Aplicar redondeo
+  if v_price_rounding = 'UP' then
+    v_calculated_price := ceil(v_calculated_price / v_rounding_to) * v_rounding_to;
+  elsif v_price_rounding = 'DOWN' then
+    v_calculated_price := floor(v_calculated_price / v_rounding_to) * v_rounding_to;
+  elsif v_price_rounding = 'NEAREST' then
+    v_calculated_price := round(v_calculated_price / v_rounding_to) * v_rounding_to;
+  end if;
+
+  return round(v_calculated_price, 2);
+end;
+$$;
+
+-- 9.3 Trigger para actualizar costo promedio automáticamente
+create or replace function trg_update_average_cost()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_new_cost numeric(14,2);
+  v_new_price numeric(14,2);
+begin
+  -- Solo actualizar en entradas de inventario con costo
+  if new.move_type in ('PURCHASE_IN', 'ADJUSTMENT', 'TRANSFER_IN') and new.unit_cost > 0 then
+    -- Calcular y actualizar costo promedio
+    v_new_cost := fn_update_average_cost(
+      new.tenant_id,
+      new.location_id,
+      new.variant_id,
+      new.quantity,
+      new.unit_cost
+    );
+
+    -- Recalcular precio de venta si aplica
+    v_new_price := fn_calculate_sale_price(new.tenant_id, new.variant_id, v_new_cost);
+
+    -- Actualizar precio en la variante
+    update product_variants
+       set price = v_new_price
+     where tenant_id = new.tenant_id
+       and variant_id = new.variant_id
+       and pricing_method = 'MARKUP'; -- Solo si usa markup automático
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_update_average_cost_after on inventory_moves;
+create trigger trg_update_average_cost_after
+after insert on inventory_moves
+for each row
+execute function trg_update_average_cost();
+
+-- 9.4 SP: Registrar Compra con actualización automática de costos
+create or replace function sp_create_purchase(
+  p_tenant uuid,
+  p_location uuid,
+  p_supplier_id uuid,
+  p_created_by uuid,
+  p_lines jsonb,
+  p_note text default null
+) returns uuid
+language plpgsql
+as $$
+declare
+  v_purchase_id uuid;
+  v_total numeric(14,2) := 0;
+
+  v_line jsonb;
+  v_variant uuid;
+  v_qty numeric(14,3);
+  v_unit_cost numeric(14,2);
+  v_line_total numeric(14,2);
+begin
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'Purchase must have at least one line';
+  end if;
+
+  -- Crear registro de compra
+  v_purchase_id := gen_random_uuid();
+
+  -- Procesar líneas
+  for v_line in select * from jsonb_array_elements(p_lines)
+  loop
+    v_variant := (v_line->>'variant_id')::uuid;
+    v_qty := (v_line->>'qty')::numeric;
+    v_unit_cost := (v_line->>'unit_cost')::numeric;
+
+    if v_qty <= 0 then
+      raise exception 'Invalid qty for variant %', v_variant;
+    end if;
+    if v_unit_cost < 0 then
+      raise exception 'Invalid unit_cost for variant %', v_variant;
+    end if;
+
+    -- Validar que la variante existe
+    perform 1
+      from product_variants pv
+     where pv.tenant_id = p_tenant 
+       and pv.variant_id = v_variant 
+       and pv.is_active = true;
+
+    if not found then
+      raise exception 'Variant not found/active: %', v_variant;
+    end if;
+
+    v_line_total := round(v_qty * v_unit_cost, 2);
+
+    -- Registrar movimiento de inventario (el trigger actualizará el costo promedio)
+    insert into inventory_moves(
+      tenant_id, move_type, location_id, variant_id, quantity, unit_cost,
+      source, source_id, note, created_at, created_by
+    )
+    values(
+      p_tenant, 'PURCHASE_IN', p_location, v_variant, v_qty, v_unit_cost,
+      'PURCHASE', v_purchase_id, p_note, now(), p_created_by
+    );
+
+    -- Actualizar stock
+    perform fn_apply_stock_delta(p_tenant, p_location, v_variant, v_qty);
+
+    v_total := v_total + v_line_total;
+  end loop;
+
+  return v_purchase_id;
+end;
+$$;
+
+-- 9.5 Vista de compras para reportes
+create or replace view vw_purchases_summary as
+select
+  im.tenant_id,
+  im.location_id,
+  l.name as location_name,
+  im.source_id as purchase_id,
+  im.created_at as purchased_at,
+  im.created_by,
+  u.full_name as purchased_by_name,
+  im.variant_id,
+  pv.sku,
+  p.product_id,
+  p.name as product_name,
+  pv.variant_name,
+  im.quantity,
+  im.unit_cost,
+  round(im.quantity * im.unit_cost, 2) as line_total,
+  pv.cost as current_avg_cost,
+  pv.price as current_price,
+  im.note
+from inventory_moves im
+join locations l on l.location_id = im.location_id
+join product_variants pv on pv.variant_id = im.variant_id
+join products p on p.product_id = pv.product_id
+join users u on u.user_id = im.created_by
+where im.move_type = 'PURCHASE_IN'
+order by im.created_at desc;
 
