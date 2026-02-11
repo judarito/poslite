@@ -114,6 +114,9 @@
                   {{ formatDate(payment.paid_at) }}
                   <span v-if="payment.reference"> • Ref: {{ payment.reference }}</span>
                 </v-list-item-subtitle>
+                <template #append>
+                  <v-btn icon="mdi-printer" size="x-small" variant="text" :loading="printing" @click="handlePrintPaymentReceipt(payment)"></v-btn>
+                </template>
               </v-list-item>
             </v-list>
             <div v-else class="text-center text-grey py-4">
@@ -159,6 +162,17 @@
         <v-card class="mt-3">
           <v-card-title>Acciones</v-card-title>
           <v-card-text class="d-flex flex-column ga-2">
+            <v-btn 
+              color="primary" 
+              block 
+              variant="tonal"
+              prepend-icon="mdi-printer"
+              :loading="printing"
+              @click="handlePrintContract"
+            >
+              Imprimir Contrato
+            </v-btn>
+            
             <v-btn 
               v-if="contract.status === 'ACTIVE' && contract.balance === 0 && canComplete"
               color="primary" 
@@ -323,14 +337,17 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
+import { usePrint } from '@/composables/usePrint'
 import layawayService from '@/services/layaway.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import cashService from '@/services/cash.service'
+import supabaseService from '@/services/supabase.service'
 
 const route = useRoute()
 const router = useRouter()
 const { tenantId } = useTenant()
 const { userProfile, hasPermission } = useAuth()
+const { printing, printLayawayContract, printPaymentReceipt } = usePrint()
 
 const canAddPayment = hasPermission('LAYAWAY.PAYMENT.ADD')
 const canComplete = hasPermission('LAYAWAY.COMPLETE')
@@ -382,6 +399,32 @@ const getStatusLabel = (status) => ({
   CANCELLED: 'Cancelado',
   EXPIRED: 'Expirado'
 }[status] || status)
+
+const handlePrintContract = async () => {
+  if (!contract.value) return
+  
+  // Obtener datos del tenant
+  const { data: tenant } = await supabaseService.client
+    .from('tenants')
+    .select('*')
+    .eq('tenant_id', tenantId.value)
+    .single()
+  
+  printLayawayContract(contract.value, tenant)
+}
+
+const handlePrintPaymentReceipt = async (payment) => {
+  if (!contract.value || !payment) return
+  
+  // Obtener datos del tenant
+  const { data: tenant } = await supabaseService.client
+    .from('tenants')
+    .select('*')
+    .eq('tenant_id', tenantId.value)
+    .single()
+  
+  printPaymentReceipt(payment, contract.value, tenant)
+}
 
 const loadDetail = async () => {
   const r = await layawayService.getLayawayDetail(tenantId.value, route.params.id)

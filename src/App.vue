@@ -16,10 +16,6 @@
 
         <v-spacer></v-spacer>
 
-        <v-btn icon>
-          <v-icon>mdi-magnify</v-icon>
-        </v-btn>
-
         <v-btn icon @click="toggleTheme">
           <v-icon>{{ isDark ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
         </v-btn>
@@ -34,7 +30,7 @@
           </v-badge>
         </v-btn>
 
-        <v-btn icon>
+        <v-btn icon @click="router.push('/tenant-config')">
           <v-icon>mdi-account-circle</v-icon>
         </v-btn>
       </v-app-bar>

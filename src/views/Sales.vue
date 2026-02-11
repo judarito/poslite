@@ -42,6 +42,7 @@
             </div>
             <!-- Botones en móvil - debajo del contenido -->
             <div v-if="item.status === 'COMPLETED'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
+              <v-btn size="small" color="primary" variant="text" prepend-icon="mdi-printer" @click.stop="handlePrintSale(item)" :loading="printing">Imprimir</v-btn>
               <v-btn size="small" color="warning" variant="tonal" @click.stop="openReturnDialog(item)">Devolver</v-btn>
               <v-btn size="small" color="error" variant="tonal" @click.stop="confirmVoid(item)">Anular</v-btn>
             </div>
@@ -49,6 +50,7 @@
           <template #actions="{ item }">
             <!-- Botones en desktop - al lado derecho -->
             <div class="d-none d-sm-flex ga-1">
+              <v-btn size="x-small" color="primary" variant="text" icon="mdi-printer" @click.stop="handlePrintSale(item)" :loading="printing" title="Imprimir Factura"></v-btn>
               <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="warning" variant="tonal" @click.stop="openReturnDialog(item)">Devolver</v-btn>
               <v-btn v-if="item.status === 'COMPLETED'" size="x-small" color="error" variant="tonal" @click.stop="confirmVoid(item)">Anular</v-btn>
             </div>
@@ -137,6 +139,9 @@
           </v-chip>
         </v-card-text>
         <v-card-actions>
+          <v-btn color="primary" prepend-icon="mdi-printer" :loading="printing" @click="handlePrintSale(saleDetail)">
+            Imprimir Factura
+          </v-btn>
           <v-spacer></v-spacer>
           <v-btn @click="detailDialog = false">Cerrar</v-btn>
         </v-card-actions>
@@ -273,12 +278,14 @@
 import { ref } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
+import { usePrint } from '@/composables/usePrint'
 import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
 import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
+const { printing, printSaleTicket } = usePrint()
 
 const tab = ref('sales')
 const sales = ref([])
@@ -352,6 +359,19 @@ const viewSale = async (item) => {
     detailDialog.value = true
   }
   else showMsg('Error al cargar detalle', 'error')
+}
+
+const handlePrintSale = async () => {
+  if (!saleDetail.value) return
+  
+  // Obtener datos del tenant
+  const { data: tenant } = await supabaseService.client
+    .from('tenants')
+    .select('*')
+    .eq('tenant_id', tenantId.value)
+    .single()
+  
+  printSaleTicket(saleDetail.value, tenant)
 }
 
 const openReturnDialog = async (item) => {
