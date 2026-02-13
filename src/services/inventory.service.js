@@ -74,6 +74,18 @@ class InventoryService {
     }
   }
 
+  // Refrescar alertas de stock manualmente (respaldo a triggers)
+  async refreshStockAlerts() {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_refresh_stock_alerts')
+      if (error) {
+        console.warn('Error refrescando alertas de stock:', error.message)
+      }
+    } catch (error) {
+      console.warn('Error refrescando alertas de stock:', error.message)
+    }
+  }
+
   // Crear movimiento manual (ajuste)
   async createManualAdjustment(tenantId, adjustment) {
     try {
@@ -104,6 +116,10 @@ class InventoryService {
       })
 
       if (stockErr) throw stockErr
+      
+      // Refrescar alertas después de cambios en stock
+      await this.refreshStockAlerts()
+      
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -154,6 +170,9 @@ class InventoryService {
         p_delta: transfer.quantity
       })
 
+      // Refrescar alertas después de traslado
+      await this.refreshStockAlerts()
+
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -184,6 +203,9 @@ class InventoryService {
         p_delta: entry.quantity
       })
 
+      // Refrescar alertas después de entrada por compra
+      await this.refreshStockAlerts()
+
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -200,6 +222,10 @@ class InventoryService {
       })
 
       if (error) throw error
+      
+      // Refrescar alertas después de cambiar stock mínimo
+      await this.refreshStockAlerts()
+      
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

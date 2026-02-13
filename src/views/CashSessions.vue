@@ -6,6 +6,7 @@
       :items="sessions"
       :total-items="totalSessions"
       :loading="loadingSessions"
+      :page-size="defaultPageSize"
       item-key="cash_session_id"
       title-field="cash_session_id"
       avatar-icon="mdi-cash-register"
@@ -284,14 +285,16 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const { userProfile } = useAuth()
 
 // Sesiones
@@ -359,7 +362,7 @@ const openSession = async () => {
   savingSession.value = true
   try {
     const r = await cashService.openCashSession(tenantId.value, sessionData.value.cash_register_id, userProfile.value?.user_id, sessionData.value.opening_amount)
-    if (r.success) { showMsg('Caja abierta'); sessionDialog.value = false; loadSessions({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Caja abierta'); sessionDialog.value = false; loadSessions({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { savingSession.value = false }
 }
@@ -492,7 +495,7 @@ const closeSession = async () => {
   closingSession.value = true
   try {
     const r = await cashService.closeCashSession(tenantId.value, selectedSession.value.cash_session_id, userProfile.value?.user_id, closeData.value.closing_amount_counted)
-    if (r.success) { showMsg('Caja cerrada'); closeDialog.value = false; loadSessions({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Caja cerrada'); closeDialog.value = false; loadSessions({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { closingSession.value = false }
 }
@@ -519,10 +522,14 @@ const saveMovement = async () => {
     if (r.success) {
       showMsg('Movimiento registrado')
       movementDialog.value = false
-      loadSessions({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value })
+      loadSessions({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error, 'error')
   } finally { savingMovement.value = false }
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>

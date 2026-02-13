@@ -6,6 +6,7 @@
       :items="products"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="product_id"
       title-field="name"
       avatar-icon="mdi-package-variant"
@@ -274,14 +275,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import productsService from '@/services/products.service'
 import categoriesService from '@/services/categories.service'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const products = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -465,4 +468,9 @@ const confirmDeleteVariant = async (v) => {
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+// Lifecycle
+onMounted(async () => {
+  await loadSettings()
+})
 </script>

@@ -6,6 +6,7 @@
       :items="categories"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="category_id"
       title-field="name"
       avatar-icon="mdi-tag"
@@ -62,10 +63,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import categoriesService from '@/services/categories.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const categories = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -111,7 +114,7 @@ const save = async () => {
     const r = isEditing.value
       ? await categoriesService.updateCategory(tenantId.value, formData.value.category_id, formData.value)
       : await categoriesService.createCategory(tenantId.value, formData.value)
-    if (r.success) { showMsg(isEditing.value ? 'Categoría actualizada' : 'Categoría creada'); dialog.value = false; loadCategories({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(isEditing.value ? 'Categoría actualizada' : 'Categoría creada'); dialog.value = false; loadCategories({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error || 'Error al guardar', 'error')
   } finally { saving.value = false }
 }
@@ -121,10 +124,14 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await categoriesService.deleteCategory(tenantId.value, itemToDelete.value.category_id)
-    if (r.success) { showMsg('Categoría eliminada'); deleteDialog.value = false; loadCategories({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Categoría eliminada'); deleteDialog.value = false; loadCategories({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error || 'Error al eliminar', 'error')
   } finally { deleting.value = false }
 }
+
+onMounted(async () => {
+  await loadSettings()
+})
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 </script>

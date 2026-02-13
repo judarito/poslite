@@ -69,6 +69,7 @@
                   <th>Producto</th>
                   <th class="text-center" style="width:80px">Cant.</th>
                   <th class="text-right" style="width:100px">Precio</th>
+                  <th v-if="isAdmin" class="text-right" style="width:100px">Desc.</th>
                   <th class="text-right" style="width:100px">Total</th>
                   <th style="width:40px"></th>
                 </tr>
@@ -83,6 +84,9 @@
                     <v-text-field v-model.number="line.quantity" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="1" @update:model-value="recalculate"></v-text-field>
                   </td>
                   <td class="text-right">{{ formatMoney(line.unit_price) }}</td>
+                  <td v-if="isAdmin" class="text-right">
+                    <v-text-field v-model.number="line.discount" type="number" variant="outlined" density="compact" hide-details style="width:90px" min="0" prefix="$" @update:model-value="recalculate"></v-text-field>
+                  </td>
                   <td class="text-right font-weight-bold">{{ formatMoney(line.line_total) }}</td>
                   <td><v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn></td>
                 </tr>
@@ -102,7 +106,7 @@
                   </div>
                   <v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn>
                 </div>
-                <div class="d-flex justify-space-between align-center">
+                <div class="d-flex justify-space-between align-center gap-2">
                   <v-text-field 
                     v-model.number="line.quantity" 
                     type="number" 
@@ -112,6 +116,19 @@
                     style="max-width:80px" 
                     min="1" 
                     label="Cant."
+                    @update:model-value="recalculate"
+                  ></v-text-field>
+                  <v-text-field 
+                    v-if="isAdmin"
+                    v-model.number="line.discount" 
+                    type="number" 
+                    variant="outlined" 
+                    density="compact" 
+                    hide-details 
+                    style="max-width:90px" 
+                    min="0" 
+                    label="Desc."
+                    prefix="$"
                     @update:model-value="recalculate"
                   ></v-text-field>
                   <div class="text-right">
@@ -158,10 +175,27 @@
 
           <v-divider></v-divider>
 
+          <!-- Botón Descuento Global (solo admin) -->
+          <v-card-text v-if="isAdmin && cart.length > 0" class="pa-2 pb-0">
+            <v-btn 
+              size="small" 
+              variant="tonal" 
+              color="warning" 
+              prepend-icon="mdi-percent" 
+              @click="showGlobalDiscountDialog = true"
+              block
+            >
+              Aplicar Descuento Global
+            </v-btn>
+          </v-card-text>
+
           <!-- Totales -->
           <v-card-text class="pa-3 totals-sticky">
             <div class="d-flex justify-space-between mb-1">
               <span>Subtotal:</span><span>{{ formatMoney(totals.subtotal) }}</span>
+            </div>
+            <div v-if="totals.discount > 0" class="d-flex justify-space-between mb-1 text-warning">
+              <span>Descuento:</span><span>-{{ formatMoney(totals.discount) }}</span>
             </div>
             <div class="d-flex justify-space-between mb-1">
               <span>Impuestos:</span><span>{{ formatMoney(totals.tax) }}</span>
@@ -280,6 +314,35 @@
       </v-col>
     </v-row>
 
+    <!-- Dialog Descuento Global -->
+    <v-dialog v-model="showGlobalDiscountDialog" max-width="400">
+      <v-card>
+        <v-card-title>Aplicar Descuento Global</v-card-title>
+        <v-card-text>
+          <v-radio-group v-model="globalDiscountType">
+            <v-radio label="Porcentaje" value="percentage"></v-radio>
+            <v-radio label="Monto Fijo" value="fixed"></v-radio>
+          </v-radio-group>
+          <v-text-field
+            v-model.number="globalDiscountValue"
+            type="number"
+            :label="globalDiscountType === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'"
+            variant="outlined"
+            density="compact"
+            min="0"
+            :max="globalDiscountType === 'percentage' ? 100 : undefined"
+            :prefix="globalDiscountType === 'fixed' ? '$' : ''"
+            :suffix="globalDiscountType === 'percentage' ? '%' : ''"
+          ></v-text-field>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="showGlobalDiscountDialog = false">Cancelar</v-btn>
+          <v-btn color="primary" @click="applyGlobalDiscount">Aplicar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
 </template>
@@ -288,6 +351,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import productsService from '@/services/products.service'
 import customersService from '@/services/customers.service'
 import salesService from '@/services/sales.service'
@@ -297,6 +361,7 @@ import taxesService from '@/services/taxes.service'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
+const { maxDiscountWithoutAuth, applyRounding, loadSettings } = useTenantSettings()
 
 const searchTerm = ref('')
 const searchResults = ref([])
@@ -313,21 +378,38 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
+// Descuentos (solo admin)
+const showGlobalDiscountDialog = ref(false)
+const globalDiscountType = ref('percentage')
+const globalDiscountValue = ref(0)
+
 let searchTimeout = null
 const searchInput = ref(null)
 const selectedVariant = ref(null)
 const searchingProduct = ref(false)
 
+// Verificar si el usuario es administrador
+const isAdmin = computed(() => {
+  return userProfile.value?.roles?.some(role => role.name === 'ADMINISTRADOR') || false
+})
+
 const totals = computed(() => {
-  let subtotal = 0, tax = 0, total = 0
+  let subtotal = 0, discount = 0, tax = 0, total = 0
   cart.value.forEach(l => {
-    // Usar los valores ya calculados en recalculateTaxes
+    // Subtotal sin impuestos ni descuentos
+    subtotal += (l.quantity * l.unit_price)
+    // Descuentos
+    discount += (l.discount || 0)
+    // Impuestos ya calculados
     tax += l.tax_amount || 0
+    // Total de la línea
     total += l.line_total || 0
   })
-  // El subtotal es el total menos los impuestos
-  subtotal = total - tax
-  return { subtotal, tax, total }
+  
+  // Aplicar redondeo al total final según configuración del tenant
+  total = applyRounding(total)
+  
+  return { subtotal, discount, tax, total }
 })
 
 const paidTotal = computed(() => payments.value.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0))
@@ -430,22 +512,23 @@ const recalculateTaxes = async (line) => {
   const taxResult = await taxesService.getTaxRateForVariant(tenantId.value, line.variant_id)
   console.log('Tax result:', taxResult, 'for variant:', line.variant_id)
   
+  // Calcular base: precio * cantidad - descuento
+  const baseAmount = (line.quantity * line.unit_price) - (line.discount || 0)
+  
   if (taxResult.success && taxResult.rate) {
     line.tax_rate = taxResult.rate
-    const grossAmount = (line.quantity * line.unit_price) - (line.discount || 0)
     
     // Impuesto ADICIONAL: El impuesto se suma al precio
     // Formula: impuesto = base * tasa, total = base + impuesto
-    line.tax_amount = Math.round(grossAmount * line.tax_rate)
-    line.line_total = Math.round(grossAmount + line.tax_amount)
-    console.log('Tax ADDITIONAL - base:', grossAmount, 'tax:', line.tax_amount, 'total:', line.line_total)
+    line.tax_amount = Math.round(baseAmount * line.tax_rate)
+    line.line_total = Math.round(baseAmount + line.tax_amount)
+    console.log('Tax ADDITIONAL - base:', baseAmount, 'discount:', line.discount, 'tax:', line.tax_amount, 'total:', line.line_total)
   } else {
     console.warn('No tax rate found or error:', taxResult)
     // Sin impuesto
-    const base = (line.quantity * line.unit_price) - (line.discount || 0)
     line.tax_amount = 0
     line.tax_rate = 0
-    line.line_total = Math.round(base)
+    line.line_total = Math.round(baseAmount)
   }
 }
 
@@ -460,6 +543,53 @@ const recalculate = async () => {
 
 const recalcPayments = () => {
   if (payments.value.length === 1) payments.value[0].amount = totals.value.total
+}
+
+// Aplicar descuento global
+const applyGlobalDiscount = async () => {
+  if (!isAdmin.value) {
+    showMsg('Solo administradores pueden aplicar descuentos', 'error')
+    return
+  }
+  
+  if (!globalDiscountValue.value || globalDiscountValue.value <= 0) {
+    showMsg('Ingrese un valor válido de descuento', 'warning')
+    return
+  }
+  
+  // Validar límite de descuento sin autorización
+  if (globalDiscountType.value === 'percentage') {
+    if (globalDiscountValue.value > maxDiscountWithoutAuth.value) {
+      showMsg(`El descuento máximo permitido es ${maxDiscountWithoutAuth.value}%. Requiere autorización superior.`, 'error')
+      return
+    }
+  }
+  
+  if (globalDiscountType.value === 'percentage') {
+    // Aplicar porcentaje a cada línea
+    for (const line of cart.value) {
+      const lineSubtotal = line.quantity * line.unit_price
+      line.discount = Math.round(lineSubtotal * (globalDiscountValue.value / 100))
+      await recalculateTaxes(line)
+    }
+  } else {
+    // Distribuir monto fijo proporcionalmente
+    const totalBeforeDiscount = cart.value.reduce((sum, l) => sum + (l.quantity * l.unit_price), 0)
+    
+    for (const line of cart.value) {
+      const lineSubtotal = line.quantity * line.unit_price
+      const proportion = lineSubtotal / totalBeforeDiscount
+      line.discount = Math.round(globalDiscountValue.value * proportion)
+      await recalculateTaxes(line)
+    }
+  }
+  
+  // Forzar actualización reactiva
+  cart.value = [...cart.value]
+  
+  showGlobalDiscountDialog.value = false
+  globalDiscountValue.value = 0
+  showMsg('Descuento aplicado correctamente')
 }
 
 // Cliente

@@ -99,9 +99,12 @@ class CashAssignmentService {
     }
   }
 
-  // Obtener todas las asignaciones (para vista Admin)
-  async getAllAssignments(tenantId, filters = {}) {
+  // Obtener todas las asignaciones (para vista Admin) - Con paginación
+  async getAllAssignments(tenantId, page = 1, pageSize = 20, filters = {}) {
     try {
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+
       let query = supabaseService.client
         .from('cash_register_assignments')
         .select(`
@@ -126,7 +129,7 @@ class CashAssignmentService {
               name
             )
           )
-        `)
+        `, { count: 'exact' })
         .eq('tenant_id', tenantId)
 
       if (filters.userId) query = query.eq('user_id', filters.userId)
@@ -134,9 +137,9 @@ class CashAssignmentService {
       if (filters.locationId) query = query.eq('cash_register.location_id', filters.locationId)
       if (typeof filters.isActive === 'boolean') query = query.eq('is_active', filters.isActive)
 
-      query = query.order('assigned_at', { ascending: false })
+      query = query.order('assigned_at', { ascending: false }).range(from, to)
 
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
 
@@ -156,10 +159,10 @@ class CashAssignmentService {
         note: item.note
       }))
 
-      return { success: true, data: transformed }
+      return { success: true, data: transformed, total: count || 0 }
     } catch (error) {
       console.error('getAllAssignments error:', error)
-      return { success: false, error: error.message, data: [] }
+      return { success: false, error: error.message, data: [], total: 0 }
     }
   }
 }

@@ -36,9 +36,17 @@ export function useTheme() {
 
   // Establecer tema específico
   const setTheme = (theme) => {
-    isDark.value = theme === 'dark'
-    vuetifyTheme.global.name.value = theme
-    saveTheme(theme)
+    if (theme === 'auto') {
+      // Modo automático: detectar del sistema
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      isDark.value = prefersDark
+      vuetifyTheme.global.name.value = prefersDark ? 'dark' : 'light'
+      saveTheme('auto')
+    } else {
+      isDark.value = theme === 'dark'
+      vuetifyTheme.global.name.value = theme
+      saveTheme(theme)
+    }
   }
 
   // Observar cambios en la preferencia del sistema

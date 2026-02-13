@@ -1,104 +1,67 @@
 <template>
   <div>
-    <v-card>
-      <v-card-title class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center">
-          <v-icon class="mr-2" size="large">mdi-account-group</v-icon>
-          <span class="text-h5">Usuarios</span>
+    <ListView
+      title="Usuarios"
+      icon="mdi-account-group"
+      :items="users"
+      :total-items="totalUsers"
+      :loading="loading"
+      :page-size="defaultPageSize"
+      item-key="user_id"
+      title-field="full_name"
+      avatar-icon="mdi-account"
+      avatar-color="primary"
+      empty-message="No hay usuarios registrados"
+      create-button-text="Nuevo Usuario"
+      @create="openCreateDialog"
+      @edit="openEditDialog"
+      @delete="null"
+      @load-page="loadUsers"
+      @search="loadUsers"
+      :deletable="false"
+    >
+      <template #subtitle="{ item }">
+        {{ item.email }}
+      </template>
+      <template #content="{ item }">
+        <div class="mt-2 d-flex flex-wrap ga-2">
+          <v-chip
+            v-for="role in item.roles"
+            :key="role.role_id"
+            size="small"
+            color="primary"
+            variant="tonal"
+          >
+            {{ role.name }}
+          </v-chip>
+          <v-chip v-if="!item.roles || item.roles.length === 0" size="small" color="grey">
+            Sin roles
+          </v-chip>
+          <v-chip :color="item.is_active ? 'success' : 'error'" size="small">
+            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+          </v-chip>
         </div>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">
-          Nuevo Usuario
-        </v-btn>
-      </v-card-title>
-
-      <v-card-text>
-        <!-- Tabla de usuarios -->
-        <v-data-table
-          :headers="headers"
-          :items="users"
-          :loading="loading"
-          :items-per-page="10"
-          class="elevation-1"
-        >
-          <!-- Email -->
-          <template #[`item.email`]="{ item }">
-            <div class="d-flex align-center">
-              <v-icon class="mr-2" size="small">mdi-email</v-icon>
-              {{ item.email }}
-            </div>
-          </template>
-
-          <!-- Roles -->
-          <template #[`item.roles`]="{ item }">
-            <v-chip
-              v-for="role in item.roles"
-              :key="role.role_id"
-              size="small"
-              class="mr-1"
-              color="primary"
-              variant="tonal"
-            >
-              {{ role.name }}
-            </v-chip>
-            <v-chip v-if="!item.roles || item.roles.length === 0" size="small" color="grey">
-              Sin roles
-            </v-chip>
-          </template>
-
-          <!-- Estado -->
-          <template #[`item.is_active`]="{ item }">
-            <v-chip :color="item.is_active ? 'success' : 'error'" size="small">
-              {{ item.is_active ? 'Activo' : 'Inactivo' }}
-            </v-chip>
-          </template>
-
-          <!-- Fecha de creación -->
-          <template #[`item.created_at`]="{ item }">
-            {{ formatDate(item.created_at) }}
-          </template>
-
-          <!-- Acciones -->
-          <template #[`item.actions`]="{ item }">
-            <v-tooltip text="Editar">
-              <template #activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  icon="mdi-pencil"
-                  size="small"
-                  variant="text"
-                  @click="openEditDialog(item)"
-                ></v-btn>
-              </template>
-            </v-tooltip>
-
-            <v-tooltip text="Cambiar Contraseña">
-              <template #activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  icon="mdi-lock-reset"
-                  size="small"
-                  variant="text"
-                  @click="openPasswordDialog(item)"
-                ></v-btn>
-              </template>
-            </v-tooltip>
-
-            <v-tooltip :text="item.is_active ? 'Desactivar' : 'Activar'">
-              <template #activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  :icon="item.is_active ? 'mdi-account-off' : 'mdi-account-check'"
-                  size="small"
-                  variant="text"
-                  :color="item.is_active ? 'error' : 'success'"
-                  @click="toggleUserStatus(item)"
-                ></v-btn>
-              </template>
-            </v-tooltip>
-          </template>
-        </v-data-table>
-      </v-card-text>
-    </v-card>
+      </template>
+      <template #actions="{ item }">
+        <div class="d-flex ga-1">
+          <v-btn
+            icon="mdi-lock-reset"
+            size="small"
+            variant="text"
+            @click.stop="openPasswordDialog(item)"
+            title="Cambiar Contraseña"
+          ></v-btn>
+          <v-btn
+            :icon="item.is_active ? 'mdi-account-off' : 'mdi-account-check'"
+            size="small"
+            variant="text"
+            :color="item.is_active ? 'error' : 'success'"
+            @click.stop="toggleUserStatus(item)"
+            :title="item.is_active ? 'Desactivar' : 'Activar'"
+          ></v-btn>
+        </div>
+      </template>
+    </ListView>
 
     <!-- Dialog para crear/editar usuario -->
     <v-dialog v-model="dialog" max-width="600px" persistent>
@@ -256,21 +219,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
+import ListView from '@/components/ListView.vue'
 import {
   getUsers,
+  getAllUsers,
   createUser,
   updateUser,
-  deleteUser,
   changeUserPassword,
   getRoles
 } from '@/services/users.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 
 // Estado
 const users = ref([])
+const totalUsers = ref(0)
 const availableRoles = ref([])
 const loading = ref(false)
 const dialog = ref(false)
@@ -306,16 +273,6 @@ const passwordForm = ref({
   confirmPassword: ''
 })
 
-// Headers de la tabla
-const headers = [
-  { title: 'Email', key: 'email', sortable: true },
-  { title: 'Nombre Completo', key: 'full_name', sortable: true },
-  { title: 'Roles', key: 'roles', sortable: false },
-  { title: 'Estado', key: 'is_active', sortable: true },
-  { title: 'Fecha Creación', key: 'created_at', sortable: true },
-  { title: 'Acciones', key: 'actions', sortable: false, align: 'end' }
-]
-
 // Reglas de validación
 const rules = {
   required: v => !!v || 'Este campo es requerido',
@@ -326,11 +283,17 @@ const rules = {
 }
 
 // Métodos
-async function loadUsers() {
-  if (!tenantId.value) return
+async function loadUsers({ page, pageSize, search, tenantId: tid }) {
+  if (!tid) return
   loading.value = true
   try {
-    users.value = await getUsers(tenantId.value)
+    const result = await getUsers(tid, page, pageSize, search)
+    if (result.success) {
+      users.value = result.data
+      totalUsers.value = result.total
+    } else {
+      showMessage('Error al cargar usuarios', 'error')
+    }
   } catch (error) {
     showMessage('Error al cargar usuarios', 'error')
   } finally {
@@ -403,7 +366,8 @@ async function saveUser() {
     }
 
     closeDialog()
-    await loadUsers()
+    // Recargar la lista
+    await loadUsers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
   } catch (error) {
     showMessage(error.message || 'Error al guardar usuario', 'error')
   } finally {
@@ -456,21 +420,11 @@ async function toggleUserStatus(user) {
       `Usuario ${!user.is_active ? 'activado' : 'desactivado'} exitosamente`,
       'success'
     )
-    await loadUsers()
+    // Recargar la lista
+    await loadUsers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
   } catch (error) {
     showMessage('Error al cambiar estado del usuario', 'error')
   }
-}
-
-function formatDate(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
 }
 
 function showMessage(text, color = 'success') {
@@ -481,13 +435,7 @@ function showMessage(text, color = 'success') {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([loadUsers(), loadRoles()])
+  await loadSettings()
+  await loadRoles()
 })
 </script>
-
-<style scoped>
-.v-data-table :deep(.v-data-table__th) {
-  font-weight: bold;
-  background-color: rgba(0, 0, 0, 0.05);
-}
-</style>

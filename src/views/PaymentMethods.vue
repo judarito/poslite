@@ -6,6 +6,7 @@
       :items="paymentMethods"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="payment_method_id"
       title-field="name"
       subtitle-field="code"
@@ -130,13 +131,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
 import paymentMethodsService from '@/services/paymentMethods.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const { hasPermission } = useAuth()
 
 const canManage = hasPermission('SETTINGS.PAYMENT_METHODS.MANAGE')
@@ -270,7 +273,7 @@ const savePaymentMethod = async () => {
       closeDialog()
       loadPaymentMethods({
         page: 1,
-        pageSize: 10,
+        pageSize: defaultPageSize.value,
         search: '',
         tenantId: tenantId.value
       })
@@ -304,7 +307,7 @@ const deletePaymentMethod = async () => {
       deleteDialog.value = false
       loadPaymentMethods({
         page: 1,
-        pageSize: 10,
+        pageSize: defaultPageSize.value,
         search: '',
         tenantId: tenantId.value
       })
@@ -323,4 +326,8 @@ const showMessage = (message, color = 'success') => {
   snackbarColor.value = color
   snackbar.value = true
 }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>

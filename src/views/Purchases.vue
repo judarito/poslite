@@ -46,6 +46,7 @@
       :items="purchases"
       :total-items="totalPurchases"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="purchase_id"
       avatar-icon="mdi-truck-delivery"
       avatar-color="teal"
@@ -645,6 +646,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import supabaseService from '@/services/supabase.service'
 import purchasesService from '@/services/purchases.service'
@@ -652,6 +654,7 @@ import ListView from '@/components/ListView.vue'
 
 const { isMobile } = useDisplay()
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const { userProfile } = useAuth()
 
 const loading = ref(false)
@@ -849,6 +852,7 @@ const getConfidenceColor = (confidence) => {
 }
 
 onMounted(async () => {
+  await loadSettings()
   await loadLocations()
   await loadPurchases()
   // Cargar sugerencias en background para mostrar badge
@@ -866,34 +870,24 @@ const loadLocations = async () => {
   if (!error) locations.value = data || []
 }
 
-const loadPurchases = async () => {
+const loadPurchases = async (pageParam = 1, pageSizeParam = null) => {
   if (!tenantId.value) return
   loading.value = true
   try {
-    let query = supabaseService.client
-      .from('vw_purchases_summary')
-      .select('*', { count: 'exact' })
-      .eq('tenant_id', tenantId.value)
-      .order('purchased_at', { ascending: false })
-      .limit(100)
+    const actualPageSize = pageSizeParam || defaultPageSize.value
+    const filters = {}
+    if (selectedLocation.value) filters.location_id = selectedLocation.value
+    if (dateFrom.value) filters.from_date = dateFrom.value
+    if (dateTo.value) filters.to_date = dateTo.value + 'T23:59:59'
 
-    if (selectedLocation.value) {
-      query = query.eq('location_id', selectedLocation.value)
+    const result = await purchasesService.getPurchases(tenantId.value, pageParam, actualPageSize, filters)
+    
+    if (result.success) {
+      purchases.value = result.data || []
+      totalPurchases.value = result.total || 0
+    } else {
+      throw new Error(result.error)
     }
-    if (dateFrom.value) {
-      query = query.gte('purchased_at', dateFrom.value)
-    }
-    if (dateTo.value) {
-      query = query.lte('purchased_at', dateTo.value + 'T23:59:59')
-    }
-    if (search.value) {
-      query = query.or(`product_name.ilike.%${search.value}%,sku.ilike.%${search.value}%`)
-    }
-
-    const { data, error, count } = await query
-    if (error) throw error
-    purchases.value = data || []
-    totalPurchases.value = count || 0
   } catch (error) {
     showMsg('Error al cargar compras: ' + error.message, 'error')
   } finally {
@@ -901,14 +895,13 @@ const loadPurchases = async () => {
   }
 }
 
-const loadPurchasesPage = (page, pageSize) => {
-  // Por ahora solo recargamos todo - puedes implementar paginación después
-  loadPurchases()
+const loadPurchasesPage = ({ page, pageSize }) => {
+  loadPurchases(page, pageSize)
 }
 
-const handleSearch = (searchTerm) => {
+const handleSearch = ({ search: searchTerm, page, pageSize }) => {
   search.value = searchTerm
-  loadPurchases()
+  loadPurchases(page, pageSize)
 }
 
 const loadInitialVariants = async () => {

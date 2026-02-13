@@ -210,7 +210,7 @@ import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import cashAssignmentService from '@/services/cashAssignment.service'
-import { getUsers } from '@/services/users.service'
+import { getAllUsers } from '@/services/users.service'
 import cashService from '@/services/cash.service'
 import locationsService from '@/services/locations.service'
 import { useNotification } from '@/composables/useNotification'
@@ -237,10 +237,10 @@ const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO', {
   minute: '2-digit'
 }) : ''
 
-const loadAssignments = async () => {
+const loadAssignments = async (page = 1, pageSize = 20) => {
   if (!tenantId.value) return
   try {
-    const r = await cashAssignmentService.getAllAssignments(tenantId.value, filters.value)
+    const r = await cashAssignmentService.getAllAssignments(tenantId.value, page, pageSize, filters.value)
     console.log('loadAssignments result:', r)
     if (r.success) {
       assignments.value = r.data
@@ -258,8 +258,8 @@ const loadAssignments = async () => {
 const loadUsers = async () => {
   if (!tenantId.value) return
   try {
-    const data = await getUsers(tenantId.value)
-    users.value = data.filter(u => u.is_active)
+    const result = await getAllUsers(tenantId.value)
+    users.value = result.filter(u => u.is_active)
   } catch (error) {
     console.error('Error loading users:', error)
     showError('Error al cargar usuarios')

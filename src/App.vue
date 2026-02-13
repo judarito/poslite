@@ -16,10 +16,6 @@
 
         <v-spacer></v-spacer>
 
-        <v-btn icon @click="toggleTheme">
-          <v-icon>{{ isDark ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
-        </v-btn>
-
         <v-btn icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
@@ -454,6 +450,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useNotification } from '@/composables/useNotification'
 import { useTheme } from '@/composables/useTheme'
 import { useDisplay } from 'vuetify'
@@ -464,8 +461,9 @@ const router = useRouter()
 const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
 const { tenantId, clearTenant } = useTenant()
+const { theme, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
-const { isDark, toggleTheme } = useTheme()
+const { isDark, setTheme } = useTheme()
 const { mobile: isMobile } = useDisplay()
 
 const drawer = ref(true)
@@ -714,18 +712,30 @@ const loadLocations = async () => {
 }
 
 const handleAlertChange = (payload) => {
-  console.log('Alert change:', payload)
+  console.log('📡 Alert change received:', payload)
   
   const { eventType, new: newRecord, old: oldRecord } = payload
   
   if (eventType === 'INSERT') {
-    allAlerts.value.unshift(newRecord)
+    // Nueva alerta: agregar al inicio
+    console.log('➕ Nueva alerta:', newRecord)
+    const exists = allAlerts.value.find(a => a.alert_id === newRecord.alert_id)
+    if (!exists) {
+      allAlerts.value.unshift(newRecord)
+    }
   } else if (eventType === 'UPDATE') {
+    // Actualizar alerta existente
+    console.log('🔄 Actualizando alerta:', newRecord)
     const index = allAlerts.value.findIndex(a => a.alert_id === newRecord.alert_id)
     if (index !== -1) {
       allAlerts.value[index] = newRecord
+    } else {
+      // Si no existe, agregarla (puede ser el caso de filtros activos)
+      allAlerts.value.unshift(newRecord)
     }
   } else if (eventType === 'DELETE') {
+    // Eliminar alerta resuelta
+    console.log('❌ Eliminando alerta:', oldRecord)
     allAlerts.value = allAlerts.value.filter(a => a.alert_id !== oldRecord.alert_id)
   }
 }
@@ -735,11 +745,22 @@ const subscribeToAlerts = () => {
   
   // Desuscribirse si ya existe
   if (alertsChannel) {
+    console.log('🔌 Desconectando canal anterior de alertas')
     alertsService.unsubscribe(alertsChannel)
   }
   
-  // Suscribirse a cambios
-  alertsChannel = alertsService.subscribeToAlerts(tenantId.value, handleAlertChange)
+  // Suscribirse a cambios en tiempo real
+  console.log('📡 Suscribiendo a alertas en tiempo real para tenant:', tenantId.value)
+  alertsChannel = alertsService.subscribeToAlerts(tenantId.value, (payload) => {
+    handleAlertChange(payload)
+  })
+  
+  // Verificar estado de suscripción
+  if (alertsChannel) {
+    console.log('✅ Suscripción a alertas activa')
+  } else {
+    console.error('❌ Error al suscribirse a alertas')
+  }
 }
 
 const unsubscribeFromAlerts = () => {
@@ -859,9 +880,24 @@ watch([tenantId, isAuthRoute], ([newTenantId, newIsAuthRoute]) => {
   }
 }, { immediate: true })
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', handleResize)
   handleResize()
+  
+  // Cargar configuración del tenant y aplicar tema
+  if (tenantId.value) {
+    await loadSettings()
+    if (theme.value) {
+      setTheme(theme.value)
+    }
+  }
+})
+
+// Aplicar tema cuando cambie la configuración
+watch(theme, (newTheme) => {
+  if (newTheme && ['light', 'dark', 'auto'].includes(newTheme)) {
+    setTheme(newTheme)
+  }
 })
 
 onUnmounted(() => {

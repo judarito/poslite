@@ -6,6 +6,7 @@
       :items="customers"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="customer_id"
       title-field="full_name"
       avatar-icon="mdi-account"
@@ -101,12 +102,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import customersService from '@/services/customers.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const customers = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -178,7 +181,7 @@ const save = async () => {
       }
       showMsg(isEditing.value ? 'Cliente actualizado' : 'Cliente creado')
       dialog.value = false
-      loadCustomers({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value })
+      loadCustomers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error || 'Error al guardar', 'error')
   } finally { saving.value = false }
 }
@@ -189,10 +192,14 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await customersService.deleteCustomer(tenantId.value, itemToDelete.value.customer_id)
-    if (r.success) { showMsg('Cliente eliminado'); deleteDialog.value = false; loadCustomers({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Cliente eliminado'); deleteDialog.value = false; loadCustomers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }
+
+onMounted(async () => {
+  await loadSettings()
+})
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 </script>

@@ -121,6 +121,89 @@ class PurchasesService {
   isAIAvailable() {
     return aiPurchaseAdvisor.isAvailable()
   }
+
+  /**
+   * Obtener historial de compras con paginación
+   * @param {string} tenantId - ID del tenant
+   * @param {number} page - Página actual
+   * @param {number} pageSize - Tamaño de página
+   * @param {Object} filters - Filtros opcionales
+   */
+  async getPurchases(tenantId, page = 1, pageSize = 20, filters = {}) {
+    try {
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+
+      let query = supabaseService.client
+        .from('inventory_moves')
+        .select(`
+          inventory_move_id,
+          move_type,
+          location_id,
+          variant_id,
+          quantity,
+          unit_cost,
+          created_at,
+          note,
+          location:location_id(name),
+          variant:variant_id(
+            sku,
+            variant_name,
+            product:product_id(name)
+          ),
+          created_by_user:created_by(full_name)
+        `, { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .eq('move_type', 'PURCHASE_IN')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (filters.location_id) {
+        query = query.eq('location_id', filters.location_id)
+      }
+      if (filters.from_date) {
+        query = query.gte('created_at', filters.from_date)
+      }
+      if (filters.to_date) {
+        query = query.lte('created_at', filters.to_date)
+      }
+
+      const { data, error, count } = await query
+
+      if (error) throw error
+
+      // Transformar datos para mejor acceso
+      const purchases = (data || []).map(item => ({
+        purchase_id: item.inventory_move_id,
+        sku: item.variant?.sku || '',
+        variant_name: item.variant?.variant_name || '',
+        product_name: item.variant?.product?.name || '',
+        location_name: item.location?.name || '',
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+        line_total: item.quantity * item.unit_cost,
+        purchased_at: item.created_at,
+        purchased_by_name: item.created_by_user?.full_name || '',
+        note: item.note,
+        // Para compatibilidad con cálculo de precio actual
+        current_price: item.variant?.price || 0
+      }))
+
+      return {
+        success: true,
+        data: purchases,
+        total: count || 0
+      }
+    } catch (error) {
+      console.error('Error getting purchases:', error)
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+        total: 0
+      }
+    }
+  }
 }
 
 export default new PurchasesService()

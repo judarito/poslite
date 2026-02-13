@@ -6,6 +6,7 @@
       :items="registers"
       :total-items="totalRegisters"
       :loading="loadingRegisters"
+      :page-size="defaultPageSize"
       item-key="cash_register_id"
       title-field="name"
       avatar-icon="mdi-desktop-classic"
@@ -69,12 +70,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import locationsService from '@/services/locations.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const { hasPermission } = useAuth()
 
 const canManage = hasPermission('CASH.REGISTER.MANAGE')
@@ -140,7 +143,7 @@ const saveRegister = async () => {
     } else {
       r = await cashService.createCashRegister(tenantId.value, registerData.value)
     }
-    if (r.success) { showMsg(editingRegister.value ? 'Caja actualizada' : 'Caja creada'); registerDialog.value = false; loadRegisters({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(editingRegister.value ? 'Caja actualizada' : 'Caja creada'); registerDialog.value = false; loadRegisters({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { savingRegister.value = false }
 }
@@ -152,12 +155,13 @@ const doDeleteRegister = async () => {
   deletingRegister.value = true
   try {
     const r = await cashService.deleteCashRegister(tenantId.value, registerToDelete.value.cash_register_id)
-    if (r.success) { showMsg('Caja eliminada'); deleteRegisterDialog.value = false; loadRegisters({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Caja eliminada'); deleteRegisterDialog.value = false; loadRegisters({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deletingRegister.value = false }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadSettings()
   loadLocations()
 })
 </script>

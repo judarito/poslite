@@ -19,6 +19,7 @@
       :items="contracts"
       :total-items="totalContracts"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="layaway_id"
       title-field="customer_name"
       avatar-icon="mdi-handshake"
@@ -292,6 +293,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
 import layawayService from '@/services/layaway.service'
@@ -303,6 +305,7 @@ import cashService from '@/services/cash.service'
 
 const router = useRouter()
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const { userProfile, hasPermission } = useAuth()
 
 const canCreate = hasPermission('LAYAWAY.CREATE')
@@ -549,7 +552,7 @@ const createContract = async () => {
     if (r.success) {
       showMsg('Contrato creado exitosamente')
       closeCreateDialog()
-      loadContracts({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value })
+      loadContracts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else {
       showMsg(r.error, 'error')
     }
@@ -566,6 +569,8 @@ const showMsg = (msg, color = 'success') => {
 
 onMounted(async () => {
   if (!tenantId.value) return
+
+  await loadSettings()
 
   // Cargar sedes activas
   const locR = await locationsService.getActiveLocations(tenantId.value)

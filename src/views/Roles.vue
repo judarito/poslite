@@ -6,6 +6,7 @@
       :items="roles"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="role_id"
       title-field="name"
       avatar-icon="mdi-account-key"
@@ -75,12 +76,14 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import rolesService from '@/services/roles.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const roles = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -157,7 +160,7 @@ const save = async () => {
     } else {
       r = await rolesService.createRole(tenantId.value, formData.value)
     }
-    if (r.success) { showMsg(isEditing.value ? 'Rol actualizado' : 'Rol creado'); dialog.value = false; loadRoles({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(isEditing.value ? 'Rol actualizado' : 'Rol creado'); dialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error || 'Error al guardar', 'error')
   } finally { saving.value = false }
 }
@@ -167,10 +170,14 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await rolesService.deleteRole(tenantId.value, itemToDelete.value.role_id)
-    if (r.success) { showMsg('Rol eliminado'); deleteDialog.value = false; loadRoles({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Rol eliminado'); deleteDialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>

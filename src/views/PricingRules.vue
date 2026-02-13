@@ -39,6 +39,7 @@
       :items="rules"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="pricing_rule_id"
       title-field="scope"
       avatar-icon="mdi-cash-multiple"
@@ -293,14 +294,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import pricingRulesService from '@/services/pricingRules.service'
 import categoriesService from '@/services/categories.service'
 import productsService from '@/services/products.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 
 const rules = ref([])
 const totalItems = ref(0)
@@ -395,7 +398,7 @@ const loadRules = async ({ page, pageSize, search, tenantId: tid }) => {
 }
 
 const applyFilters = () => {
-  loadRules({ page: 1, pageSize: 50, search: '', tenantId: tenantId.value })
+  loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
 }
 
 const loadLocations = async () => {
@@ -477,7 +480,7 @@ const save = async () => {
     if (r.success) {
       showMsg('Política guardada')
       dialog.value = false
-      loadRules({ page: 1, pageSize: 50, search: '', tenantId: tenantId.value })
+      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error || 'Error al guardar', 'error')
   } finally {
     saving.value = false
@@ -497,7 +500,7 @@ const doDelete = async () => {
     if (r.success) {
       showMsg('Política eliminada')
       deleteDialog.value = false
-      loadRules({ page: 1, pageSize: 50, search: '', tenantId: tenantId.value })
+      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error, 'error')
   } finally {
     deleting.value = false
@@ -509,4 +512,8 @@ const showMsg = (msg, color = 'success') => {
   snackbarColor.value = color
   snackbar.value = true
 }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>

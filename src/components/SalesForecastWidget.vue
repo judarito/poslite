@@ -236,15 +236,18 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import salesService from '@/services/sales.service'
 
 const { tenantId } = useTenant()
+const { aiForecastDaysBack, loadSettings } = useTenantSettings()
 
 const forecast = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
-onMounted(() => {
+onMounted(async () => {
+  await loadSettings()
   loadForecast()
 })
 
@@ -261,7 +264,7 @@ const loadForecast = async () => {
     const result = await salesService.generateSalesForecast(
       tenantId.value,
       null, // null = todas las sedes del tenant
-      { daysBack: 90 }
+      { daysBack: aiForecastDaysBack.value }
     )
 
     if (!result.success) {

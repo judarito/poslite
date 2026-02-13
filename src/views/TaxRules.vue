@@ -53,6 +53,7 @@
       :items="rules"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="tax_rule_id"
       title-field="scope"
       avatar-icon="mdi-gavel"
@@ -255,6 +256,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import taxRulesService from '@/services/taxRules.service'
 import taxesService from '@/services/taxes.service'
@@ -263,6 +265,7 @@ import productsService from '@/services/products.service'
 import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 
 const rules = ref([])
 const totalItems = ref(0)
@@ -353,7 +356,7 @@ const loadRules = async ({ page, pageSize, search, tenantId: tid }) => {
 }
 
 const applyFilters = () => {
-  loadRules({ page: 1, pageSize: 20, search: '', tenantId: tenantId.value })
+  loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
 }
 
 const loadTaxes = async () => {
@@ -526,7 +529,7 @@ const save = async () => {
     if (r.success) {
       showMsg(isEditing.value ? 'Regla actualizada' : 'Regla creada')
       closeDialog()
-      loadRules({ page: 1, pageSize: 20, search: '', tenantId: tenantId.value })
+      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else {
       showMsg(r.error || 'Error al guardar', 'error')
     }
@@ -547,7 +550,7 @@ const deleteItem = async () => {
     if (r.success) {
       showMsg('Regla eliminada')
       deleteDialog.value = false
-      loadRules({ page: 1, pageSize: 20, search: '', tenantId: tenantId.value })
+      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else {
       showMsg(r.error || 'Error al eliminar', 'error')
     }
@@ -556,7 +559,8 @@ const deleteItem = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadSettings()
   loadTaxes()
 })
 </script>

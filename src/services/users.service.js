@@ -1,9 +1,61 @@
 import { supabase } from '@/plugins/supabase'
 
 /**
- * Obtener todos los usuarios del tenant
+ * Obtener usuarios del tenant con paginación
  */
-export async function getUsers(tenantId) {
+export async function getUsers(tenantId, page = 1, pageSize = 10, search = '') {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  let query = supabase
+    .from('users')
+    .select(`
+      user_id,
+      auth_user_id,
+      tenant_id,
+      email,
+      full_name,
+      is_active,
+      created_at,
+      user_roles (
+        role_id,
+        roles (
+          role_id,
+          name
+        )
+      )
+    `, { count: 'exact' })
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  // Aplicar búsqueda si existe
+  if (search && search.trim()) {
+    query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+  }
+
+  const { data, error, count } = await query
+
+  if (error) {
+    console.error('Error al obtener usuarios:', error)
+    return { success: false, error: error.message, data: [], total: 0 }
+  }
+
+  // Transformar los roles para mejor acceso
+  const users = (data || []).map(user => ({
+    ...user,
+    roles: user.user_roles?.map(ur => ur.roles) || []
+  }))
+
+  return { success: true, data: users, total: count || 0 }
+}
+
+/**
+ * Obtener todos los usuarios del tenant (sin paginación, para dropdowns)
+ */
+export async function getAllUsers(tenantId) {
   if (!tenantId) throw new Error('Tenant ID is required')
   
   const { data, error } = await supabase

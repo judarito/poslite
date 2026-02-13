@@ -4,10 +4,6 @@
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="sales">Historial de Ventas</v-tab>
       <v-tab value="returns">Devoluciones</v-tab>
-      <v-spacer></v-spacer>
-      <v-btn color="info" variant="tonal" size="small" @click="runRLSTest" class="mt-2 mr-2">
-        🔍 Test RLS
-      </v-btn>
     </v-tabs>
 
     <v-window v-model="tab">
@@ -19,6 +15,7 @@
           :items="sales"
           :total-items="totalSales"
           :loading="loadingSales"
+          :page-size="defaultPageSize"
           item-key="sale_id"
           title-field="sale_number"
           avatar-icon="mdi-receipt-text"
@@ -173,7 +170,7 @@
             <div class="text-subtitle-2 mb-2">Seleccione los productos a devolver:</div>
             
             <!-- Vista Desktop: Tabla -->
-            <v-table density="comfortable" class="d-none d-sm-table">
+            <v-table density="comfortable" class="d-none d-sm-table" style="width: 100%;">
               <thead>
                 <tr>
                   <th style="width: 50px;"></th>
@@ -269,7 +266,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn @click="voidDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="voiding" @click="doVoid">Anular</v-btn>
+          <v-btn color="error" :loading="voiding" @click="doVoidSale">Anular</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -279,18 +276,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { usePrint } from '@/composables/usePrint'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
 import supabaseService from '@/services/supabase.service'
-import { testCashierRLS } from '@/utils/testRLS'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
 const { printing, printSaleTicket } = usePrint()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 
 const tab = ref('sales')
 const sales = ref([])
@@ -366,8 +364,21 @@ const viewSale = async (item) => {
   else showMsg('Error al cargar detalle', 'error')
 }
 
-const handlePrintSale = async () => {
-  if (!saleDetail.value) return
+const handlePrintSale = async (item) => {
+  // Si se pasa un item, cargar sus detalles primero
+  let saleData = item && item.sale_id !== saleDetail.value?.sale_id ? null : saleDetail.value
+  
+  if (!saleData && item) {
+    const r = await salesService.getSaleById(tenantId.value, item.sale_id)
+    if (r.success) {
+      saleData = r.data
+    } else {
+      showMsg('Error al cargar venta', 'error')
+      return
+    }
+  } else if (!saleData) {
+    return
+  }
   
   // Obtener datos del tenant
   const { data: tenant } = await supabaseService.client
@@ -376,7 +387,7 @@ const handlePrintSale = async () => {
     .eq('tenant_id', tenantId.value)
     .single()
   
-  printSaleTicket(saleDetail.value, tenant)
+  printSaleTicket(saleData, tenant)
 }
 
 const openReturnDialog = async (item) => {
@@ -404,26 +415,25 @@ const processReturn = async () => {
       reason: returnReason.value,
       lines
     })
-    if (r.success) { showMsg('Devolución procesada'); returnDialog.value = false; loadSales({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
-    else showMsg(r.error, 'error')
+    if (r.success) { showMsg('Devolución procesada'); returnDialog.value = false; loadSales({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
+    else showMsg(r.error || 'Error', 'error')
   } finally { processingReturn.value = false }
 }
 
 const confirmVoid = (item) => { saleToVoid.value = item; voidDialog.value = true }
-const doVoid = async () => {
+const doVoidSale = async () => {
   if (!saleToVoid.value) return
   voiding.value = true
   try {
     const r = await salesService.voidSale(tenantId.value, saleToVoid.value.sale_id)
-    if (r.success) { showMsg('Venta anulada'); voidDialog.value = false; loadSales({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Venta anulada'); voidDialog.value = false; loadSales({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { voiding.value = false }
 }
 
-// Test RLS
-const runRLSTest = async () => {
-  await testCashierRLS()
-}
+onMounted(async () => {
+  await loadSettings()
+})
 
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }

@@ -6,6 +6,7 @@
       :items="locations"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="location_id"
       title-field="name"
       avatar-icon="mdi-map-marker"
@@ -162,12 +163,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import locationsService from '@/services/locations.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 
 const locations = ref([])
 const totalItems = ref(0)
@@ -282,7 +285,7 @@ const saveLocation = async () => {
       closeDialog()
       loadLocations({
         page: 1,
-        pageSize: 10,
+        pageSize: defaultPageSize.value,
         search: '',
         tenantId: tenantId.value
       })
@@ -316,7 +319,7 @@ const deleteLocation = async () => {
       deleteDialog.value = false
       loadLocations({
         page: 1,
-        pageSize: 10,
+        pageSize: defaultPageSize.value,
         search: '',
         tenantId: tenantId.value
       })
@@ -335,6 +338,10 @@ const showMessage = (message, color = 'success') => {
   snackbarColor.value = color
   snackbar.value = true
 }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>
 
 <style scoped>

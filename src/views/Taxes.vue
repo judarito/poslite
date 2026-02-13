@@ -6,6 +6,7 @@
       :items="taxes"
       :total-items="totalItems"
       :loading="loading"
+      :page-size="defaultPageSize"
       item-key="tax_id"
       title-field="name"
       avatar-icon="mdi-percent-circle"
@@ -66,12 +67,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import taxesService from '@/services/taxes.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize, loadSettings } = useTenantSettings()
 const taxes = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -111,7 +114,7 @@ const save = async () => {
     const r = isEditing.value
       ? await taxesService.updateTax(tenantId.value, formData.value.tax_id, formData.value)
       : await taxesService.createTax(tenantId.value, formData.value)
-    if (r.success) { showMsg(isEditing.value ? 'Impuesto actualizado' : 'Impuesto creado'); dialog.value = false; loadTaxes({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(isEditing.value ? 'Impuesto actualizado' : 'Impuesto creado'); dialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error || 'Error al guardar', 'error')
   } finally { saving.value = false }
 }
@@ -121,10 +124,14 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await taxesService.deleteTax(tenantId.value, itemToDelete.value.tax_id)
-    if (r.success) { showMsg('Impuesto eliminado'); deleteDialog.value = false; loadTaxes({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Impuesto eliminado'); deleteDialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+onMounted(async () => {
+  await loadSettings()
+})
 </script>
