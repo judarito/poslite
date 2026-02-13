@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { supabase } from '@/plugins/supabase'
+import { canManageTenants } from '@/utils/superAdmin'
 import Home from '@/views/Home.vue'
 import About from '@/views/About.vue'
 import Settings from '@/views/Settings.vue'
@@ -21,6 +22,7 @@ import Sales from '@/views/Sales.vue'
 import Inventory from '@/views/Inventory.vue'
 import Reports from '@/views/Reports.vue'
 import TenantConfig from '@/views/TenantConfig.vue'
+import TenantManagement from '@/views/TenantManagement.vue'
 import LayawayContracts from '@/views/LayawayContracts.vue'
 import LayawayDetail from '@/views/LayawayDetail.vue'
 import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
@@ -166,6 +168,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/tenant-management',
+    name: 'TenantManagement',
+    component: TenantManagement,
+    meta: { requiresAuth: true, requiresSuperAdmin: true }
+  },
+  {
     path: '/layaway',
     name: 'LayawayContracts',
     component: LayawayContracts,
@@ -201,13 +209,28 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
+    // Validación de autenticación
     if (to.meta.requiresAuth && !isAuthenticated) {
       next('/login')
-    } else if (to.meta.requiresGuest && isAuthenticated) {
-      next('/')
-    } else {
-      next()
+      return
     }
+    
+    if (to.meta.requiresGuest && isAuthenticated) {
+      next('/')
+      return
+    }
+
+    // Validación de Super Admin para gestión de tenants
+    if (to.meta.requiresSuperAdmin && isAuthenticated) {
+      const isSuperAdmin = await canManageTenants()
+      if (!isSuperAdmin) {
+        console.warn('🔐 Acceso denegado: Solo Super Admins pueden gestionar tenants')
+        next('/') // Redirigir a home
+        return
+      }
+    }
+
+    next()
   } catch (error) {
     console.error('Router guard error:', error)
     // En caso de error, dejar pasar a login para evitar app congelada

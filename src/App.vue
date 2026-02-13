@@ -16,7 +16,7 @@
 
         <v-spacer></v-spacer>
 
-        <v-btn icon @click="alertsDialog = true">
+        <v-btn v-if="userProfile || tenantId" icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
             :color="totalAlertsCount > 0 ? 'error' : 'grey'"
@@ -26,7 +26,7 @@
           </v-badge>
         </v-btn>
 
-        <v-btn icon @click="router.push('/tenant-config')">
+        <v-btn icon @click="handleProfileClick">
           <v-icon>mdi-account-circle</v-icon>
         </v-btn>
       </v-app-bar>
@@ -41,43 +41,50 @@
         <v-list-item
           prepend-avatar="https://randomuser.me/api/portraits/men/85.jpg"
           :title="userProfile?.full_name || user?.email || 'Usuario'"
-          :subtitle="userProfile?.tenants?.name || 'Sin empresa'"
+          :subtitle="(canManageTenants && !userProfile) ? 'Super Administrador' : (userProfile?.tenants?.name || 'Sin empresa')"
         ></v-list-item>
 
         <v-divider></v-divider>
 
         <v-list density="compact" nav>
-          <template v-for="(section, idx) in menuSections" :key="idx">
-            <!-- Item suelto (sin grupo) -->
-            <v-list-item
-              v-if="!section.children"
-              :prepend-icon="section.icon"
-              :title="section.title"
-              :to="section.route"
-              :value="section.title"
-              color="primary"
-            ></v-list-item>
-
-            <!-- Grupo colapsable -->
-            <v-list-group v-else :value="section.title">
-              <template #activator="{ props }">
-                <v-list-item
-                  v-bind="props"
-                  :prepend-icon="section.icon"
-                  :title="section.title"
-                ></v-list-item>
-              </template>
+          <template v-if="menuSections && menuSections.length > 0">
+            <template v-for="(section, idx) in menuSections" :key="`section-${section?.title || idx}`">
+              <!-- Item suelto (sin grupo) -->
               <v-list-item
-                v-for="child in section.children"
-                :key="child.title"
-                :prepend-icon="child.icon"
-                :title="child.title"
-                :to="child.route"
-                :value="child.title"
+                v-if="!section?.children"
+                :prepend-icon="section?.icon"
+                :title="section?.title"
+                :to="section?.route"
+                :value="section?.title"
                 color="primary"
               ></v-list-item>
-            </v-list-group>
+
+              <!-- Grupo colapsable -->
+              <v-list-group v-else-if="section?.children" :value="section?.title">
+                <template #activator="{ props }">
+                  <v-list-item
+                    v-bind="props"
+                    :prepend-icon="section?.icon"
+                    :title="section?.title"
+                  ></v-list-item>
+                </template>
+                <v-list-item
+                  v-for="(child, childIdx) in section.children"
+                  :key="`child-${child?.title || childIdx}`"
+                  :prepend-icon="child?.icon"
+                  :title="child?.title"
+                  :to="child?.route"
+                  :value="child?.title"
+                  color="primary"
+                ></v-list-item>
+              </v-list-group>
+            </template>
           </template>
+          
+          <!-- Mensaje cuando no hay menú disponible -->
+          <v-list-item v-else>
+            <v-list-item-title class="text-caption text-grey">Cargando menú...</v-list-item-title>
+          </v-list-item>
         </v-list>
 
         <template v-slot:append>
@@ -453,6 +460,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useNotification } from '@/composables/useNotification'
 import { useTheme } from '@/composables/useTheme'
+import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useDisplay } from 'vuetify'
 import alertsService from '@/services/alerts.service'
 import locationsService from '@/services/locations.service'
@@ -464,6 +472,7 @@ const { tenantId, clearTenant } = useTenant()
 const { theme, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 const { isDark, setTheme } = useTheme()
+const { canManageTenants } = useSuperAdmin()
 const { mobile: isMobile } = useDisplay()
 
 const drawer = ref(true)
@@ -616,6 +625,7 @@ const allMenuItems = [
     permissions: [], // Visible si tiene algún hijo visible
     children: [
       { title: 'Empresa', icon: 'mdi-domain', route: '/tenant-config', permissions: ['SETTINGS.TENANT.MANAGE'] },
+      { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
       { title: 'Sedes', icon: 'mdi-store', route: '/locations', permissions: ['SETTINGS.LOCATIONS.MANAGE'] },
       { title: 'Impuestos', icon: 'mdi-percent', route: '/taxes', permissions: ['SETTINGS.TAXES.MANAGE'] },
       { title: 'Reglas de Impuestos', icon: 'mdi-file-tree', route: '/tax-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
@@ -627,14 +637,35 @@ const allMenuItems = [
   { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
 ]
 
+// Menú específico para Super Admin (usuarios sin tenant)
+const superAdminMenuItems = [
+  {
+    title: 'Gestión del Sistema',
+    icon: 'mdi-cog-outline',
+    permissions: [],
+    children: [
+      { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
+    ]
+  },
+  { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
+]
+
 // Filtrar menú según permisos del usuario
 const menuSections = computed(() => {
-  if (!userProfile.value) return []
-  
+  // Guarda: esperar a que se inicialicen los datos
+  if (!user.value) {
+    return []
+  }
+
+  // Definir función de filtrado
   const filterItems = (items) => {
+    if (!Array.isArray(items)) return []
+    
     const result = []
     
     for (const item of items) {
+      if (!item) continue // Guarda contra items null/undefined
+      
       // Crear copia del item
       const newItem = { ...item }
       
@@ -649,8 +680,20 @@ const menuSections = computed(() => {
       
       // Si tiene permisos requeridos, verificar acceso
       if (newItem.permissions && newItem.permissions.length > 0) {
-        if (!hasAnyPermission(newItem.permissions)) {
-          continue // No tiene permiso, omitir
+        // Validación especial para Gestión de Tenants (solo Super Admin)
+        if (newItem.permissions.includes('SUPER_ADMIN_ONLY')) {
+          if (!canManageTenants.value) {
+            continue // No es super admin, omitir
+          }
+        } else {
+          // Para usuarios normales, verificar permisos si tienen perfil
+          if (userProfile.value && !hasAnyPermission(newItem.permissions)) {
+            continue // No tiene permiso, omitir
+          }
+          // Si no tiene perfil, también omitir (excepto SUPER_ADMIN_ONLY)
+          if (!userProfile.value) {
+            continue
+          }
         }
       }
       
@@ -660,8 +703,24 @@ const menuSections = computed(() => {
     
     return result
   }
-  
-  return filterItems(JSON.parse(JSON.stringify(allMenuItems)))
+
+  try {
+    // Si es Super Admin (sin perfil), mostrar menú especial
+    if (!userProfile.value && canManageTenants.value) {
+      return filterItems(JSON.parse(JSON.stringify(superAdminMenuItems || [])))
+    }
+    
+    // Si no tiene perfil y tampoco es super admin, no mostrar nada
+    if (!userProfile.value) {
+      return []
+    }
+
+    // Usuario normal: usar menú completo filtrado por permisos
+    return filterItems(JSON.parse(JSON.stringify(allMenuItems || [])))
+  } catch (error) {
+    console.warn('Error procesando menú:', error)
+    return [] // Retornar array vacío en caso de error
+  }
 })
 
 const handleResize = () => {
@@ -670,6 +729,27 @@ const handleResize = () => {
     drawer.value = false
   } else {
     drawer.value = true
+  }
+}
+
+const handleProfileClick = () => {
+  try {
+    // Guarda: asegurar que hay un usuario autenticado
+    if (!user.value?.id) {
+      console.warn('No hay usuario autenticado')
+      return
+    }
+
+    // Super Admin va a gestión de tenants, usuario normal a config de tenant
+    if (canManageTenants.value && !userProfile.value) {
+      router.push('/tenant-management')
+    } else {
+      router.push('/tenant-config')
+    }
+  } catch (error) {
+    console.error('Error en handleProfileClick:', error)
+    // Fallback seguro
+    router.push('/tenant-config')
   }
 }
 

@@ -193,7 +193,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useTheme } from '@/composables/useTheme'
 import supabaseService from '@/services/supabase.service'
 
-const { tenantId, tenantData } = useTenant()
+const { tenantId, currentTenant } = useTenant()
 const { userProfile } = useAuth()
 const { currentTheme } = useTheme()
 
@@ -203,12 +203,25 @@ const systemInfo = ref({
   lastUpdate: 'Febrero 2026'
 })
 
-const tenantInfo = computed(() => ({
-  name: tenantData.value?.name || 'No disponible',
-  userName: userProfile.value?.full_name || 'No disponible',
-  role: userProfile.value?.role || 'No disponible',
-  theme: currentTheme.value === 'dark' ? 'Oscuro' : 'Claro'
-}))
+const tenantInfo = computed(() => {
+  // Guardas defensivas para evitar errores de acceso
+  try {
+    return {
+      name: currentTenant.value?.name || 'No disponible',
+      userName: userProfile.value?.full_name || 'No disponible', 
+      role: userProfile.value?.role || 'No disponible',
+      theme: (currentTheme && typeof currentTheme.value === 'string' && currentTheme.value === 'dark') ? 'Oscuro' : 'Claro'
+    }
+  } catch (error) {
+    console.warn('Error en tenantInfo computed:', error)
+    return {
+      name: 'Error',
+      userName: 'Error',
+      role: 'Error', 
+      theme: 'Claro'
+    }
+  }
+})
 
 const stats = ref({
   products: '...',
@@ -241,7 +254,16 @@ const technologies = ref([
 ])
 
 const loadStats = async () => {
-  if (!tenantId.value) return
+  // Guarda: solo cargar estadísticas si hay tenant
+  if (!tenantId.value) {
+    stats.value = {
+      products: 'N/A',
+      sales: 'N/A', 
+      customers: 'N/A',
+      locations: 'N/A'
+    }
+    return
+  }
 
   try {
     // Contar productos
