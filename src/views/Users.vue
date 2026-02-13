@@ -257,6 +257,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useTenant } from '@/composables/useTenant'
 import {
   getUsers,
   createUser,
@@ -265,6 +266,8 @@ import {
   changeUserPassword,
   getRoles
 } from '@/services/users.service'
+
+const { tenantId } = useTenant()
 
 // Estado
 const users = ref([])
@@ -324,9 +327,10 @@ const rules = {
 
 // Métodos
 async function loadUsers() {
+  if (!tenantId.value) return
   loading.value = true
   try {
-    users.value = await getUsers()
+    users.value = await getUsers(tenantId.value)
   } catch (error) {
     showMessage('Error al cargar usuarios', 'error')
   } finally {
@@ -335,8 +339,9 @@ async function loadUsers() {
 }
 
 async function loadRoles() {
+  if (!tenantId.value) return
   try {
-    availableRoles.value = await getRoles()
+    availableRoles.value = await getRoles(tenantId.value)
   } catch (error) {
     showMessage('Error al cargar roles', 'error')
   }
@@ -375,12 +380,12 @@ function closeDialog() {
 }
 
 async function saveUser() {
-  if (!formValid.value) return
+  if (!formValid.value || !tenantId.value) return
 
   saving.value = true
   try {
     if (isEdit.value) {
-      await updateUser(form.value.user_id, {
+      await updateUser(tenantId.value, form.value.user_id, {
         full_name: form.value.full_name,
         is_active: form.value.is_active,
         roleIds: form.value.roleIds
@@ -440,8 +445,9 @@ async function changePassword() {
 }
 
 async function toggleUserStatus(user) {
+  if (!tenantId.value) return
   try {
-    await updateUser(user.user_id, {
+    await updateUser(tenantId.value, user.user_id, {
       full_name: user.full_name,
       is_active: !user.is_active,
       roleIds: user.roles.map(r => r.role_id)

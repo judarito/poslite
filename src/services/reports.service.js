@@ -2,15 +2,21 @@ import supabaseService from './supabase.service'
 
 class ReportsService {
   constructor() {
+    // Las políticas RLS en las tablas sales, sale_lines, etc. ya filtran por rol
     this.salesTable = 'sales'
     this.saleLinesTable = 'sale_lines'
+    this.salePaymentsTable = 'sale_payments'
+    this.saleReturnsTable = 'sale_returns'
+    this.cashSessionsTable = 'cash_sessions'
+    this.cashMovementsTable = 'cash_movements'
   }
 
   // Resumen de ventas por período
   async getSalesSummary(tenantId, fromDate, toDate, locationId = null) {
     try {
+      // Las políticas RLS de sales ya filtran por rol automáticamente
       let query = supabaseService.client
-        .from(this.salesTable)
+        .from('sales')
         .select('sale_id, subtotal, discount_total, tax_total, total, status, sold_at')
         .eq('tenant_id', tenantId)
         .in('status', ['COMPLETED', 'PARTIAL_RETURN', 'RETURNED'])
@@ -40,19 +46,12 @@ class ReportsService {
       })
 
       // Obtener total de devoluciones en el mismo período
-      let returnsQuery = supabaseService.client
-        .from('sale_returns')
-        .select('refund_total, created_at')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'COMPLETED')
-        .gte('created_at', fromDate)
-        .lte('created_at', toDate)
-
-      if (locationId) returnsQuery = returnsQuery.eq('location_id', locationId)
-
-      const { data: returns } = await returnsQuery
-      ;(returns || []).forEach(r => {
-        summary.returns_total += parseFloat(r.refund_total) || 0
+      // Nota: Las devoluciones ya están incluidas en el estado PARTIAL_RETURN y RETURNED
+      // Aquí calculamos el total real de devoluciones
+      const returns = data.filter(s => s.status === 'RETURNED' || s.status === 'PARTIAL_RETURN')
+      returns.forEach(r => {
+        // Las devoluciones parciales y totales ya están en negativo en el total
+        summary.returns_total += Math.abs(parseFloat(r.total) || 0)
       })
 
       summary.net_total = summary.gross_total - summary.returns_total
@@ -86,24 +85,11 @@ class ReportsService {
         if (!byDay[day]) byDay[day] = { date: day, count: 0, gross_total: 0, returns_total: 0, net_total: 0 }
         byDay[day].count++
         byDay[day].gross_total += parseFloat(s.total) || 0
-      })
-
-      // Obtener devoluciones agrupadas por día
-      let returnsQuery = supabaseService.client
-        .from('sale_returns')
-        .select('created_at, refund_total')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'COMPLETED')
-        .gte('created_at', fromDate)
-        .lte('created_at', toDate)
-
-      if (locationId) returnsQuery = returnsQuery.eq('location_id', locationId)
-
-      const { data: returns } = await returnsQuery
-      ;(returns || []).forEach(r => {
-        const day = r.created_at.substring(0, 10)
-        if (!byDay[day]) byDay[day] = { date: day, count: 0, gross_total: 0, returns_total: 0, net_total: 0 }
-        byDay[day].returns_total += parseFloat(r.refund_total) || 0
+        
+        // Si es devolución, sumar al total de devoluciones
+        if (s.status === 'RETURNED' || s.status === 'PARTIAL_RETURN') {
+          byDay[day].returns_total += Math.abs(parseFloat(s.total) || 0)
+        }
       })
 
       // Calcular neto
@@ -200,7 +186,7 @@ class ReportsService {
   async getSalesByPaymentMethod(tenantId, fromDate, toDate) {
     try {
       const { data, error } = await supabaseService.client
-        .from('sale_payments')
+        .from(this.salePaymentsTable)
         .select(`
           amount,
           payment_method:payment_method_id(code, name),
@@ -233,7 +219,7 @@ class ReportsService {
   async getCashMovements(tenantId, fromDate, toDate, locationId = null, type = null) {
     try {
       let query = supabaseService.client
-        .from('cash_movements')
+        .from(this.cashMovementsTable)
         .select(`
           cash_movement_id,
           type,

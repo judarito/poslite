@@ -171,11 +171,15 @@
                   label="Producto *"
                   prepend-inner-icon="mdi-package-variant"
                   variant="outlined"
-                  :rules="[rules.required]"
+                  :rules="[rules_validation.required]"
                   :loading="loadingProducts"
                   :disabled="isEditing"
                   @update:search="searchProducts"
-                ></v-autocomplete>
+                >
+                  <template #item="{ props, item }">
+                    <v-list-item v-bind="props" :title="item.raw.name" :subtitle="item.raw.category?.name || 'Sin categoría'"></v-list-item>
+                  </template>
+                </v-autocomplete>
               </v-col>
 
               <!-- Variante (si aplica) -->
@@ -183,16 +187,22 @@
                 <v-autocomplete
                   v-model="formData.variant_id"
                   :items="variants"
-                  :item-title="v => `${v.sku} - ${v.variant_name}`"
                   item-value="variant_id"
                   label="Variante *"
                   prepend-inner-icon="mdi-tag"
                   variant="outlined"
-                  :rules="[rules.required]"
+                  :rules="[rules_validation.required]"
                   :loading="loadingVariants"
                   :disabled="isEditing"
                   @update:search="searchVariants"
-                ></v-autocomplete>
+                >
+                  <template #item="{ props, item }">
+                    <v-list-item v-bind="props" :title="`${item.raw.sku} - ${item.raw.variant_name || 'Sin nombre'}`" :subtitle="item.raw.product?.name"></v-list-item>
+                  </template>
+                  <template #selection="{ item }">
+                    {{ item.raw.sku }} - {{ item.raw.variant_name || 'Sin nombre' }}
+                  </template>
+                </v-autocomplete>
               </v-col>
 
               <!-- Estado -->
@@ -250,6 +260,7 @@ import taxRulesService from '@/services/taxRules.service'
 import taxesService from '@/services/taxes.service'
 import categoriesService from '@/services/categories.service'
 import productsService from '@/services/products.service'
+import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
 
@@ -397,6 +408,63 @@ const onScopeChange = () => {
 
   if (formData.value.scope === 'CATEGORY') {
     loadCategories()
+  } else if (formData.value.scope === 'PRODUCT') {
+    loadInitialProducts()
+  } else if (formData.value.scope === 'VARIANT') {
+    loadInitialVariants()
+  }
+}
+
+const loadInitialProducts = async () => {
+  loadingProducts.value = true
+  try {
+    const { data, error } = await supabaseService.client
+      .from('products')
+      .select(`
+        product_id,
+        name,
+        is_active,
+        category:category_id(category_id, name)
+      `)
+      .eq('tenant_id', tenantId.value)
+      .eq('is_active', true)
+      .limit(50)
+
+    if (error) throw error
+    products.value = data || []
+  } catch (error) {
+    console.error('Error cargando productos:', error)
+    showMsg('Error al cargar productos', 'error')
+  } finally {
+    loadingProducts.value = false
+  }
+}
+
+const loadInitialVariants = async () => {
+  loadingVariants.value = true
+  try {
+    const { data, error } = await supabaseService.client
+      .from('product_variants')
+      .select(`
+        variant_id,
+        sku,
+        variant_name,
+        cost,
+        price,
+        is_active,
+        product:product_id(product_id, name)
+      `)
+      .eq('tenant_id', tenantId.value)
+      .eq('is_active', true)
+      .limit(50)
+
+    if (error) throw error
+    variants.value = data || []
+  } catch (error) {
+    console.error('Error cargando variantes:', error)
+    showMsg('Error al cargar variantes', 'error')
+  } finally {
+    loadingVariants.value = false
   }
 }
 

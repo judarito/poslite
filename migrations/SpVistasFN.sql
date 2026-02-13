@@ -243,7 +243,7 @@ begin
 
     -- Si NO permite sobreventa (allow_backorder = false o NULL), validar stock disponible
     if coalesce(v_allow_backorder, false) = false and v_on_hand < v_qty then
-      raise exception 'Insufficient AVAILABLE stock for variant % (available=%, required=%)', v_variant, v_on_hand, v_qty;
+      raise exception 'Stock insuficiente para la variante % (disponible=%, requerido=%)', v_variant, v_on_hand, v_qty;
     end if;
 
     v_tax_rate := fn_get_tax_rate_for_variant(p_tenant, v_variant);

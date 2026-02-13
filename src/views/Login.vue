@@ -6,7 +6,7 @@
         <v-icon size="120" class="mb-6">mdi-lock-outline</v-icon>
         <h1 class="text-h3 mb-4">Bienvenido</h1>
         <p class="text-h6 text-center px-8">
-          Sistema de gestión con Vue.js y Supabase
+          Gestiona tu negocio de forma inteligente con nuestro sistema POS e inventarios
         </p>
         <div class="mt-8 d-flex ga-2">
           <v-chip color="white" variant="outlined" size="large">

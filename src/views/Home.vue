@@ -17,7 +17,7 @@
     <!-- Accesos directos -->
     <v-row>
       <v-col
-        v-for="card in cards"
+        v-for="card in visibleCards"
         :key="card.title"
         cols="12"
         sm="6"
@@ -45,14 +45,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCashSession } from '@/composables/useCashSession'
+import { useAuth } from '@/composables/useAuth'
 import CashSessionCard from '@/components/CashSessionCard.vue'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 
 const router = useRouter()
 const { hasOpenSession, loadPOSContext } = useCashSession()
+const { userProfile } = useAuth()
 
 onMounted(async () => {
   await loadPOSContext()
@@ -64,51 +66,70 @@ const cards = ref([
     icon: 'mdi-point-of-sale',
     color: 'primary',
     description: 'Registra ventas rápidamente',
-    route: '/pos'
+    route: '/pos',
+    roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
     title: 'Productos',
     icon: 'mdi-package-variant',
     color: 'success',
     description: 'Administra tu catálogo de productos',
-    route: '/products'
+    route: '/products',
+    roles: ['ADMINISTRADOR', 'GERENTE', 'VENDEDOR'] // NO cajeros
   },
   {
     title: 'Ventas',
     icon: 'mdi-cart',
     color: 'info',
     description: 'Consulta historial de ventas',
-    route: '/sales'
+    route: '/sales',
+    roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
     title: 'Plan Separe',
     icon: 'mdi-calendar-clock',
     color: 'blue',
     description: 'Contratos de plan separe',
-    route: '/layaway'
+    route: '/layaway',
+    roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
     title: 'Inventario',
     icon: 'mdi-warehouse',
     color: 'orange',
     description: 'Control de stock y movimientos',
-    route: '/inventory'
+    route: '/inventory',
+    roles: ['ADMINISTRADOR', 'GERENTE'] // NO cajeros
   },
   {
     title: 'Compras',
     icon: 'mdi-cart-plus',
     color: 'teal',
     description: 'Registro de compras a proveedores',
-    route: '/purchases'
+    route: '/purchases',
+    roles: ['ADMINISTRADOR', 'GERENTE'] // NO cajeros
   },
   {
     title: 'Reportes',
     icon: 'mdi-chart-bar',
     color: 'purple',
     description: 'Reportes y estadísticas',
-    route: '/reports'
+    route: '/reports',
+    roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
 ])
+
+// Filtrar cards según roles del usuario
+const visibleCards = computed(() => {
+  if (!userProfile.value?.roles) return []
+  
+  const userRoles = userProfile.value.roles.map(r => r.name)
+  
+  return cards.value.filter(card => {
+    // Si el usuario tiene al menos uno de los roles requeridos
+    return card.roles.some(role => userRoles.includes(role))
+  })
+})
 
 const navigateTo = (route) => {
   if (route) {

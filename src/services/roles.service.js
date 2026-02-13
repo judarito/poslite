@@ -85,11 +85,17 @@ class RolesService {
     }
   }
 
-  async getRolePermissions(roleId) {
+  async getRolePermissions(tenantId, roleId) {
     try {
+      if (!tenantId) throw new Error('Tenant ID is required')
+      
       const { data, error } = await supabaseService.client
         .from(this.rolePermissionsTable)
-        .select('permission_id')
+        .select(`
+          permission_id,
+          role:role_id!inner(role_id, tenant_id)
+        `)
+        .eq('role.tenant_id', tenantId)
         .eq('role_id', roleId)
 
       if (error) throw error
@@ -99,8 +105,22 @@ class RolesService {
     }
   }
 
-  async setRolePermissions(roleId, permissionIds) {
+  async setRolePermissions(tenantId, roleId, permissionIds) {
     try {
+      if (!tenantId) throw new Error('Tenant ID is required')
+      
+      // Validar que el role pertenece al tenant
+      const { data: role, error: roleError } = await supabaseService.client
+        .from(this.table)
+        .select('tenant_id')
+        .eq('role_id', roleId)
+        .single()
+      
+      if (roleError) throw roleError
+      if (!role || role.tenant_id !== tenantId) {
+        throw new Error('Unauthorized: Role does not belong to tenant')
+      }
+      
       // Eliminar todos los permisos existentes
       await supabaseService.client
         .from(this.rolePermissionsTable)
@@ -123,11 +143,17 @@ class RolesService {
   }
 
   // User Roles
-  async getUserRoles(userId) {
+  async getUserRoles(tenantId, userId) {
     try {
+      if (!tenantId) throw new Error('Tenant ID is required')
+      
       const { data, error } = await supabaseService.client
         .from(this.userRolesTable)
-        .select('role_id, roles:role_id(name)')
+        .select(`
+          role_id,
+          roles:role_id!inner(role_id, name, tenant_id)
+        `)
+        .eq('roles.tenant_id', tenantId)
         .eq('user_id', userId)
 
       if (error) throw error
@@ -137,13 +163,43 @@ class RolesService {
     }
   }
 
-  async setUserRoles(userId, roleIds) {
+  async setUserRoles(tenantId, userId, roleIds) {
     try {
+      if (!tenantId) throw new Error('Tenant ID is required')
+      
+      // Validar que el usuario pertenece al tenant
+      const { data: user, error: userError } = await supabaseService.client
+        .from('users')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .single()
+      
+      if (userError) throw userError
+      if (!user || user.tenant_id !== tenantId) {
+        throw new Error('Unauthorized: User does not belong to tenant')
+      }
+      
+      // Validar que todos los roles pertenecen al tenant
+      if (roleIds.length > 0) {
+        const { data: validRoles, error: rolesError } = await supabaseService.client
+          .from(this.table)
+          .select('role_id')
+          .eq('tenant_id', tenantId)
+          .in('role_id', roleIds)
+        
+        if (rolesError) throw rolesError
+        if (validRoles.length !== roleIds.length) {
+          throw new Error('Some roles do not belong to this tenant')
+        }
+      }
+      
+      // Eliminar roles existentes
       await supabaseService.client
         .from(this.userRolesTable)
         .delete()
         .eq('user_id', userId)
 
+      // Insertar nuevos roles
       if (roleIds.length > 0) {
         const rows = roleIds.map(rid => ({ user_id: userId, role_id: rid }))
         const { error } = await supabaseService.client

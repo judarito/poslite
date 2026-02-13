@@ -64,7 +64,7 @@ begin
   where tenant_id=p_tenant and location_id=p_location and variant_id=p_variant;
 
   if v_reserved < 0 then
-    raise exception 'Reserved stock cannot be negative (tenant=%, location=%, variant=%)', p_tenant, p_location, p_variant;
+    raise exception 'El stock reservado no puede ser negativo (tenant=%, location=%, variant=%)', p_tenant, p_location, p_variant;
   end if;
 end;
 $$;
@@ -301,11 +301,11 @@ begin
 
     if v_available is null then
       -- si no existe fila, se asume 0 disponible
-      raise exception 'No stock record for variant % (tenant=% location=%)', v_variant, p_tenant, p_location;
+      raise exception 'No existe registro de stock para la variante % (tenant=% location=%)', v_variant, p_tenant, p_location;
     end if;
 
     if v_available < v_qty then
-      raise exception 'Insufficient AVAILABLE stock for variant % (available=%, required=%)', v_variant, v_available, v_qty;
+      raise exception 'Stock disponible insuficiente para la variante % (disponible=%, requerido=%)', v_variant, v_available, v_qty;
     end if;
 
     v_tax_rate := fn_get_tax_rate_for_variant(p_tenant, v_variant);

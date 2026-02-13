@@ -1,12 +1,20 @@
 <template>
   <div>
     <v-card>
-      <v-card-title class="d-flex align-center">
-        <v-icon start color="primary">mdi-cash-register</v-icon>
-        Asignación de Cajas a Cajeros
+      <v-card-title class="d-flex align-center flex-wrap ga-2">
+        <div class="d-flex align-center">
+          <v-icon start color="primary">mdi-cash-register</v-icon>
+          Asignación de Cajas a Cajeros
+        </div>
         <v-spacer></v-spacer>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openAssignDialog">
-          Asignar Caja
+        <v-btn 
+          color="primary" 
+          prepend-icon="mdi-plus" 
+          @click="openAssignDialog"
+          class="text-none"
+        >
+          <span class="d-none d-sm-inline">Asignar Caja</span>
+          <span class="d-sm-none">Asignar</span>
         </v-btn>
       </v-card-title>
 
@@ -250,9 +258,10 @@ const loadAssignments = async () => {
 const loadUsers = async () => {
   if (!tenantId.value) return
   try {
-    const data = await getUsers()
+    const data = await getUsers(tenantId.value)
     users.value = data.filter(u => u.is_active)
   } catch (error) {
+    console.error('Error loading users:', error)
     showError('Error al cargar usuarios')
   }
 }

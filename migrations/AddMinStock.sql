@@ -209,7 +209,7 @@ where tenant_id = 'tenant-uuid'
 /*
   -- En lugar de:
   if v_on_hand < v_qty then
-    raise exception 'Insufficient stock';
+    raise exception 'Stock insuficiente';
   end if;
 
   -- Usar:
@@ -218,7 +218,7 @@ where tenant_id = 'tenant-uuid'
    where variant_id = v_variant;
    
   if NOT v_allow_backorder and v_on_hand < v_qty then
-    raise exception 'Insufficient stock';
+    raise exception 'Stock insuficiente';
   end if;
 */
 */

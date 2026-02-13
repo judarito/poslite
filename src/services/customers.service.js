@@ -166,8 +166,7 @@ class CustomersService {
       })
       if (error) throw error
 
-      // Actualizar saldo
-      await supabaseService.client.rpc('', {}) // Se maneja con trigger o manual
+      // El saldo se actualiza automáticamente con un trigger en la base de datos
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }

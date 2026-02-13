@@ -4,6 +4,10 @@
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="sales">Historial de Ventas</v-tab>
       <v-tab value="returns">Devoluciones</v-tab>
+      <v-spacer></v-spacer>
+      <v-btn color="info" variant="tonal" size="small" @click="runRLSTest" class="mt-2 mr-2">
+        🔍 Test RLS
+      </v-btn>
     </v-tabs>
 
     <v-window v-model="tab">
@@ -282,6 +286,7 @@ import { usePrint } from '@/composables/usePrint'
 import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
 import supabaseService from '@/services/supabase.service'
+import { testCashierRLS } from '@/utils/testRLS'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -414,6 +419,12 @@ const doVoid = async () => {
     else showMsg(r.error, 'error')
   } finally { voiding.value = false }
 }
+
+// Test RLS
+const runRLSTest = async () => {
+  await testCashierRLS()
+}
+
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 </script>

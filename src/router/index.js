@@ -12,6 +12,7 @@ import Products from '@/views/Products.vue'
 import Customers from '@/views/Customers.vue'
 import Taxes from '@/views/Taxes.vue'
 import TaxRules from '@/views/TaxRules.vue'
+import PricingRules from '@/views/PricingRules.vue'
 import Roles from '@/views/Roles.vue'
 import CashSessions from '@/views/CashSessions.vue'
 import CashRegisters from '@/views/CashRegisters.vue'
@@ -96,6 +97,12 @@ const routes = [
     path: '/tax-rules',
     name: 'TaxRules',
     component: TaxRules,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/pricing-rules',
+    name: 'PricingRules',
+    component: PricingRules,
     meta: { requiresAuth: true }
   },
   {

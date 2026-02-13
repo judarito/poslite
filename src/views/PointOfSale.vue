@@ -208,16 +208,16 @@
                   class="align-self-center"
                 ></v-btn>
               </div>
-              <!-- Botones rápidos de pago -->
-              <div v-if="i === 0" class="d-flex flex-wrap ga-1 mt-1">
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(1000)">$1k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(2000)">$2k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(5000)">$5k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(10000)">$10k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(20000)">$20k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(50000)">$50k</v-btn>
-                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(100000)">$100k</v-btn>
-                <v-btn size="x-small" variant="tonal" color="primary" @click="setQuickAmount(totals.total)">Exacto</v-btn>
+              <!-- Botones rápidos de pago (solo para efectivo) -->
+              <div v-if="isPaymentCash(payment.method)" class="d-flex flex-wrap ga-1 mt-1">
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 1000)">$1k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 2000)">$2k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 5000)">$5k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 10000)">$10k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 20000)">$20k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 50000)">$50k</v-btn>
+                <v-btn size="x-small" variant="tonal" @click="setQuickAmount(i, 100000)">$100k</v-btn>
+                <v-btn size="x-small" variant="tonal" color="primary" @click="setQuickAmount(i, totals.total)">Exacto</v-btn>
               </div>
             </div>
             <v-btn 
@@ -319,13 +319,15 @@ const selectedVariant = ref(null)
 const searchingProduct = ref(false)
 
 const totals = computed(() => {
-  let subtotal = 0, tax = 0
-  cart.value.forEach(l => { 
-    const base = (l.quantity * l.unit_price) - (l.discount || 0)
-    subtotal += base
+  let subtotal = 0, tax = 0, total = 0
+  cart.value.forEach(l => {
+    // Usar los valores ya calculados en recalculateTaxes
     tax += l.tax_amount || 0
+    total += l.line_total || 0
   })
-  return { subtotal, tax, total: subtotal + tax }
+  // El subtotal es el total menos los impuestos
+  subtotal = total - tax
+  return { subtotal, tax, total }
 })
 
 const paidTotal = computed(() => payments.value.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0))
@@ -430,11 +432,13 @@ const recalculateTaxes = async (line) => {
   
   if (taxResult.success && taxResult.rate) {
     line.tax_rate = taxResult.rate
-    // Calcular impuesto sobre (qty * precio - descuento)
-    const base = (line.quantity * line.unit_price) - (line.discount || 0)
-    line.tax_amount = Math.round(base * line.tax_rate)
-    line.line_total = Math.round(base + line.tax_amount)
-    console.log('Tax calculated - rate:', line.tax_rate, 'base:', base, 'tax:', line.tax_amount, 'total:', line.line_total)
+    const grossAmount = (line.quantity * line.unit_price) - (line.discount || 0)
+    
+    // Impuesto ADICIONAL: El impuesto se suma al precio
+    // Formula: impuesto = base * tasa, total = base + impuesto
+    line.tax_amount = Math.round(grossAmount * line.tax_rate)
+    line.line_total = Math.round(grossAmount + line.tax_amount)
+    console.log('Tax ADDITIONAL - base:', grossAmount, 'tax:', line.tax_amount, 'total:', line.line_total)
   } else {
     console.warn('No tax rate found or error:', taxResult)
     // Sin impuesto
@@ -468,9 +472,16 @@ const searchCustomer = async (search) => {
 }
 
 // Pagos
-const setQuickAmount = (amount) => {
-  if (payments.value.length > 0) {
-    payments.value[0].amount = amount
+const isPaymentCash = (methodCode) => {
+  // Verifica si el método de pago es efectivo
+  // Soporta: CASH, EFECTIVO, EFE, CASH_COP, etc.
+  const code = (methodCode || '').toUpperCase()
+  return code === 'CASH' || code === 'EFECTIVO' || code.includes('EFECT') || code.includes('EFE')
+}
+
+const setQuickAmount = (index, amount) => {
+  if (payments.value[index]) {
+    payments.value[index].amount = amount
     // Forzar actualización reactiva
     payments.value = [...payments.value]
   }
@@ -501,7 +512,15 @@ const processSale = async () => {
       discount: l.discount || 0
     }))
 
-    const paymentsList = payments.value.map(p => ({
+    // Ajustar pagos: si hay cambio, reducir el monto del último pago al total exacto
+    const adjustedPayments = [...payments.value]
+    if (change.value > 0 && adjustedPayments.length > 0) {
+      // Reducir el último pago en el monto del cambio
+      const lastPayment = adjustedPayments[adjustedPayments.length - 1]
+      lastPayment.amount = lastPayment.amount - change.value
+    }
+
+    const paymentsList = adjustedPayments.map(p => ({
       payment_method_code: p.method,
       amount: p.amount,
       reference: null
@@ -555,14 +574,23 @@ onMounted(async () => {
   }
 
   // Buscar sesión abierta del usuario
+  // IMPORTANTE: Cajeros solo deben usar SU PROPIA sesión
   const regs = await cashService.getAllCashRegisters(tenantId.value)
   if (regs.success) {
     for (const reg of regs.data) {
       const s = await cashService.getOpenSession(tenantId.value, reg.cash_register_id)
       if (s.success && s.data) {
-        currentSession.value = { ...s.data, cash_register: reg }
-        break
+        // Verificar que la sesión pertenezca al usuario actual
+        if (s.data.opened_by === userProfile.value?.user_id) {
+          currentSession.value = { ...s.data, cash_register: reg }
+          break
+        }
       }
+    }
+    
+    // Si no encontró su propia sesión, avisar al usuario
+    if (!currentSession.value) {
+      console.warn('⚠️ No hay sesión de caja abierta para este usuario')
     }
   }
 

@@ -132,10 +132,11 @@ const openCreateDialog = () => {
 }
 
 const openEditDialog = async (item) => {
+  if (!tenantId.value) return
   isEditing.value = true
   formData.value = { role_id: item.role_id, name: item.name }
   await loadPermissions()
-  const rp = await rolesService.getRolePermissions(item.role_id)
+  const rp = await rolesService.getRolePermissions(tenantId.value, item.role_id)
   selectedPermissions.value = rp.success ? rp.data : []
   dialog.value = true
 }
@@ -151,7 +152,7 @@ const save = async () => {
     if (isEditing.value) {
       r = await rolesService.updateRole(tenantId.value, formData.value.role_id, formData.value)
       if (r.success) {
-        await rolesService.setRolePermissions(formData.value.role_id, selectedPermissions.value)
+        await rolesService.setRolePermissions(tenantId.value, formData.value.role_id, selectedPermissions.value)
       }
     } else {
       r = await rolesService.createRole(tenantId.value, formData.value)

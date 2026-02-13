@@ -621,6 +621,7 @@ const allMenuItems = [
       { title: 'Sedes', icon: 'mdi-store', route: '/locations', permissions: ['SETTINGS.LOCATIONS.MANAGE'] },
       { title: 'Impuestos', icon: 'mdi-percent', route: '/taxes', permissions: ['SETTINGS.TAXES.MANAGE'] },
       { title: 'Reglas de Impuestos', icon: 'mdi-file-tree', route: '/tax-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
+      { title: 'Políticas de Precio', icon: 'mdi-tag-multiple', route: '/pricing-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
       { title: 'Roles y Permisos', icon: 'mdi-shield-account', route: '/roles', permissions: ['SECURITY.ROLES.MANAGE'] },
       { title: 'Usuarios', icon: 'mdi-account-cog', route: '/auth', permissions: ['SECURITY.USERS.MANAGE'] },
     ]

@@ -3,7 +3,9 @@ import { supabase } from '@/plugins/supabase'
 /**
  * Obtener todos los usuarios del tenant
  */
-export async function getUsers() {
+export async function getUsers(tenantId) {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
   const { data, error } = await supabase
     .from('users')
     .select(`
@@ -22,6 +24,7 @@ export async function getUsers() {
         )
       )
     `)
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -41,7 +44,9 @@ export async function getUsers() {
 /**
  * Obtener un usuario por ID
  */
-export async function getUserById(userId) {
+export async function getUserById(tenantId, userId) {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
   const { data, error } = await supabase
     .from('users')
     .select(`
@@ -60,6 +65,7 @@ export async function getUserById(userId) {
         )
       )
     `)
+    .eq('tenant_id', tenantId)
     .eq('user_id', userId)
     .single()
 
@@ -106,7 +112,9 @@ export async function createUser({ email, password, full_name, roleIds = [], is_
 /**
  * Actualizar usuario
  */
-export async function updateUser(userId, { full_name, is_active, roleIds = [] }) {
+export async function updateUser(tenantId, userId, { full_name, is_active, roleIds = [] }) {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
   try {
     // 1. Actualizar datos del usuario
     const { error: updateError } = await supabase
@@ -115,6 +123,7 @@ export async function updateUser(userId, { full_name, is_active, roleIds = [] })
         full_name,
         is_active
       })
+      .eq('tenant_id', tenantId)
       .eq('user_id', userId)
 
     if (updateError) {
@@ -122,7 +131,21 @@ export async function updateUser(userId, { full_name, is_active, roleIds = [] })
       throw updateError
     }
 
-    // 2. Actualizar roles - eliminar roles existentes
+    // 2. Verificar que los roleIds pertenezcan al tenant
+    if (roleIds.length > 0) {
+      const { data: validRoles, error: rolesCheckError } = await supabase
+        .from('roles')
+        .select('role_id')
+        .eq('tenant_id', tenantId)
+        .in('role_id', roleIds)
+      
+      if (rolesCheckError) throw rolesCheckError
+      if (validRoles.length !== roleIds.length) {
+        throw new Error('Some roles do not belong to this tenant')
+      }
+    }
+
+    // 3. Actualizar roles - eliminar roles existentes
     const { error: deleteRolesError } = await supabase
       .from('user_roles')
       .delete()
@@ -133,7 +156,7 @@ export async function updateUser(userId, { full_name, is_active, roleIds = [] })
       throw deleteRolesError
     }
 
-    // 3. Insertar nuevos roles
+    // 4. Insertar nuevos roles
     if (roleIds.length > 0) {
       const userRoles = roleIds.map(roleId => ({
         user_id: userId,
@@ -160,10 +183,13 @@ export async function updateUser(userId, { full_name, is_active, roleIds = [] })
 /**
  * Eliminar usuario (soft delete)
  */
-export async function deleteUser(userId) {
+export async function deleteUser(tenantId, userId) {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
   const { error } = await supabase
     .from('users')
     .update({ is_active: false })
+    .eq('tenant_id', tenantId)
     .eq('user_id', userId)
 
   if (error) {
@@ -199,10 +225,13 @@ export async function changeUserPassword(authUserId, newPassword) {
 /**
  * Obtener todos los roles disponibles
  */
-export async function getRoles() {
+export async function getRoles(tenantId) {
+  if (!tenantId) throw new Error('Tenant ID is required')
+  
   const { data, error } = await supabase
     .from('roles')
     .select('*')
+    .eq('tenant_id', tenantId)
     .order('name')
 
   if (error) {

@@ -34,6 +34,35 @@
           </v-chip>
         </div>
       </template>
+      <template #actions="{ item }">
+        <div class="d-flex flex-column flex-sm-row ga-1">
+          <v-tooltip text="Gestionar variantes" location="top">
+            <template #activator="{ props }">
+              <v-btn
+                icon="mdi-cube-outline"
+                variant="text"
+                size="small"
+                color="primary"
+                v-bind="props"
+                @click.stop="openVariantDialogFromList(item)"
+              ></v-btn>
+            </template>
+          </v-tooltip>
+          <v-btn
+            icon="mdi-pencil"
+            variant="text"
+            size="small"
+            @click.stop="openEditDialog(item)"
+          ></v-btn>
+          <v-btn
+            icon="mdi-delete"
+            variant="text"
+            size="small"
+            color="error"
+            @click.stop="confirmDelete(item)"
+          ></v-btn>
+        </div>
+      </template>
     </ListView>
 
     <!-- Dialog Crear/Editar Producto -->
@@ -134,10 +163,40 @@
         <v-card-title>{{ editingVariant ? 'Editar Variante' : 'Nueva Variante' }}</v-card-title>
         <v-card-text>
           <v-form ref="variantForm" @submit.prevent="saveVariant">
-            <v-text-field v-model="variantData.sku" label="SKU" prepend-inner-icon="mdi-barcode" variant="outlined" :rules="[rules.required]" class="mb-2"></v-text-field>
-            <v-text-field v-model="variantData.variant_name" label="Nombre variante" prepend-inner-icon="mdi-text" variant="outlined" hint="Ej: Rojo / M" class="mb-2"></v-text-field>
+            <div class="d-flex ga-2 align-end mb-2">
+              <v-text-field 
+                v-model="variantData.sku" 
+                label="SKU" 
+                prepend-inner-icon="mdi-barcode" 
+                variant="outlined" 
+                :rules="[rules.required]"
+                hint="Código único del producto"
+                persistent-hint
+                style="flex: 1"
+              ></v-text-field>
+              <v-tooltip text="Generar SKU automático" location="top">
+                <template #activator="{ props }">
+                  <v-btn 
+                    v-bind="props"
+                    icon="mdi-auto-fix"
+                    color="primary" 
+                    variant="tonal" 
+                    @click="autoGenerateSKU"
+                    :disabled="!formData.name"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
+            </div>
+            <v-text-field 
+              v-model="variantData.variant_name" 
+              label="Nombre variante" 
+              prepend-inner-icon="mdi-text" 
+              variant="outlined" 
+              hint="Ej: Rojo / M" 
+              class="mb-2"
+            ></v-text-field>
             <v-row>
-              <v-col cols="6">
+              <v-col cols="12" sm="6">
                 <v-text-field 
                   v-model.number="variantData.cost" 
                   label="Costo" 
@@ -150,74 +209,15 @@
                   persistent-hint
                 ></v-text-field>
               </v-col>
-              <v-col cols="6">
+              <v-col cols="12" sm="6">
                 <v-text-field 
                   v-model.number="variantData.price" 
-                  label="Precio" 
+                  label="Precio de Venta" 
                   prepend-inner-icon="mdi-cash-plus" 
                   variant="outlined" 
                   type="number" 
                   :rules="[rules.required, rules.positive]"
-                  :readonly="variantData.pricing_method === 'MARKUP'"
-                  :hint="variantData.pricing_method === 'MARKUP' ? 'Calculado automáticamente según markup' : 'Precio manual'"
-                  persistent-hint
-                ></v-text-field>
-              </v-col>
-            </v-row>
-
-            <!-- Configuración de Precio -->
-            <v-divider class="my-4"></v-divider>
-            <div class="text-subtitle-2 mb-3">Configuración de Precio</div>
-
-            <v-select
-              v-model="variantData.pricing_method"
-              label="Método de precio"
-              prepend-inner-icon="mdi-calculator"
-              variant="outlined"
-              :items="pricingMethods"
-              item-title="label"
-              item-value="value"
-              hint="MARKUP: precio automático con margen. FIXED: precio manual"
-              persistent-hint
-              class="mb-3"
-            ></v-select>
-
-            <v-row v-if="variantData.pricing_method === 'MARKUP'">
-              <v-col cols="12">
-                <v-text-field
-                  v-model.number="variantData.markup_percentage"
-                  label="% de Ganancia (Markup)"
-                  prepend-inner-icon="mdi-percent"
-                  variant="outlined"
-                  type="number"
-                  min="0"
-                  suffix="%"
-                  hint="Porcentaje de ganancia sobre el costo"
-                  persistent-hint
-                ></v-text-field>
-              </v-col>
-              <v-col cols="6">
-                <v-select
-                  v-model="variantData.price_rounding"
-                  label="Redondeo"
-                  prepend-inner-icon="mdi-circle-outline"
-                  variant="outlined"
-                  :items="roundingOptions"
-                  item-title="label"
-                  item-value="value"
-                  hint="Tipo de redondeo del precio calculado"
-                  persistent-hint
-                ></v-select>
-              </v-col>
-              <v-col cols="6">
-                <v-text-field
-                  v-model.number="variantData.rounding_to"
-                  label="Redondear a múltiplo de"
-                  prepend-inner-icon="mdi-numeric"
-                  variant="outlined"
-                  type="number"
-                  min="1"
-                  hint="Ej: 100 para redondear a centenas"
+                  hint="Precio calculado según políticas de precio"
                   persistent-hint
                 ></v-text-field>
               </v-col>
@@ -279,6 +279,7 @@ import { useTenant } from '@/composables/useTenant'
 import ListView from '@/components/ListView.vue'
 import productsService from '@/services/products.service'
 import categoriesService from '@/services/categories.service'
+import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 
 const { tenantId } = useTenant()
 const products = ref([])
@@ -302,19 +303,7 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true })
-const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, pricing_method: 'MARKUP', markup_percentage: 20, price_rounding: 'NONE', rounding_to: 1, min_stock: 0, allow_backorder: false, is_active: true })
-
-const pricingMethods = [
-  { label: 'MARKUP - Precio automático con margen', value: 'MARKUP' },
-  { label: 'FIXED - Precio manual', value: 'FIXED' }
-]
-
-const roundingOptions = [
-  { label: 'Sin redondeo', value: 'NONE' },
-  { label: 'Redondear hacia arriba', value: 'UP' },
-  { label: 'Redondear hacia abajo', value: 'DOWN' },
-  { label: 'Redondear al más cercano', value: 'NEAREST' }
-]
+const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, min_stock: 0, allow_backorder: false, is_active: true })
 
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
@@ -353,6 +342,19 @@ const openEditDialog = async (item) => {
     formData.value = { product_id: r.data.product_id, name: r.data.name, description: r.data.description, category_id: r.data.category_id, is_active: r.data.is_active, track_inventory: r.data.track_inventory }
     variants.value = r.data.product_variants || []
     dialog.value = true
+  } else showMsg('Error al cargar producto', 'error')
+}
+
+const openVariantDialogFromList = async (item) => {
+  // Cargar el producto y abrir directamente el diálogo de agregar variante
+  isEditing.value = true
+  loadCategories()
+  const r = await productsService.getProductById(tenantId.value, item.product_id)
+  if (r.success) {
+    formData.value = { product_id: r.data.product_id, name: r.data.name, description: r.data.description, category_id: r.data.category_id, is_active: r.data.is_active, track_inventory: r.data.track_inventory }
+    variants.value = r.data.product_variants || []
+    // Abrir inmediatamente el diálogo de agregar variante
+    addVariant()
   } else showMsg('Error al cargar producto', 'error')
 }
 
@@ -400,10 +402,6 @@ const addVariant = () => {
     variant_name: '', 
     cost: 0, 
     price: 0, 
-    pricing_method: 'MARKUP', 
-    markup_percentage: 20, 
-    price_rounding: 'NONE', 
-    rounding_to: 1, 
     min_stock: 0, 
     allow_backorder: false, 
     is_active: true 
@@ -414,14 +412,29 @@ const editVariant = (v) => {
   editingVariant.value = true
   variantData.value = { 
     ...v, 
-    pricing_method: v.pricing_method || 'MARKUP',
-    markup_percentage: v.markup_percentage || 20,
-    price_rounding: v.price_rounding || 'NONE',
-    rounding_to: v.rounding_to || 1,
     min_stock: v.min_stock || 0, 
     allow_backorder: v.allow_backorder || false 
   }
   variantDialog.value = true 
+}
+
+// Generar SKU automáticamente basado en producto, categoría y variante
+const autoGenerateSKU = () => {
+  const productName = formData.value.name || ''
+  const variantName = variantData.value.variant_name || ''
+  
+  // Buscar el nombre de la categoría si existe
+  let categoryName = ''
+  if (formData.value.category_id) {
+    const category = categoryOptions.value.find(c => c.category_id === formData.value.category_id)
+    categoryName = category ? category.name : ''
+  }
+
+  // Generar SKU usando la función utilitaria
+  const generatedSKU = generateSKU(productName, categoryName, variantName)
+  variantData.value.sku = generatedSKU
+  
+  showMsg('SKU generado automáticamente', 'info')
 }
 
 const saveVariant = async () => {
