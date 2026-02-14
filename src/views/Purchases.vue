@@ -273,9 +273,27 @@
     <!-- Dialog Análisis IA Avanzado -->
     <v-dialog v-model="aiAnalysisDialog" max-width="1400" scrollable>
       <v-card>
-        <v-card-title class="bg-deep-purple">
+        <v-card-title class="bg-deep-purple d-flex align-center">
           <v-icon start color="white">mdi-robot</v-icon>
           <span class="text-white">Análisis IA Avanzado - DeepSeek</span>
+          <v-spacer></v-spacer>
+          <v-chip v-if="aiAnalysis && aiAnalysis.from_cache" color="blue" size="small" variant="flat" class="mr-2">
+            <v-icon start size="small">mdi-cached</v-icon>
+            Caché
+          </v-chip>
+          <v-tooltip text="Forzar actualización (consultar API nuevamente)">
+            <template v-slot:activator="{ props }">
+              <v-btn 
+                v-bind="props" 
+                icon="mdi-refresh" 
+                size="small" 
+                variant="text"
+                color="white"
+                @click="refreshAIAnalysis"
+                :loading="loadingAIAnalysis"
+              ></v-btn>
+            </template>
+          </v-tooltip>
         </v-card-title>
         <v-card-text class="pa-4">
           <!-- Loading State -->
@@ -776,7 +794,7 @@ const openAIAnalysisDialog = async () => {
   }
 }
 
-const loadAIAnalysis = async () => {
+const loadAIAnalysis = async (forceRefresh = false) => {
   if (!tenantId.value) return
   if (!aiAvailable.value) {
     aiAnalysisError.value = 'Servicio de IA no disponible. Configure VITE_DEEPSEEK_API_KEY en las variables de entorno.'
@@ -789,7 +807,8 @@ const loadAIAnalysis = async () => {
   try {
     const result = await purchasesService.getAIPurchaseAnalysis(tenantId.value, {
       businessContext: 'Tienda minorista con análisis histórico de ventas',
-      priorityLevel: 3
+      priorityLevel: 3,
+      forceRefresh
     })
 
     if (result.success) {
@@ -808,7 +827,7 @@ const loadAIAnalysis = async () => {
 
 const refreshAIAnalysis = async () => {
   aiAnalysis.value = null
-  await loadAIAnalysis()
+  await loadAIAnalysis(true)
 }
 
 const addAISuggestionToCart = (item) => {

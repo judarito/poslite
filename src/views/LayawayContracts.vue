@@ -178,7 +178,8 @@
                       <th>Producto</th>
                       <th class="text-center" style="width:100px">Cant.</th>
                       <th class="text-right" style="width:120px">Precio Unit.</th>
-                      <th class="text-right" style="width:100px">Desc.</th>
+                      <th class="text-right" style="width:100px">Subtotal</th>
+                      <th class="text-center" style="width:180px">Descuento</th>
                       <th class="text-right" style="width:120px">Total</th>
                       <th style="width:50px"></th>
                     </tr>
@@ -186,7 +187,10 @@
                   <tbody>
                     <tr v-for="(item, i) in formData.items" :key="i">
                       <td>
-                        <div class="text-body-2">{{ item.productName }}</div>
+                        <div class="text-body-2">
+                          {{ item.productName }}
+                          <v-chip v-if="item.price_includes_tax" size="x-small" color="primary" variant="tonal" class="ml-1">IVA incl.</v-chip>
+                        </div>
                         <div class="text-caption text-grey">{{ item.variantName }} — {{ item.sku }}</div>
                       </td>
                       <td class="text-center">
@@ -195,8 +199,15 @@
                       <td class="text-right">
                         <v-text-field v-model.number="item.unit_price" type="number" variant="outlined" density="compact" hide-details style="width:110px" min="0" @update:model-value="recalculateItem(item)"></v-text-field>
                       </td>
-                      <td class="text-right">
-                        <v-text-field v-model.number="item.discount" type="number" variant="outlined" density="compact" hide-details style="width:90px" min="0" @update:model-value="recalculateItem(item)"></v-text-field>
+                      <td class="text-right text-grey">{{ formatMoney(item.qty * item.unit_price) }}</td>
+                      <td class="text-center">
+                        <div class="d-flex align-center gap-1">
+                          <v-btn-toggle v-model="item.discount_type" mandatory density="compact" variant="outlined" divided style="height: 32px;">
+                            <v-btn value="AMOUNT" size="x-small" @click="recalculateItem(item)">$</v-btn>
+                            <v-btn value="PERCENT" size="x-small" @click="recalculateItem(item)">%</v-btn>
+                          </v-btn-toggle>
+                          <v-text-field v-model.number="item.discount" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="0" :max="item.discount_type === 'PERCENT' ? 100 : undefined" @update:model-value="recalculateItem(item)"></v-text-field>
+                        </div>
                       </td>
                       <td class="text-right font-weight-bold">{{ formatMoney(item.total) }}</td>
                       <td><v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeProduct(i)"></v-btn></td>
@@ -302,6 +313,8 @@ import customersService from '@/services/customers.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import locationsService from '@/services/locations.service'
 import cashService from '@/services/cash.service'
+import taxesService from '@/services/taxes.service'
+import { calculateDiscount } from '@/utils/discountCalculator'
 
 const router = useRouter()
 const { tenantId } = useTenant()
@@ -358,9 +371,15 @@ const contractTotals = computed(() => {
   formData.value.items.forEach(item => {
     const base = item.qty * item.unit_price
     subtotal += base
-    discount += item.discount || 0
+    // Calcular descuento según tipo
+    const discountAmount = calculateDiscount(
+      base,
+      item.discount || 0,
+      item.discount_type || 'AMOUNT'
+    )
+    discount += discountAmount
     // Impuesto simplificado al 19% sobre base - descuento
-    const taxBase = base - (item.discount || 0)
+    const taxBase = base - discountAmount
     tax += taxBase * 0.19
   })
   return {
@@ -473,7 +492,7 @@ const fetchSuggestions = async (query) => {
   }
 }
 
-const addProduct = (variant) => {
+const addProduct = async (variant) => {
   if (!variant) return
   
   const existing = formData.value.items.find(i => i.variant_id === variant.variant_id)
@@ -491,9 +510,17 @@ const addProduct = (variant) => {
     variantName: variant.variant_name || '',
     qty: 1,
     unit_price: parseFloat(variant.price) || 0,
+    price_includes_tax: variant.price_includes_tax || false, // 🆕 NUEVO
     discount: 0,
+    discount_type: 'AMOUNT',
+    base_amount: 0, // 🆕 NUEVO: Base gravable
+    tax_amount: 0, // 🆕 NUEVO
+    tax_rate: 0, // 🆕 NUEVO
     total: parseFloat(variant.price) || 0
   }
+  
+  // 🆕 NUEVO: Calcular impuestos antes de agregar
+  await recalculateItem(item)
   
   formData.value.items.push(item)
   selectedVariant.value = null
@@ -505,9 +532,60 @@ const removeProduct = (index) => {
   formData.value.items.splice(index, 1)
 }
 
-const recalculateItem = (item) => {
-  item.total = (item.qty * item.unit_price) - (item.discount || 0)
-  if (item.total < 0) item.total = 0
+const recalculateItem = async (item) => {
+  if (!tenantId.value || !item.variant_id) return
+  
+  // 1. Calcular subtotal
+  const subtotal = item.qty * item.unit_price
+  
+  // 2. Calcular descuento
+  const discountAmount = calculateDiscount(
+    subtotal,
+    item.discount || 0,
+    item.discount_type || 'AMOUNT'
+  )
+  
+  // 3. Precio después de descuento
+  const priceAfterDiscount = subtotal - discountAmount
+  if (priceAfterDiscount < 0) {
+    item.total = 0
+    item.tax_amount = 0
+    return
+  }
+  
+  // 4. Obtener información del impuesto
+  const taxResult = await taxesService.getTaxInfoForVariant(tenantId.value, item.variant_id)
+  
+  if (taxResult.success && taxResult.rate) {
+    item.tax_rate = taxResult.rate
+    
+    // 5. 🆕 NUEVA LÓGICA: Calcular según si el precio incluye o no IVA
+    if (item.price_includes_tax) {
+      // IVA INCLUIDO: descomponer
+      const total = priceAfterDiscount
+      const base = total / (1 + item.tax_rate)
+      const tax = total - base
+      
+      item.base_amount = Math.round(base)
+      item.tax_amount = Math.round(tax)
+      item.total = Math.round(total)
+    } else {
+      // IVA ADICIONAL: agregar
+      const base = priceAfterDiscount
+      const tax = base * item.tax_rate
+      const total = base + tax
+      
+      item.base_amount = Math.round(base)
+      item.tax_amount = Math.round(tax)
+      item.total = Math.round(total)
+    }
+  } else {
+    // Sin impuesto
+    item.base_amount = Math.round(priceAfterDiscount)
+    item.tax_amount = 0
+    item.tax_rate = 0
+    item.total = Math.round(priceAfterDiscount)
+  }
 }
 
 const createContract = async () => {
@@ -528,7 +606,8 @@ const createContract = async () => {
       variant_id: i.variant_id,
       qty: i.qty,
       unit_price: i.unit_price,
-      discount: i.discount || 0
+      discount: i.discount || 0,
+      discount_type: i.discount_type || 'AMOUNT'
     }))
 
     const initial_payment = hasInitialPayment.value && initialPayment.value.amount > 0 ? {

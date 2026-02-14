@@ -6,10 +6,26 @@
       </v-icon>
       Pronóstico de Ventas (IA)
       <v-spacer></v-spacer>
-      <v-chip v-if="forecast && !forecast.is_fallback" color="success" size="small" variant="flat">
+      <v-chip v-if="forecast && forecast.from_cache" color="blue" size="small" variant="flat" class="mr-2">
+        <v-icon start size="small">mdi-cached</v-icon>
+        Caché
+      </v-chip>
+      <v-chip v-if="forecast && !forecast.is_fallback" color="success" size="small" variant="flat" class="mr-2">
         <v-icon start size="small">mdi-robot</v-icon>
         AI
       </v-chip>
+      <v-tooltip text="Forzar actualización (consultar API nuevamente)">
+        <template v-slot:activator="{ props }">
+          <v-btn 
+            v-bind="props" 
+            icon="mdi-refresh" 
+            size="small" 
+            variant="text"
+            @click="refreshForecast"
+            :loading="loading"
+          ></v-btn>
+        </template>
+      </v-tooltip>
     </v-card-title>
 
     <v-card-text v-if="error">
@@ -251,7 +267,7 @@ onMounted(async () => {
   loadForecast()
 })
 
-const loadForecast = async () => {
+const loadForecast = async (forceRefresh = false) => {
   if (!tenantId.value) {
     error.value = 'No se pudo determinar el tenant'
     return
@@ -264,7 +280,10 @@ const loadForecast = async () => {
     const result = await salesService.generateSalesForecast(
       tenantId.value,
       null, // null = todas las sedes del tenant
-      { daysBack: aiForecastDaysBack.value }
+      { 
+        daysBack: aiForecastDaysBack.value,
+        forceRefresh
+      }
     )
 
     if (!result.success) {
@@ -281,7 +300,7 @@ const loadForecast = async () => {
 }
 
 const refreshForecast = () => {
-  loadForecast()
+  loadForecast(true)
 }
 
 const formatNumber = (value) => {

@@ -2,10 +2,14 @@
  * AI Purchase Advisor Service
  * Utiliza DeepSeek para generar sugerencias inteligentes de compra
  * basadas en históricos de ventas, inventario y tendencias
+ * Con sistema de caché inteligente para optimizar costos
  */
+
+import AICacheManager from '../utils/aiCache.js';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
+const CACHE_TTL_HOURS = 12; // Caché de 12 horas para sugerencias de compra
 
 class AIPurchaseAdvisorService {
   constructor() {
@@ -27,7 +31,7 @@ class AIPurchaseAdvisorService {
    * @param {string} tenantId - ID del tenant
    * @param {Array} rotationData - Datos de rotación de inventario
    * @param {Array} suggestions - Sugerencias base del sistema
-   * @param {Object} options - Opciones adicionales
+   * @param {Object} options - Opciones adicionales (forceRefresh: boolean)
    */
   async generatePurchaseRecommendations(tenantId, rotationData, suggestions, options = {}) {
     if (!this.isAvailable()) {
@@ -35,6 +39,29 @@ class AIPurchaseAdvisorService {
     }
 
     try {
+      // Generar clave de caché
+      const cacheParams = {
+        suggestionCount: suggestions.length,
+        rotationDataHash: this._hashRotationData(rotationData),
+        maxBudget: options.maxBudget
+      };
+      const cacheKey = AICacheManager.generateKey('purchase', tenantId, cacheParams);
+
+      // Verificar caché (a menos que se fuerce refresh)
+      if (!options.forceRefresh) {
+        const cached = AICacheManager.get(cacheKey);
+        if (cached) {
+          console.log('📦 Usando análisis de compra desde caché');
+          return {
+            ...cached,
+            from_cache: true,
+            cached_at: new Date().toISOString()
+          };
+        }
+      }
+
+      console.log('🚀 Consultando API de DeepSeek...');
+
       const prompt = this._buildPrompt(rotationData, suggestions, options);
       
       const response = await fetch(DEEPSEEK_API_URL, {
@@ -73,7 +100,15 @@ class AIPurchaseAdvisorService {
         throw new Error('Respuesta vacía de DeepSeek');
       }
 
-      return this._parseAIResponse(aiResponse, suggestions);
+      const result = this._parseAIResponse(aiResponse, suggestions);
+
+      // Guardar en caché
+      AICacheManager.set(cacheKey, result, CACHE_TTL_HOURS);
+
+      return {
+        ...result,
+        from_cache: false
+      };
     } catch (error) {
       console.error('Error en AI Purchase Advisor:', error);
       throw error;
@@ -317,6 +352,25 @@ Responde ÚNICAMENTE con JSON válido en este formato:
     }
 
     return 'Mantener niveles actuales de inventario con monitoreo continuo.';
+  }
+
+  /**
+   * Genera un hash simple de los datos de rotación para caché
+   * @private
+   */
+  _hashRotationData(rotationData) {
+    // Usar solo métricas clave para el hash (no todo el objeto)
+    const key = rotationData.slice(0, 20).map(p => 
+      `${p.variant_id}_${p.current_stock}_${p.sold_last_30d}`
+    ).join('|');
+    
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      const char = key.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36).substring(0, 8);
   }
 }
 

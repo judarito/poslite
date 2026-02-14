@@ -43,7 +43,7 @@ class ProductsService {
           *,
           category:category_id(category_id, name),
           product_variants(
-            variant_id, sku, variant_name, attrs, cost, price, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active,
+            variant_id, sku, variant_name, attrs, cost, price, price_includes_tax, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active,
             product_barcodes(barcode_id, barcode)
           )
         `)
@@ -114,6 +114,7 @@ class ProductsService {
         attrs: variant.attrs || null,
         cost: variant.cost || 0,
         price: variant.price || 0,
+        price_includes_tax: variant.price_includes_tax || false,
         pricing_method: variant.pricing_method || 'MARKUP',
         markup_percentage: variant.markup_percentage || 20,
         price_rounding: variant.price_rounding || 'NONE',
@@ -137,6 +138,7 @@ class ProductsService {
         attrs: updates.attrs || null,
         cost: updates.cost || 0,
         price: updates.price || 0,
+        price_includes_tax: updates.price_includes_tax || false,
         pricing_method: updates.pricing_method || 'MARKUP',
         markup_percentage: updates.markup_percentage || 20,
         price_rounding: updates.price_rounding || 'NONE',
@@ -173,7 +175,7 @@ class ProductsService {
         .select(`
           barcode,
           variant:variant_id(
-            variant_id, sku, variant_name, cost, price, is_active,
+            variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
             product:product_id(product_id, name, category_id, track_inventory)
           )
         `)
@@ -188,7 +190,7 @@ class ProductsService {
       const r = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, is_active,
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
           product:product_id(product_id, name, category_id, track_inventory)
         `)
         .eq('tenant_id', tenantId)
@@ -211,7 +213,7 @@ class ProductsService {
       const { data: byVariant, error: e1 } = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, is_active,
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
           product:product_id(product_id, name)
         `)
         .eq('tenant_id', tenantId)
@@ -225,7 +227,7 @@ class ProductsService {
       const { data: byProduct, error: e2 } = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, is_active,
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
           product:product_id!inner(product_id, name)
         `)
         .eq('tenant_id', tenantId)

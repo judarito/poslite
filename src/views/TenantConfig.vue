@@ -170,6 +170,88 @@
                   ></v-switch>
                 </v-col>
               </v-row>
+
+              <!-- Administración de Caché IA -->
+              <v-divider class="my-6"></v-divider>
+              <div class="text-h6 mb-4">Administración de Caché IA</div>
+              <v-alert type="info" variant="tonal" class="mb-4">
+                <v-icon start>mdi-cached</v-icon>
+                El caché ahorra ~70% en costos de API al reutilizar análisis recientes.
+                <br>
+                <strong>Pronósticos:</strong> 24 horas | <strong>Compras:</strong> 12 horas
+              </v-alert>
+
+              <v-row v-if="cacheStats">
+                <v-col cols="12" sm="3">
+                  <v-card variant="tonal" color="blue">
+                    <v-card-text>
+                      <div class="text-overline">Total en Caché</div>
+                      <div class="text-h4">{{ validCacheCount }}</div>
+                      <div class="text-caption">entradas válidas</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="3">
+                  <v-card variant="tonal" color="orange">
+                    <v-card-text>
+                      <div class="text-overline">Expiradas</div>
+                      <div class="text-h4">{{ expiredCacheCount }}</div>
+                      <div class="text-caption">para limpieza</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="3">
+                  <v-card variant="tonal" color="green">
+                    <v-card-text>
+                      <div class="text-overline">Tamaño</div>
+                      <div class="text-h4">{{ cacheSizeKB }}</div>
+                      <div class="text-caption">KB almacenados</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="3">
+                  <v-card variant="tonal" color="purple">
+                    <v-card-text>
+                      <div class="text-overline">Ahorro Estimado</div>
+                      <div class="text-h4">~70%</div>
+                      <div class="text-caption">en costos API</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
+              <v-row class="mt-2">
+                <v-col cols="12" sm="auto">
+                  <v-btn 
+                    color="primary" 
+                    prepend-icon="mdi-refresh" 
+                    variant="outlined"
+                    @click="refreshCacheStats"
+                  >
+                    Actualizar Stats
+                  </v-btn>
+                </v-col>
+                <v-col cols="12" sm="auto">
+                  <v-btn 
+                    color="warning" 
+                    prepend-icon="mdi-broom" 
+                    variant="outlined"
+                    @click="clearExpiredCache"
+                  >
+                    Limpiar Expirados
+                  </v-btn>
+                </v-col>
+                <v-col cols="12" sm="auto">
+                  <v-btn 
+                    color="error" 
+                    prepend-icon="mdi-delete" 
+                    variant="outlined"
+                    @click="confirmClearAllCache"
+                  >
+                    Limpiar Todo
+                  </v-btn>
+                </v-col>
+              </v-row>
             </v-window-item>
 
             <!-- INVENTARIO -->
@@ -374,10 +456,20 @@
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useAICache } from '@/composables/useAICache'
 import tenantSettingsService from '@/services/tenantSettings.service'
 
 const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()
+const { 
+  cacheStats, 
+  validCacheCount, 
+  expiredCacheCount, 
+  cacheSizeKB,
+  refreshStats: refreshCacheStats,
+  clearAll,
+  clearExpired
+} = useAICache()
 
 const configForm = ref(null)
 const tab = ref('general')
@@ -556,6 +648,19 @@ const saveAll = async () => {
   } catch (error) {
     showMsg('Error al guardar configuración', 'error')
   } finally { saving.value = false }
+}
+
+// Funciones de Gestión de Caché IA
+const clearExpiredCache = () => {
+  const count = clearExpired()
+  showMsg(`${count} entradas expiradas eliminadas`, 'success')
+}
+
+const confirmClearAllCache = () => {
+  if (confirm('¿Está seguro de eliminar TODO el caché de IA? Esto forzará nuevas consultas a la API.')) {
+    const count = clearAll()
+    showMsg(`${count} entradas eliminadas. El caché se ha limpiado completamente.`, 'warning')
+  }
 }
 
 onMounted(loadData)

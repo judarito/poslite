@@ -222,6 +222,16 @@
                   persistent-hint
                 ></v-text-field>
               </v-col>
+              <v-col cols="12">
+                <v-switch 
+                  v-model="variantData.price_includes_tax" 
+                  label="Precio incluye IVA (IVA incluido)" 
+                  color="primary"
+                  hint="Si está activo: el precio ya incluye el IVA (se descompone). Si está inactivo: el IVA se suma al precio."
+                  persistent-hint
+                  class="mb-2"
+                ></v-switch>
+              </v-col>
             </v-row>
 
             <v-divider class="my-4"></v-divider>
@@ -306,7 +316,7 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true })
-const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, min_stock: 0, allow_backorder: false, is_active: true })
+const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, price_includes_tax: false, min_stock: 0, allow_backorder: false, is_active: true })
 
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
@@ -405,6 +415,7 @@ const addVariant = () => {
     variant_name: '', 
     cost: 0, 
     price: 0, 
+    price_includes_tax: false, 
     min_stock: 0, 
     allow_backorder: false, 
     is_active: true 
@@ -416,7 +427,8 @@ const editVariant = (v) => {
   variantData.value = { 
     ...v, 
     min_stock: v.min_stock || 0, 
-    allow_backorder: v.allow_backorder || false 
+    allow_backorder: v.allow_backorder || false, 
+    price_includes_tax: v.price_includes_tax || false 
   }
   variantDialog.value = true 
 }

@@ -159,6 +159,36 @@ class TaxesService {
       return { success: false, rate: 0, error: error.message }
     }
   }
+
+  // Obtener información completa del impuesto para una variante
+  async getTaxInfoForVariant(tenantId, variantId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .rpc('fn_get_tax_info_for_variant', {
+          p_tenant: tenantId,
+          p_variant: variantId
+        })
+      
+      if (error) throw error
+      
+      // data es un objeto JSON: { rate, code, name }
+      return { 
+        success: true, 
+        rate: data?.rate || 0,
+        code: data?.code || null,
+        name: data?.name || null
+      }
+    } catch (error) {
+      console.warn('Error getting tax info:', error)
+      return { 
+        success: false, 
+        rate: 0, 
+        code: null, 
+        name: null, 
+        error: error.message 
+      }
+    }
+  }
 }
 
 export default new TaxesService()

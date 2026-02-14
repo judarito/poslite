@@ -1,10 +1,14 @@
 /**
  * Sales Forecast Service with AI (DeepSeek)
  * Genera pronósticos inteligentes de ventas basados en histórico
+ * Con sistema de caché inteligente para optimizar costos
  */
+
+import AICacheManager from '../utils/aiCache.js';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
+const CACHE_TTL_HOURS = 24; // Caché de 24 horas para pronósticos
 
 class SalesForecastService {
   constructor() {
@@ -23,7 +27,7 @@ class SalesForecastService {
    * @param {string} tenantId - ID del tenant
    * @param {string} locationId - ID de la sede (opcional)
    * @param {Array} historicalData - Datos históricos de ventas
-   * @param {Object} options - Opciones adicionales
+   * @param {Object} options - Opciones adicionales (forceRefresh: boolean)
    */
   async generateForecast(tenantId, locationId, historicalData, options = {}) {
     if (!this.isAvailable()) {
@@ -31,6 +35,29 @@ class SalesForecastService {
     }
 
     try {
+      // Generar clave de caché
+      const cacheParams = {
+        locationId,
+        dataPoints: historicalData.length,
+        latestDate: historicalData[0]?.sale_date
+      };
+      const cacheKey = AICacheManager.generateKey('forecast', tenantId, cacheParams);
+
+      // Verificar caché (a menos que se fuerce refresh)
+      if (!options.forceRefresh) {
+        const cached = AICacheManager.get(cacheKey);
+        if (cached) {
+          console.log('📦 Usando pronóstico desde caché');
+          return {
+            ...cached,
+            from_cache: true,
+            cached_at: new Date().toISOString()
+          };
+        }
+      }
+
+      console.log('🚀 Consultando API de DeepSeek...');
+
       const prompt = this._buildForecastPrompt(historicalData, options);
 
       const response = await fetch(DEEPSEEK_API_URL, {
@@ -69,7 +96,15 @@ class SalesForecastService {
         throw new Error('Respuesta vacía de DeepSeek');
       }
 
-      return this._parseForecastResponse(aiResponse, historicalData);
+      const result = this._parseForecastResponse(aiResponse, historicalData);
+
+      // Guardar en caché
+      AICacheManager.set(cacheKey, result, CACHE_TTL_HOURS);
+
+      return {
+        ...result,
+        from_cache: false
+      };
     } catch (error) {
       console.error('Error en Sales Forecast:', error);
       throw error;

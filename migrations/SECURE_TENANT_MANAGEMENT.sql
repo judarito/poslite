@@ -147,10 +147,10 @@ begin
   
   insert into roles (role_id, tenant_id, name)
   values 
-    (v_admin_role_id, v_tenant_id, 'ADMIN'),
+    (v_admin_role_id, v_tenant_id, 'ADMINISTRADOR'),
     (v_cashier_role_id, v_tenant_id, 'CAJERO');
 
-  -- Permisos para rol ADMIN (todos)
+  -- Permisos para rol ADMINISTRADOR (todos)
   insert into role_permissions (role_id, permission_id)
   select v_admin_role_id, permission_id
   from permissions
@@ -202,16 +202,22 @@ begin
   end if;
 
   -- Crear usuario administrador
-  insert into users (user_id, auth_user_id, tenant_id, full_name, email, role_id, is_active)
+  -- NOTA: El auth_user_id debe ser creado en Supabase Auth usando:
+  -- supabase.auth.admin.createUser({ email, password, email_confirm: true })
+  -- Por ahora se genera un UUID temporal que debe ser reemplazado
+  insert into users (user_id, auth_user_id, tenant_id, full_name, email, is_active)
   values (
     v_user_id,
-    gen_random_uuid(), -- UUID temporal hasta que se vincule con Supabase Auth
+    gen_random_uuid(), -- UUID temporal - debe ser reemplazado por el auth_user_id real de Supabase
     v_tenant_id,
     p_admin_data->>'full_name',
     p_admin_data->>'email',
-    v_admin_role_id,
     true
   );
+
+  -- Asignar rol ADMINISTRADOR al usuario
+  insert into user_roles (user_id, role_id)
+  values (v_user_id, v_admin_role_id);
 
   -- Resultado exitoso
   v_result := jsonb_build_object(
