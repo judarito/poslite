@@ -147,6 +147,16 @@
                 Stock
               </v-badge>
             </v-tab>
+            <v-tab value="expiration">
+              <v-badge
+                :content="expirationAlertsCount"
+                :color="expirationAlertsCount > 0 ? 'error' : 'grey'"
+                :model-value="expirationAlertsCount > 0"
+                inline
+              >
+                Vencimientos
+              </v-badge>
+            </v-tab>
             <v-tab value="layaway">
               <v-badge
                 :content="layawayAlertsCount"
@@ -298,6 +308,176 @@
                 <v-btn color="primary" variant="tonal" @click="goToInventory">
                   <v-icon start>mdi-warehouse</v-icon>
                   Ir a Inventario
+                </v-btn>
+              </v-card-actions>
+            </v-window-item>
+
+            <!-- Tab de Vencimientos -->
+            <v-window-item value="expiration">
+              <!-- Filtros Vencimientos -->
+              <v-card-text class="pa-4">
+                <v-row dense>
+                  <v-col cols="12" sm="6" md="3">
+                    <v-select
+                      v-model="expirationFilters.alert_level"
+                      :items="expirationAlertLevels"
+                      label="Nivel de alerta"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6" md="3">
+                    <v-select
+                      v-model="expirationFilters.location_id"
+                      :items="locations"
+                      item-title="name"
+                      item-value="location_id"
+                      label="Sede"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="12" md="6">
+                    <v-text-field
+                      v-model="expirationFilters.search"
+                      label="Buscar producto, SKU o lote"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                      @keyup.enter="loadExpirationAlerts"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <!-- Lista Vencimientos Mobile -->
+              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
+                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de vencimiento</p>
+                </div>
+                <v-card
+                  v-else
+                  v-for="alert in expirationAlerts"
+                  :key="alert.alert_id"
+                  class="mb-2"
+                  :color="getExpirationAlertColor(alert.alert_level) + '-lighten-5'"
+                  variant="outlined"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center mb-2">
+                      <v-chip :color="getExpirationAlertColor(alert.alert_level)" size="small" label>
+                        <v-icon start size="small">{{ getExpirationAlertIcon(alert.alert_level) }}</v-icon>
+                        {{ getExpirationAlertLabel(alert.alert_level) }}
+                      </v-chip>
+                      <v-spacer></v-spacer>
+                      <span class="text-caption text-grey">{{ alert.data.location_name }}</span>
+                    </div>
+                    <div class="mb-1">
+                      <strong>{{ alert.data.product_name }}</strong>
+                      <span v-if="alert.data.variant_name" class="text-caption ml-1">({{ alert.data.variant_name }})</span>
+                    </div>
+                    <div class="text-caption text-grey mb-2">
+                      Lote: {{ alert.data.batch_number }} | SKU: {{ alert.data.sku }}
+                    </div>
+                    <v-row dense class="text-caption">
+                      <v-col cols="6">
+                        <div class="text-grey">Vence:</div>
+                        <div class="font-weight-bold">{{ formatDate(alert.data.expiration_date) }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Días:</div>
+                        <div class="font-weight-bold" :class="alert.data.days_to_expiry < 0 ? 'text-error' : ''">
+                          {{ alert.data.days_to_expiry }}
+                        </div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Stock:</div>
+                        <div class="font-weight-bold">{{ alert.data.on_hand }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Disponible:</div>
+                        <div class="font-weight-bold">{{ alert.data.available }}</div>
+                      </v-col>
+                    </v-row>
+                    <div v-if="alert.data.physical_location" class="text-caption text-grey mt-2">
+                      <v-icon size="small">mdi-map-marker</v-icon>
+                      {{ alert.data.physical_location }}
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-card-text>
+
+              <!-- Tabla Vencimientos Desktop -->
+              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
+                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de vencimiento</p>
+                </div>
+                <v-table v-else density="compact" fixed-header height="500">
+                  <thead>
+                    <tr>
+                      <th>Alerta</th>
+                      <th>Sede</th>
+                      <th>Producto</th>
+                      <th>Lote</th>
+                      <th>Vencimiento</th>
+                      <th class="text-right">Días</th>
+                      <th class="text-right">Stock</th>
+                      <th class="text-right">Disponible</th>
+                      <th>Ubicación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alert in expirationAlerts" :key="alert.alert_id">
+                      <td>
+                        <v-chip :color="getExpirationAlertColor(alert.alert_level)" size="small" label>
+                          <v-icon start size="small">{{ getExpirationAlertIcon(alert.alert_level) }}</v-icon>
+                          {{ getExpirationAlertLabel(alert.alert_level) }}
+                        </v-chip>
+                      </td>
+                      <td>{{ alert.data.location_name }}</td>
+                      <td>
+                        <div>{{ alert.data.product_name }}</div>
+                        <div v-if="alert.data.variant_name" class="text-caption text-grey">{{ alert.data.variant_name }}</div>
+                        <div class="text-caption text-grey">{{ alert.data.sku }}</div>
+                      </td>
+                      <td>{{ alert.data.batch_number }}</td>
+                      <td>{{ formatDate(alert.data.expiration_date) }}</td>
+                      <td class="text-right" :class="alert.data.days_to_expiry < 0 ? 'text-error font-weight-bold' : ''">
+                        {{ alert.data.days_to_expiry }}
+                      </td>
+                      <td class="text-right">{{ alert.data.on_hand }}</td>
+                      <td class="text-right">{{ alert.data.available }}</td>
+                      <td>
+                        <span v-if="alert.data.physical_location" class="text-caption">
+                          {{ alert.data.physical_location }}
+                        </span>
+                        <span v-else class="text-caption text-grey">-</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-actions class="pa-4">
+                <v-btn color="error" variant="text" @click="loadExpirationAlerts">
+                  <v-icon start>mdi-refresh</v-icon>
+                  Actualizar
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="error" variant="tonal" @click="goToBatches">
+                  <v-icon start>mdi-barcode</v-icon>
+                  Ir a Lotes
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -502,6 +682,19 @@ const stockAlertLevels = [
   { title: 'Disponible bajo', value: 'LOW_AVAILABLE' }
 ]
 
+// Expiration Alerts
+const expirationFilters = ref({
+  alert_level: null,
+  location_id: null,
+  search: ''
+})
+
+const expirationAlertLevels = [
+  { title: 'Vencido', value: 'EXPIRED' },
+  { title: 'Crítico', value: 'CRITICAL' },
+  { title: 'Advertencia', value: 'WARNING' }
+]
+
 // Layaway Alerts
 const layawayFilters = ref({
   alert_level: null,
@@ -555,9 +748,33 @@ const layawayAlerts = computed(() => {
   return alerts
 })
 
+const expirationAlerts = computed(() => {
+  let alerts = allAlerts.value.filter(a => a.alert_type === 'EXPIRATION')
+  
+  if (expirationFilters.value.alert_level) {
+    alerts = alerts.filter(a => a.alert_level === expirationFilters.value.alert_level)
+  }
+  
+  if (expirationFilters.value.location_id) {
+    alerts = alerts.filter(a => a.data.location_id === expirationFilters.value.location_id)
+  }
+  
+  if (expirationFilters.value.search) {
+    const search = expirationFilters.value.search.toLowerCase()
+    alerts = alerts.filter(a => 
+      a.data.product_name?.toLowerCase().includes(search) ||
+      a.data.sku?.toLowerCase().includes(search) ||
+      a.data.batch_number?.toLowerCase().includes(search)
+    )
+  }
+  
+  return alerts
+})
+
 const stockAlertsCount = computed(() => stockAlerts.value.length)
+const expirationAlertsCount = computed(() => expirationAlerts.value.length)
 const layawayAlertsCount = computed(() => layawayAlerts.value.length)
-const totalAlertsCount = computed(() => stockAlertsCount.value + layawayAlertsCount.value)
+const totalAlertsCount = computed(() => stockAlertsCount.value + expirationAlertsCount.value + layawayAlertsCount.value)
 
 // Filtered layaway alerts (deprecated, usando computed ahora)
 const filteredLayawayAlerts = computed(() => layawayAlerts.value)
@@ -890,6 +1107,44 @@ const loadStockAlerts = async () => {
 const goToInventory = () => {
   alertsDialog.value = false
   router.push('/inventory')
+}
+
+// Expiration Alert Helpers
+const loadExpirationAlerts = async () => {
+  // Trigger manual refresh of expiration alerts
+  await alertsService.refreshExpirationAlerts()
+}
+
+const getExpirationAlertColor = (level) => {
+  const colors = {
+    EXPIRED: 'error',
+    CRITICAL: 'deep-orange',
+    WARNING: 'warning'
+  }
+  return colors[level] || 'grey'
+}
+
+const getExpirationAlertIcon = (level) => {
+  const icons = {
+    EXPIRED: 'mdi-alert-circle',
+    CRITICAL: 'mdi-alert-octagon',
+    WARNING: 'mdi-alert'
+  }
+  return icons[level] || 'mdi-information'
+}
+
+const getExpirationAlertLabel = (level) => {
+  const labels = {
+    EXPIRED: 'Vencido',
+    CRITICAL: 'Crítico',
+    WARNING: 'Advertencia'
+  }
+  return labels[level] || level
+}
+
+const goToBatches = () => {
+  alertsDialog.value = false
+  router.push('/batches')
 }
 
 // Layaway Alert Helpers

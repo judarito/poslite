@@ -100,6 +100,34 @@ const alertsService = {
       console.error('Error refreshing layaway alerts:', error)
       return { success: false, error: error.message }
     }
+  },
+
+  /**
+   * Refrescar alertas de vencimiento manualmente
+   */
+  async refreshExpirationAlerts() {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_refresh_expiration_alerts')
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error refreshing expiration alerts:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Refrescar todas las alertas
+   */
+  async refreshAllAlerts() {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_refresh_all_alerts')
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error refreshing all alerts:', error)
+      return { success: false, error: error.message }
+    }
   }
 }
 
