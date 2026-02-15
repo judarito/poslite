@@ -204,6 +204,87 @@ class PurchasesService {
       }
     }
   }
+
+  /**
+   * Obtener detalle completo de una compra con todas sus líneas
+   * @param {string} tenantId - ID del tenant
+   * @param {string} purchaseId - ID de la compra (source_id)
+   */
+  async getPurchaseDetail(tenantId, purchaseId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('inventory_moves')
+        .select(`
+          inventory_move_id,
+          move_type,
+          location_id,
+          variant_id,
+          quantity,
+          unit_cost,
+          created_at,
+          note,
+          source_id,
+          location:location_id(name),
+          variant:variant_id(
+            sku,
+            variant_name,
+            product:product_id(name)
+          ),
+          created_by_user:created_by(full_name)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('move_type', 'PURCHASE_IN')
+        .eq('source_id', purchaseId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        return {
+          success: false,
+          error: 'Compra no encontrada'
+        }
+      }
+
+      const firstLine = data[0]
+      
+      // Transformar líneas
+      const lines = data.map(item => ({
+        line_id: item.inventory_move_id,
+        variant_id: item.variant_id,
+        sku: item.variant?.sku || '',
+        variant_name: item.variant?.variant_name || '',
+        product_name: item.variant?.product?.name || '',
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+        line_total: item.quantity * item.unit_cost
+      }))
+
+      // Calcular totales
+      const total = lines.reduce((sum, line) => sum + line.line_total, 0)
+
+      return {
+        success: true,
+        data: {
+          purchase_id: purchaseId,
+          location_id: firstLine.location_id,
+          location_name: firstLine.location?.name || '',
+          created_at: firstLine.created_at,
+          created_by_name: firstLine.created_by_user?.full_name || '',
+          note: firstLine.note || '',
+          lines: lines,
+          total: total,
+          items_count: lines.length
+        }
+      }
+    } catch (error) {
+      console.error('Error getting purchase detail:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
 }
 
 export default new PurchasesService()

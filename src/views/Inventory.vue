@@ -2,6 +2,7 @@
   <div class="fill-width">
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="stock">Stock Actual</v-tab>
+      <v-tab value="batches">Lotes</v-tab>
       <v-tab value="kardex">Kardex / Movimientos</v-tab>
       <v-tab value="operations">Operaciones</v-tab>
     </v-tabs>
@@ -115,6 +116,155 @@
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-pagination v-model="stockPage" :length="Math.ceil(stockTotal / stockPageSize)" @update:model-value="loadStock" size="small"></v-pagination>
+          </v-card-actions>
+        </v-card>
+      </v-window-item>
+
+      <!-- LOTES -->
+      <v-window-item value="batches">
+        <v-card flat class="fill-width">
+          <v-card-title class="d-flex align-center flex-wrap ga-2">
+            <v-icon start color="purple">mdi-barcode</v-icon>
+            Lotes por Producto
+            <v-spacer></v-spacer>
+            <v-select
+              v-model="batchLocationFilter"
+              :items="locations"
+              item-title="name"
+              item-value="location_id"
+              label="Sede"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              style="max-width: 250px;"
+              @update:model-value="loadBatches"
+            ></v-select>
+          </v-card-title>
+
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Lote</th>
+                <th>Sede</th>
+                <th>Ubicación</th>
+                <th>Vencimiento</th>
+                <th class="text-right">Stock</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="batch in batchItems" :key="batch.batch_id">
+                <td>
+                  <div class="text-body-2">{{ batch.variant?.product?.name }}</div>
+                  <div class="text-caption text-grey">{{ batch.variant?.variant_name || '' }}</div>
+                  <div class="text-caption text-grey">SKU: {{ batch.variant?.sku }}</div>
+                </td>
+                <td>{{ batch.batch_number }}</td>
+                <td>{{ batch.location?.name }}</td>
+                <td>
+                  <v-chip v-if="batch.physical_location" size="small" variant="outlined">
+                    {{ batch.physical_location }}
+                  </v-chip>
+                  <span v-else class="text-grey">-</span>
+                </td>
+                <td>
+                  <div v-if="batch.expiration_date">
+                    {{ formatDate(batch.expiration_date) }}
+                    <div class="text-caption" :class="getDaysColor(batch)">
+                      {{ formatDaysToExpiry(batch) }}
+                    </div>
+                  </div>
+                  <span v-else class="text-grey">Sin vencimiento</span>
+                </td>
+                <td class="text-right">
+                  <div>
+                    <strong>{{ batch.on_hand }}</strong>
+                    <span v-if="batch.reserved > 0" class="text-grey text-caption ml-1">
+                      ({{ batch.reserved }} reserv.)
+                    </span>
+                  </div>
+                  <div class="text-caption text-grey">
+                    {{ (batch.on_hand - batch.reserved) }} disponible
+                  </div>
+                </td>
+                <td>
+                  <v-chip :color="getBatchAlertColor(batch)" size="small">
+                    {{ getBatchAlertLabel(batch) }}
+                  </v-chip>
+                </td>
+              </tr>
+              <tr v-if="batchItems.length === 0">
+                <td colspan="7" class="text-center text-grey pa-4">
+                  No hay lotes registrados
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card v-for="batch in batchItems" :key="batch.batch_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <div class="d-flex align-center mb-2">
+                  <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="text-body-2 font-weight-bold">{{ batch.variant?.product?.name }}</div>
+                    <div class="text-caption text-grey">{{ batch.variant?.variant_name || '' }}</div>
+                    <div class="text-caption text-grey mt-1">SKU: {{ batch.variant?.sku }}</div>
+                  </div>
+                  <v-chip :color="getBatchAlertColor(batch)" size="small" class="ml-2 flex-shrink-0">
+                    {{ getBatchAlertLabel(batch) }}
+                  </v-chip>
+                </div>
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex justify-space-between text-caption">
+                  <span class="text-grey">Lote:</span>
+                  <span class="font-weight-bold">{{ batch.batch_number }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1">
+                  <span class="text-grey">Sede:</span>
+                  <span>{{ batch.location?.name }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1" v-if="batch.physical_location">
+                  <span class="text-grey">Ubicación:</span>
+                  <span>{{ batch.physical_location }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1" v-if="batch.expiration_date">
+                  <span class="text-grey">Vencimiento:</span>
+                  <span :class="getDaysColor(batch)">
+                    {{ formatDate(batch.expiration_date) }}
+                  </span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1" v-if="batch.expiration_date">
+                  <span class="text-grey">Tiempo restante:</span>
+                  <span :class="getDaysColor(batch)">
+                    {{ formatDaysToExpiry(batch) }}
+                  </span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mt-1">
+                  <span class="text-grey">Stock:</span>
+                  <span class="font-weight-bold">
+                    {{ batch.on_hand }}
+                    <span v-if="batch.reserved > 0" class="text-grey">
+                      ({{ batch.reserved }} reserv.)
+                    </span>
+                  </span>
+                </div>
+              </v-card-text>
+            </v-card>
+            <div v-if="batchItems.length === 0" class="text-center text-grey pa-4">No hay lotes registrados</div>
+          </div>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-pagination
+              v-model="batchPage"
+              :length="Math.ceil(batchTotal / batchPageSize)"
+              @update:model-value="loadBatches"
+              size="small"
+            ></v-pagination>
           </v-card-actions>
         </v-card>
       </v-window-item>
@@ -299,6 +449,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
+import batchesService from '@/services/batches.service'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -320,6 +471,13 @@ const kardexPage = ref(1)
 const kardexPageSize = 20
 const kardexLocationFilter = ref(null)
 const kardexTypeFilter = ref(null)
+
+// Batches
+const batchItems = ref([])
+const batchTotal = ref(0)
+const batchPage = ref(1)
+const batchPageSize = 20
+const batchLocationFilter = ref(null)
 
 // Operations
 const adjustForm = ref(null)
@@ -428,6 +586,51 @@ const loadKardex = async () => {
   if (r.success) { kardexItems.value = r.data; kardexTotal.value = r.total }
 }
 
+// Cargar lotes
+const loadBatches = async () => {
+  if (!tenantId.value) return
+  const r = await batchesService.getBatches(tenantId.value, batchPage.value, batchPageSize, {
+    location_id: batchLocationFilter.value || undefined,
+    hasStock: true
+  })
+  if (r.success) { batchItems.value = r.data; batchTotal.value = r.total }
+}
+
+// Funciones para alertas de lotes
+const getBatchAlertColor = (batch) => {
+  if (!batch.expiration_date) return 'grey'
+  const level = batchesService.getAlertLevel(batch.expiration_date)
+  const colors = { EXPIRED: 'error', CRITICAL: 'error', WARNING: 'warning', OK: 'success' }
+  return colors[level] || 'grey'
+}
+
+const getBatchAlertLabel = (batch) => {
+  if (!batch.expiration_date) return 'Sin venc.'
+  const level = batchesService.getAlertLevel(batch.expiration_date)
+  const labels = { EXPIRED: 'Vencido', CRITICAL: 'Crítico', WARNING: 'Advertencia', OK: 'OK' }
+  return labels[level] || '-'
+}
+
+const getDaysColor = (batch) => {
+  if (!batch.expiration_date) return ''
+  const today = new Date()
+  const expDate = new Date(batch.expiration_date)
+  const days = Math.floor((expDate - today) / (1000 * 60 * 60 * 24))
+  
+  if (days < 0) return 'text-error font-weight-bold'
+  if (days <= 7) return 'text-error font-weight-bold'
+  if (days <= 30) return 'text-warning'
+  return ''
+}
+
+const formatDaysToExpiry = (batch) => {
+  if (!batch.expiration_date) return ''
+  const today = new Date()
+  const expDate = new Date(batch.expiration_date)
+  const days = Math.floor((expDate - today) / (1000 * 60 * 60 * 24))
+  return batchesService.formatDaysToExpiry(days)
+}
+
 // Ajuste
 const doAdjustment = async () => {
   const { valid } = await adjustForm.value.validate()
@@ -520,5 +723,8 @@ onMounted(async () => {
   await loadLocations()
   loadStock()
   loadKardex()
+  if (tab.value === 'batches') {
+    loadBatches()
+  }
 })
 </script>

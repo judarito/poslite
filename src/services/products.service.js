@@ -66,7 +66,8 @@ class ProductsService {
         description: product.description || null,
         category_id: product.category_id || null,
         is_active: product.is_active !== false,
-        track_inventory: product.track_inventory !== false
+        track_inventory: product.track_inventory !== false,
+        requires_expiration: product.requires_expiration || false
       })
       if (error) throw error
       return { success: true, data: data[0] }
@@ -82,7 +83,8 @@ class ProductsService {
         description: updates.description || null,
         category_id: updates.category_id || null,
         is_active: updates.is_active,
-        track_inventory: updates.track_inventory
+        track_inventory: updates.track_inventory,
+        requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : false
       }, { tenant_id: tenantId, product_id: productId })
       if (error) throw error
       return { success: true, data: data[0] }
@@ -121,7 +123,8 @@ class ProductsService {
         rounding_to: variant.rounding_to || 1,
         min_stock: variant.min_stock || 0,
         allow_backorder: variant.allow_backorder || false,
-        is_active: variant.is_active !== false
+        is_active: variant.is_active !== false,
+        requires_expiration: variant.requires_expiration !== undefined ? variant.requires_expiration : null
       })
       if (error) throw error
       return { success: true, data: data[0] }
@@ -145,7 +148,8 @@ class ProductsService {
         rounding_to: updates.rounding_to || 1,
         min_stock: updates.min_stock || 0,
         allow_backorder: updates.allow_backorder || false,
-        is_active: updates.is_active
+        is_active: updates.is_active,
+        requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : null
       }, { tenant_id: tenantId, variant_id: variantId })
       if (error) throw error
       return { success: true, data: data[0] }

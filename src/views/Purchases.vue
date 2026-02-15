@@ -54,8 +54,10 @@
       :show-create-button="false"
       :editable="false"
       :deletable="false"
+      :clickable="true"
       @load-page="loadPurchasesPage"
       @search="handleSearch"
+      @item-click="viewPurchaseDetail"
     >
       <!-- Filtros personalizados -->
       <template #filters>
@@ -122,6 +124,10 @@
           <v-chip size="small" variant="tonal" prepend-icon="mdi-cash" color="primary">Costo: {{ formatMoney(item.unit_cost) }}</v-chip>
           <v-chip size="small" variant="tonal" prepend-icon="mdi-currency-usd" color="success">Total: {{ formatMoney(item.line_total) }}</v-chip>
           <v-chip size="small" variant="tonal" prepend-icon="mdi-tag" color="orange">Precio: {{ formatMoney(item.current_price) }}</v-chip>
+        </div>
+        <div class="mt-2 text-caption text-grey">
+          <v-icon size="small">mdi-cursor-default-click</v-icon>
+          Haz clic para ver el detalle completo de la compra
         </div>
       </template>
     </ListView>
@@ -604,10 +610,15 @@
                       variant="outlined"
                       density="compact"
                       :rules="[rules.required]"
+                      @update:model-value="onVariantSelected(i, line.variant_id)"
                       @update:search="searchVariants"
                     >
                       <template #item="{ props, item }">
-                        <v-list-item v-bind="props" :subtitle="'SKU: ' + item.raw.sku"></v-list-item>
+                        <v-list-item v-bind="props" :subtitle="'SKU: ' + item.raw.sku">
+                          <template #append>
+                            <v-icon v-if="item.raw.requires_expiration" color="warning" size="small">mdi-calendar-alert</v-icon>
+                          </template>
+                        </v-list-item>
                       </template>
                     </v-autocomplete>
                   </v-col>
@@ -639,6 +650,58 @@
                   <v-col cols="12" sm="1" class="d-flex align-center">
                     <v-btn icon="mdi-delete" size="small" color="error" variant="text" @click="removeLine(i)"></v-btn>
                   </v-col>
+
+                  <!-- Campos de lote si el producto requiere vencimiento -->
+                  <v-col v-if="line.requires_expiration" cols="12">
+                    <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
+                      <v-icon start>mdi-calendar-alert</v-icon>
+                      Este producto requiere control de vencimiento
+                    </v-alert>
+                  </v-col>
+                  <v-col v-if="line.requires_expiration" cols="12" sm="4">
+                    <v-text-field
+                      v-model="line.batch_number"
+                      label="Número de Lote"
+                      prepend-inner-icon="mdi-barcode"
+                      variant="outlined"
+                      density="compact"
+                      hint="Se generará automáticamente si se deja vacío"
+                      persistent-hint
+                    >
+                      <template #append>
+                        <v-btn 
+                          icon="mdi-refresh" 
+                          size="x-small" 
+                          variant="text"
+                          @click="generateBatchNumber(i)"
+                        ></v-btn>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col v-if="line.requires_expiration" cols="12" sm="4">
+                    <v-text-field
+                      v-model="line.expiration_date"
+                      label="Fecha de Vencimiento *"
+                      type="date"
+                      prepend-inner-icon="mdi-calendar-clock"
+                      variant="outlined"
+                      density="compact"
+                      :rules="line.requires_expiration ? [rules.required] : []"
+                      :min="new Date().toISOString().split('T')[0]"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col v-if="line.requires_expiration" cols="12" sm="4">
+                    <v-text-field
+                      v-model="line.physical_location"
+                      label="Ubicación Física"
+                      prepend-inner-icon="mdi-map-marker"
+                      variant="outlined"
+                      density="compact"
+                      placeholder="Ej: NEVERA-2, ESTANTE-A1"
+                      hint="Opcional"
+                      persistent-hint
+                    ></v-text-field>
+                  </v-col>
                 </v-row>
               </v-card-text>
             </v-card>
@@ -656,6 +719,116 @@
       </v-card>
     </v-dialog>
 
+    <!-- Dialog Detalle de Compra -->
+    <v-dialog v-model="detailDialog" max-width="900" scrollable>
+      <v-card>
+        <v-card-title class="bg-teal">
+          <v-icon start color="white">mdi-truck-delivery</v-icon>
+          <span class="text-white">Detalle de Compra</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-alert v-if="loadingDetail" type="info" variant="tonal">
+            <v-progress-linear indeterminate></v-progress-linear>
+            <div class="mt-2">Cargando detalle de compra...</div>
+          </v-alert>
+
+          <v-alert v-if="detailError" type="error" variant="tonal">
+            {{ detailError }}
+          </v-alert>
+
+          <div v-if="purchaseDetail && !loadingDetail">
+            <!-- Información general -->
+            <v-card variant="outlined" class="mb-4">
+              <v-card-text>
+                <v-row dense>
+                  <v-col cols="12" md="6">
+                    <div class="text-caption text-grey">Sede</div>
+                    <div class="text-body-1">
+                      <v-icon size="small" class="mr-1">mdi-store</v-icon>
+                      {{ purchaseDetail.location_name }}
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="text-caption text-grey">Fecha</div>
+                    <div class="text-body-1">
+                      <v-icon size="small" class="mr-1">mdi-calendar</v-icon>
+                      {{ formatDate(purchaseDetail.created_at) }}
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="text-caption text-grey">Registrado por</div>
+                    <div class="text-body-1">
+                      <v-icon size="small" class="mr-1">mdi-account</v-icon>
+                      {{ purchaseDetail.created_by_name }}
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="text-caption text-grey">Productos</div>
+                    <div class="text-body-1">
+                      <v-icon size="small" class="mr-1">mdi-package-variant</v-icon>
+                      {{ purchaseDetail.items_count }} {{ purchaseDetail.items_count === 1 ? 'producto' : 'productos' }}
+                    </div>
+                  </v-col>
+                  <v-col v-if="purchaseDetail.note" cols="12">
+                    <div class="text-caption text-grey">Nota</div>
+                    <div class="text-body-2">
+                      <v-icon size="small" class="mr-1">mdi-note-text</v-icon>
+                      {{ purchaseDetail.note }}
+                    </div>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+
+            <!-- Líneas de la compra -->
+            <div class="text-subtitle-1 font-weight-bold mb-2">Productos Comprados</div>
+            <v-card v-for="(line, idx) in purchaseDetail.lines" :key="line.line_id" variant="outlined" class="mb-2">
+              <v-card-text>
+                <v-row align="center">
+                  <v-col cols="12" md="5">
+                    <div class="text-h6">{{ line.product_name }}</div>
+                    <div class="text-caption text-grey">
+                      {{ line.variant_name || 'Sin variante' }} • SKU: {{ line.sku }}
+                    </div>
+                  </v-col>
+                  <v-col cols="4" md="2" class="text-center">
+                    <div class="text-caption text-grey">Cantidad</div>
+                    <div class="text-h6">{{ line.quantity }}</div>
+                  </v-col>
+                  <v-col cols="4" md="2" class="text-center">
+                    <div class="text-caption text-grey">Costo Unit.</div>
+                    <div class="text-body-1">{{ formatMoney(line.unit_cost) }}</div>
+                  </v-col>
+                  <v-col cols="4" md="3" class="text-right">
+                    <div class="text-caption text-grey">Subtotal</div>
+                    <div class="text-h6 text-primary">{{ formatMoney(line.line_total) }}</div>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+
+            <!-- Total -->
+            <v-card color="teal" variant="flat" class="mt-4">
+              <v-card-text>
+                <v-row align="center">
+                  <v-col cols="6">
+                    <div class="text-h6 text-white">TOTAL</div>
+                  </v-col>
+                  <v-col cols="6" class="text-right">
+                    <div class="text-h5 text-white font-weight-bold">{{ formatMoney(purchaseDetail.total) }}</div>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="detailDialog = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
 </template>
@@ -668,6 +841,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
 import supabaseService from '@/services/supabase.service'
 import purchasesService from '@/services/purchases.service'
+import batchesService from '@/services/batches.service'
 import ListView from '@/components/ListView.vue'
 
 const { isMobile } = useDisplay()
@@ -679,6 +853,13 @@ const loading = ref(false)
 const dialog = ref(false)
 const saving = ref(false)
 const form = ref(null)
+
+// Variables para detalle de compra
+const detailDialog = ref(false)
+const purchaseDetail = ref(null)
+const loadingDetail = ref(false)
+const detailError = ref(null)
+
 const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
@@ -923,6 +1104,45 @@ const handleSearch = ({ search: searchTerm, page, pageSize }) => {
   loadPurchases(page, pageSize)
 }
 
+// Ver detalle de compra
+const viewPurchaseDetail = async (item) => {
+  if (!tenantId.value || !item.purchase_id) return
+  
+  detailDialog.value = true
+  loadingDetail.value = true
+  detailError.value = null
+  purchaseDetail.value = null
+
+  try {
+    // El purchase_id en el listado es inventory_move_id
+    // Necesitamos buscar por source_id que es el ID real de la compra
+    // Primero obtener el source_id del item clickeado
+    const { data: moveData, error: moveError } = await supabaseService.client
+      .from('inventory_moves')
+      .select('source_id')
+      .eq('inventory_move_id', item.purchase_id)
+      .eq('tenant_id', tenantId.value)
+      .single()
+
+    if (moveError) throw moveError
+    
+    const purchaseId = moveData.source_id
+    
+    const result = await purchasesService.getPurchaseDetail(tenantId.value, purchaseId)
+    
+    if (result.success) {
+      purchaseDetail.value = result.data
+    } else {
+      detailError.value = result.error
+    }
+  } catch (error) {
+    console.error('Error loading purchase detail:', error)
+    detailError.value = 'Error al cargar detalle: ' + error.message
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
 const loadInitialVariants = async () => {
   if (!tenantId.value) return
   searchingVariants.value = true
@@ -933,7 +1153,8 @@ const loadInitialVariants = async () => {
         variant_id,
         sku,
         variant_name,
-        product_id!inner(product_id, name)
+        requires_expiration,
+        product_id!inner(product_id, name, requires_expiration)
       `)
       .eq('tenant_id', tenantId.value)
       .eq('is_active', true)
@@ -945,6 +1166,8 @@ const loadInitialVariants = async () => {
     if (data) {
       variants.value = data.map(v => ({
         ...v,
+        // Resolver requires_expiration con jerarquía: variant sobreescribe producto si no es null
+        requires_expiration: v.requires_expiration !== null ? v.requires_expiration : (v.product_id?.requires_expiration || false),
         _displayName: `${v.product_id.name}${v.variant_name ? ' - ' + v.variant_name : ''} (${v.sku})`
       }))
     }
@@ -973,7 +1196,8 @@ const searchVariants = async (searchTerm) => {
         variant_id,
         sku,
         variant_name,
-        product_id!inner(product_id, name)
+        requires_expiration,
+        product_id!inner(product_id, name, requires_expiration)
       `)
       .eq('tenant_id', tenantId.value)
       .eq('is_active', true)
@@ -997,6 +1221,8 @@ const searchVariants = async (searchTerm) => {
       
       variants.value = filtered.map(v => ({
         ...v,
+        // Resolver requires_expiration con jerarquía: variant sobreescribe producto si no es null
+        requires_expiration: v.requires_expiration !== null ? v.requires_expiration : (v.product_id?.requires_expiration || false),
         _displayName: `${v.product_id.name}${v.variant_name ? ' - ' + v.variant_name : ''} (${v.sku})`
       }))
     }
@@ -1021,12 +1247,54 @@ const addLine = () => {
   purchaseData.value.lines.push({
     variant_id: null,
     qty: 1,
-    unit_cost: 0
+    unit_cost: 0,
+    requires_expiration: false,
+    batch_number: '',
+    expiration_date: null,
+    physical_location: ''
   })
 }
 
 const removeLine = (index) => {
   purchaseData.value.lines.splice(index, 1)
+}
+
+// Detectar si el producto seleccionado requiere vencimiento
+const onVariantSelected = (lineIndex, variantId) => {
+  if (!variantId) return
+  
+  const variant = variants.value.find(v => v.variant_id === variantId)
+  if (variant) {
+    purchaseData.value.lines[lineIndex].requires_expiration = variant.requires_expiration || false
+    
+    // Limpiar campos de lote si no requiere vencimiento
+    if (!variant.requires_expiration) {
+      purchaseData.value.lines[lineIndex].batch_number = ''
+      purchaseData.value.lines[lineIndex].expiration_date = null
+      purchaseData.value.lines[lineIndex].physical_location = ''
+    }
+  }
+}
+
+// Generar número de lote automático
+const generateBatchNumber = async (lineIndex) => {
+  const line = purchaseData.value.lines[lineIndex]
+  if (!line.variant_id || !tenantId.value) {
+    showMsg('Selecciona primero un producto', 'warning')
+    return
+  }
+  
+  try {
+    const result = await batchesService.generateBatchNumber(tenantId.value, line.variant_id)
+    if (result.success) {
+      purchaseData.value.lines[lineIndex].batch_number = result.batchNumber
+      showMsg('Número de lote generado', 'success')
+    } else {
+      showMsg('Error al generar lote: ' + result.error, 'error')
+    }
+  } catch (error) {
+    showMsg('Error al generar lote', 'error')
+  }
 }
 
 const savePurchase = async () => {

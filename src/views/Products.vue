@@ -91,6 +91,15 @@
               <v-col cols="6">
                 <v-switch v-model="formData.track_inventory" label="Controlar inventario" color="info" hide-details></v-switch>
               </v-col>
+              <v-col cols="12">
+                <v-switch 
+                  v-model="formData.requires_expiration" 
+                  label="Requiere control de vencimiento" 
+                  color="warning"
+                  hint="Los productos con esta opción activa deben registrarse en lotes con fecha de vencimiento"
+                  persistent-hint
+                ></v-switch>
+              </v-col>
             </v-row>
 
             <!-- Variantes -->
@@ -256,6 +265,26 @@
               persistent-hint
               class="mb-2"
             ></v-switch>
+            <v-switch 
+              v-model="variantData.requires_expiration" 
+              label="Requiere control de vencimiento (sobreescribe producto)" 
+              color="warning"
+              hint="Si se define aquí, sobreescribe la configuración del producto"
+              persistent-hint
+              class="mb-2"
+              :indeterminate="variantData.requires_expiration === null"
+            >
+              <template #label>
+                <div class="d-flex align-center ga-2">
+                  <span>Requiere vencimiento</span>
+                  <v-tooltip text="Null = heredar del producto, True/False = sobreescribir">
+                    <template #activator="{ props }">
+                      <v-icon v-bind="props" size="small" color="grey">mdi-information</v-icon>
+                    </template>
+                  </v-tooltip>
+                </div>
+              </template>
+            </v-switch>
             <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
           </v-form>
         </v-card-text>
@@ -315,8 +344,8 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
-const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true })
-const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, price_includes_tax: false, min_stock: 0, allow_backorder: false, is_active: true })
+const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true, requires_expiration: false })
+const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, price_includes_tax: false, min_stock: 0, allow_backorder: false, requires_expiration: null, is_active: true })
 
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
@@ -341,7 +370,7 @@ const loadCategories = async () => {
 
 const openCreateDialog = () => {
   isEditing.value = false
-  formData.value = { product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true }
+  formData.value = { product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true, requires_expiration: false }
   variants.value = []
   loadCategories()
   dialog.value = true
@@ -352,7 +381,15 @@ const openEditDialog = async (item) => {
   loadCategories()
   const r = await productsService.getProductById(tenantId.value, item.product_id)
   if (r.success) {
-    formData.value = { product_id: r.data.product_id, name: r.data.name, description: r.data.description, category_id: r.data.category_id, is_active: r.data.is_active, track_inventory: r.data.track_inventory }
+    formData.value = { 
+      product_id: r.data.product_id, 
+      name: r.data.name, 
+      description: r.data.description, 
+      category_id: r.data.category_id, 
+      is_active: r.data.is_active, 
+      track_inventory: r.data.track_inventory,
+      requires_expiration: r.data.requires_expiration || false
+    }
     variants.value = r.data.product_variants || []
     dialog.value = true
   } else showMsg('Error al cargar producto', 'error')
@@ -364,7 +401,15 @@ const openVariantDialogFromList = async (item) => {
   loadCategories()
   const r = await productsService.getProductById(tenantId.value, item.product_id)
   if (r.success) {
-    formData.value = { product_id: r.data.product_id, name: r.data.name, description: r.data.description, category_id: r.data.category_id, is_active: r.data.is_active, track_inventory: r.data.track_inventory }
+    formData.value = { 
+      product_id: r.data.product_id, 
+      name: r.data.name, 
+      description: r.data.description, 
+      category_id: r.data.category_id, 
+      is_active: r.data.is_active, 
+      track_inventory: r.data.track_inventory,
+      requires_expiration: r.data.requires_expiration || false
+    }
     variants.value = r.data.product_variants || []
     // Abrir inmediatamente el diálogo de agregar variante
     addVariant()
@@ -418,7 +463,8 @@ const addVariant = () => {
     price_includes_tax: false, 
     min_stock: 0, 
     allow_backorder: false, 
-    is_active: true 
+    is_active: true,
+    requires_expiration: null  // null = hereda del producto
   }
   variantDialog.value = true 
 }
@@ -428,7 +474,8 @@ const editVariant = (v) => {
     ...v, 
     min_stock: v.min_stock || 0, 
     allow_backorder: v.allow_backorder || false, 
-    price_includes_tax: v.price_includes_tax || false 
+    price_includes_tax: v.price_includes_tax || false,
+    requires_expiration: v.requires_expiration !== undefined ? v.requires_expiration : null
   }
   variantDialog.value = true 
 }

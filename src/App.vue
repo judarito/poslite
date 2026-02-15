@@ -599,6 +599,7 @@ const allMenuItems = [
     permissions: [], // Visible si tiene algún hijo visible
     children: [
       { title: 'Stock y Kardex', icon: 'mdi-clipboard-list', route: '/inventory', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
+      { title: 'Lotes y Vencimientos', icon: 'mdi-barcode', route: '/batches', permissions: ['INVENTORY.VIEW'] },
       { title: 'Compras', icon: 'mdi-cart-plus', route: '/purchases', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
     ]
   },

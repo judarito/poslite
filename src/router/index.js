@@ -20,6 +20,7 @@ import CashRegisters from '@/views/CashRegisters.vue'
 import PointOfSale from '@/views/PointOfSale.vue'
 import Sales from '@/views/Sales.vue'
 import Inventory from '@/views/Inventory.vue'
+import BatchManagement from '@/views/BatchManagement.vue'
 import Reports from '@/views/Reports.vue'
 import TenantConfig from '@/views/TenantConfig.vue'
 import TenantManagement from '@/views/TenantManagement.vue'
@@ -147,6 +148,12 @@ const routes = [
     path: '/inventory',
     name: 'Inventory',
     component: Inventory,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/batches',
+    name: 'BatchManagement',
+    component: BatchManagement,
     meta: { requiresAuth: true }
   },
   {
