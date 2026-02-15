@@ -496,11 +496,12 @@ const fetchSuggestions = async (query) => {
   if (!query || !tenantId.value) return
   searchingProduct.value = true
   try {
-    const r = await productsService.searchVariants(tenantId.value, query)
+    const locationId = currentSession.value?.cash_register?.location_id || null
+    const r = await productsService.searchVariants(tenantId.value, query, 20, locationId)
     if (r.success) {
       searchResults.value = r.data.map(v => ({
         ...v,
-        _displayName: `${v.product?.name || ''}${v.variant_name ? ' — ' + v.variant_name : ''} (${v.sku})`,
+        _displayName: `${v.product?.name || ''}${v.variant_name ? ' — ' + v.variant_name : ''} (${v.sku})${v.stock_on_hand !== undefined ? ` [Stock: ${v.stock_available || 0}]` : ''}`,
         _stock: v.stock_on_hand ?? null
       }))
     }

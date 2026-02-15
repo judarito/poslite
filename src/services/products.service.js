@@ -211,7 +211,7 @@ class ProductsService {
   }
 
   // Buscar variantes por texto (para POS autocomplete)
-  async searchVariants(tenantId, search, limit = 20) {
+  async searchVariants(tenantId, search, limit = 20, locationId = null) {
     try {
       // Buscar por SKU o nombre de variante
       const { data: byVariant, error: e1 } = await supabaseService.client
@@ -247,7 +247,30 @@ class ProductsService {
         if (!map.has(v.variant_id)) map.set(v.variant_id, v)
       })
 
-      return { success: true, data: Array.from(map.values()).slice(0, limit) }
+      let results = Array.from(map.values()).slice(0, limit)
+
+      // Obtener stock de cada variante si se proporciona locationId
+      if (locationId && results.length > 0) {
+        const variantIds = results.map(v => v.variant_id)
+        const { data: stockData, error: stockError } = await supabaseService.client
+          .from('stock_balances')
+          .select('variant_id, on_hand, reserved')
+          .eq('tenant_id', tenantId)
+          .eq('location_id', locationId)
+          .in('variant_id', variantIds)
+
+        if (!stockError && stockData) {
+          const stockMap = new Map(stockData.map(s => [s.variant_id, s]))
+          results = results.map(v => ({
+            ...v,
+            stock_on_hand: stockMap.get(v.variant_id)?.on_hand || 0,
+            stock_reserved: stockMap.get(v.variant_id)?.reserved || 0,
+            stock_available: (stockMap.get(v.variant_id)?.on_hand || 0) - (stockMap.get(v.variant_id)?.reserved || 0)
+          }))
+        }
+      }
+
+      return { success: true, data: results }
     } catch (error) {
       return { success: false, error: error.message, data: [] }
     }

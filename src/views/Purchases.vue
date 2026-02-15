@@ -1313,12 +1313,22 @@ const savePurchase = async () => {
 
   saving.value = true
   try {
+    // Formatear líneas para asegurar tipos correctos
+    const formattedLines = purchaseData.value.lines.map(line => ({
+      variant_id: line.variant_id,
+      qty: Number(line.qty),
+      unit_cost: Number(line.unit_cost),
+      batch_number: line.batch_number || null,
+      expiration_date: line.expiration_date || null, // Ya está en formato YYYY-MM-DD desde type="date"
+      physical_location: line.physical_location || null
+    }))
+
     const { data, error } = await supabaseService.client.rpc('sp_create_purchase', {
       p_tenant: tenantId.value,
       p_location: purchaseData.value.location_id,
       p_supplier_id: null, // Puedes agregar proveedor después
       p_created_by: userProfile.value.user_id,
-      p_lines: purchaseData.value.lines,
+      p_lines: formattedLines,
       p_note: purchaseData.value.note || null
     })
 
