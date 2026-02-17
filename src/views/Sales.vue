@@ -9,6 +9,89 @@
     <v-window v-model="tab">
       <!-- VENTAS -->
       <v-window-item value="sales">
+        <!-- Filtros -->
+        <v-card class="mb-4" elevation="1">
+          <v-card-text>
+            <v-row dense>
+              <v-col cols="12" sm="6" md="3">
+                <v-text-field
+                  v-model="filters.from_date"
+                  type="date"
+                  label="Fecha desde"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  @change="applyFilters"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6" md="3">
+                <v-text-field
+                  v-model="filters.to_date"
+                  type="date"
+                  label="Fecha hasta"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  @change="applyFilters"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6" md="3">
+                <v-select
+                  v-model="filters.location_id"
+                  :items="locations"
+                  item-title="name"
+                  item-value="location_id"
+                  label="Sede"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  clearable
+                  @update:model-value="applyFilters"
+                >
+                  <template #prepend-inner>
+                    <v-icon size="small">mdi-store</v-icon>
+                  </template>
+                </v-select>
+              </v-col>
+              <v-col cols="12" sm="6" md="3" class="d-flex align-center">
+                <v-btn
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="mdi-refresh"
+                  @click="applyFilters"
+                  block
+                >
+                  Actualizar
+                </v-btn>
+              </v-col>
+            </v-row>
+            <v-row v-if="filters.from_date || filters.to_date || filters.location_id" dense class="mt-2">
+              <v-col cols="12">
+                <div class="text-caption text-grey d-flex align-center flex-wrap ga-2">
+                  <span>Filtros activos:</span>
+                  <v-chip v-if="filters.from_date" size="small" closable @click:close="filters.from_date = ''; applyFilters()">
+                    Desde: {{ formatFilterDate(filters.from_date) }}
+                  </v-chip>
+                  <v-chip v-if="filters.to_date" size="small" closable @click:close="filters.to_date = ''; applyFilters()">
+                    Hasta: {{ formatFilterDate(filters.to_date) }}
+                  </v-chip>
+                  <v-chip v-if="filters.location_id" size="small" closable @click:close="filters.location_id = null; applyFilters()">
+                    Sede: {{ getLocationName(filters.location_id) }}
+                  </v-chip>
+                  <v-btn
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="clearFilters"
+                  >
+                    Limpiar todos
+                  </v-btn>
+                </div>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+
         <ListView
           title="Ventas"
           icon="mdi-receipt"
@@ -283,6 +366,7 @@ import { usePrint } from '@/composables/usePrint'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
+import locationsService from '@/services/locations.service'
 import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
@@ -297,6 +381,27 @@ const loadingSales = ref(false)
 const returns = ref([])
 const totalReturns = ref(0)
 const loadingReturns = ref(false)
+
+// Calcular últimos 7 días (desde hace 7 días hasta hoy)
+const getLastWeekDates = () => {
+  const today = new Date()
+  const sevenDaysAgo = new Date(today)
+  sevenDaysAgo.setDate(today.getDate() - 7)
+  
+  return {
+    from: sevenDaysAgo.toISOString().split('T')[0],
+    to: today.toISOString().split('T')[0]
+  }
+}
+
+// Filtros de ventas
+const lastWeekDates = getLastWeekDates()
+const filters = ref({
+  from_date: lastWeekDates.from, // Hace 7 días
+  to_date: lastWeekDates.to,     // Hoy
+  location_id: null
+})
+const locations = ref([])
 
 const detailDialog = ref(false)
 const returnDialog = ref(false)
@@ -323,7 +428,24 @@ const loadSales = async ({ page, pageSize, search, tenantId: tid }) => {
   if (!tid) return
   loadingSales.value = true
   try {
-    const r = await salesService.getSales(tid, page, pageSize)
+    // Preparar filtros para enviar al servicio
+    const serviceFilters = {}
+    
+    if (filters.value.from_date) {
+      // Agregar hora inicio del día (00:00:00)
+      serviceFilters.from_date = `${filters.value.from_date}T00:00:00`
+    }
+    
+    if (filters.value.to_date) {
+      // Agregar hora fin del día (23:59:59)
+      serviceFilters.to_date = `${filters.value.to_date}T23:59:59`
+    }
+    
+    if (filters.value.location_id) {
+      serviceFilters.location_id = filters.value.location_id
+    }
+    
+    const r = await salesService.getSales(tid, page, pageSize, serviceFilters)
     if (r.success) { sales.value = r.data; totalSales.value = r.total }
   } finally { loadingSales.value = false }
 }
@@ -431,8 +553,44 @@ const doVoidSale = async () => {
   } finally { voiding.value = false }
 }
 
+const loadLocations = async () => {
+  if (!tenantId.value) return
+  // Obtener todas las sedes (sin paginación) para el filtro
+  const r = await locationsService.getLocations(tenantId.value, 1, 1000)
+  if (r.success) {
+    locations.value = r.data
+  }
+}
+
+const applyFilters = () => {
+  // Recargar primera página con filtros actuales
+  loadSales({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+}
+
+const clearFilters = () => {
+  const lastWeekDates = getLastWeekDates()
+  filters.value = {
+    from_date: lastWeekDates.from,
+    to_date: lastWeekDates.to,
+    location_id: null
+  }
+  applyFilters()
+}
+
+const formatFilterDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr + 'T00:00:00')
+  return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const getLocationName = (locationId) => {
+  const location = locations.value.find(l => l.location_id === locationId)
+  return location?.name || ''
+}
+
 onMounted(async () => {
   await loadSettings()
+  await loadLocations()
 })
 
 

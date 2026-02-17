@@ -561,7 +561,8 @@ onMounted(async () => {
   await loadDetail()
 
   // Cargar métodos de pago
-  const pmR = await paymentMethodsService.getPaymentMethods(tenantId.value, 1, 100)
+  // Cargar métodos de pago (excluyendo LAYAWAY)
+  const pmR = await paymentMethodsService.getPaymentMethodsForDropdown(tenantId.value, 1, 100)
   if (pmR.success) paymentMethods.value = pmR.data
 
   // Buscar sesión de caja abierta

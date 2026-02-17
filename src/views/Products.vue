@@ -1,70 +1,156 @@
 <template>
   <div>
-    <ListView
-      title="Productos"
-      icon="mdi-package-variant-closed"
-      :items="products"
-      :total-items="totalItems"
-      :loading="loading"
-      :page-size="defaultPageSize"
-      item-key="product_id"
-      title-field="name"
-      avatar-icon="mdi-package-variant"
-      avatar-color="indigo"
-      empty-message="No hay productos registrados"
-      create-button-text="Nuevo Producto"
-      @create="openCreateDialog"
-      @edit="openEditDialog"
-      @delete="confirmDelete"
-      @load-page="loadProducts"
-      @search="loadProducts"
-    >
-      <template #subtitle="{ item }">
-        {{ item.category ? item.category.name : 'Sin categoría' }}
-      </template>
-      <template #content="{ item }">
-        <div class="mt-2 d-flex flex-wrap ga-2">
-          <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
-          </v-chip>
-          <v-chip size="small" variant="tonal" prepend-icon="mdi-cube-outline">
-            {{ item.product_variants?.length || 0 }} variante(s)
-          </v-chip>
-          <v-chip v-if="item.track_inventory" size="small" variant="tonal" color="info" prepend-icon="mdi-archive">
-            Inventario
-          </v-chip>
-        </div>
-      </template>
-      <template #actions="{ item }">
-        <div class="d-flex flex-column flex-sm-row ga-1">
-          <v-tooltip text="Gestionar variantes" location="top">
-            <template #activator="{ props }">
+    <!-- Tabs para separar productos y componentes -->
+    <v-tabs v-model="currentTab" class="mb-3" color="primary">
+      <v-tab value="products">
+        <v-icon start>mdi-package-variant-closed</v-icon>
+        Productos para Venta
+      </v-tab>
+      <v-tab value="components">
+        <v-icon start>mdi-cog</v-icon>
+        Insumos/Componentes
+      </v-tab>
+    </v-tabs>
+
+    <v-window v-model="currentTab">
+      <!-- Tab: Productos para Venta -->
+      <v-window-item value="products">
+        <ListView
+          title="Productos para Venta"
+          icon="mdi-package-variant-closed"
+          :items="products"
+          :total-items="totalItems"
+          :loading="loading"
+          :page-size="defaultPageSize"
+          item-key="product_id"
+          title-field="name"
+          avatar-icon="mdi-package-variant"
+          avatar-color="indigo"
+          empty-message="No hay productos registrados"
+          create-button-text="Nuevo Producto"
+          @create="openCreateDialog"
+          @edit="openEditDialog"
+          @delete="confirmDelete"
+          @load-page="loadProducts"
+          @search="loadProducts"
+        >
+          <template #subtitle="{ item }">
+            {{ item.category ? item.category.name : 'Sin categoría' }}
+          </template>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
+                {{ item.is_active ? 'Activo' : 'Inactivo' }}
+              </v-chip>
+              <v-chip size="small" variant="tonal" prepend-icon="mdi-cube-outline">
+                {{ item.product_variants?.length || 0 }} variante(s)
+              </v-chip>
+              <v-chip v-if="item.track_inventory" size="small" variant="tonal" color="info" prepend-icon="mdi-archive">
+                Inventario
+              </v-chip>
+            </div>
+          </template>
+          <template #actions="{ item }">
+            <div class="d-flex flex-column flex-sm-row ga-1">
+              <v-tooltip text="Gestionar variantes" location="top">
+                <template #activator="{ props }">
+                  <v-btn
+                    icon="mdi-cube-outline"
+                    variant="text"
+                    size="small"
+                    color="primary"
+                    v-bind="props"
+                    @click.stop="openVariantDialogFromList(item)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-btn
-                icon="mdi-cube-outline"
+                icon="mdi-pencil"
                 variant="text"
                 size="small"
-                color="primary"
-                v-bind="props"
-                @click.stop="openVariantDialogFromList(item)"
+                @click.stop="openEditDialog(item)"
               ></v-btn>
-            </template>
-          </v-tooltip>
-          <v-btn
-            icon="mdi-pencil"
-            variant="text"
-            size="small"
-            @click.stop="openEditDialog(item)"
-          ></v-btn>
-          <v-btn
-            icon="mdi-delete"
-            variant="text"
-            size="small"
-            color="error"
-            @click.stop="confirmDelete(item)"
-          ></v-btn>
-        </div>
-      </template>
-    </ListView>
+              <v-btn
+                icon="mdi-delete"
+                variant="text"
+                size="small"
+                color="error"
+                @click.stop="confirmDelete(item)"
+              ></v-btn>
+            </div>
+          </template>
+        </ListView>
+      </v-window-item>
+
+      <!-- Tab: Insumos/Componentes -->
+      <v-window-item value="components">
+        <ListView
+          title="Insumos/Componentes"
+          icon="mdi-cog"
+          :items="products"
+          :total-items="totalItems"
+          :loading="loading"
+          :page-size="defaultPageSize"
+          item-key="product_id"
+          title-field="name"
+          avatar-icon="mdi-cog"
+          avatar-color="orange"
+          empty-message="No hay componentes registrados"
+          create-button-text="Nuevo Componente"
+          @create="openCreateDialog"
+          @edit="openEditDialog"
+          @delete="confirmDelete"
+          @load-page="loadProducts"
+          @search="loadProducts"
+        >
+          <template #subtitle="{ item }">
+            {{ item.category ? item.category.name : 'Sin categoría' }}
+          </template>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip color="orange" size="small" variant="flat">
+                Es componente
+              </v-chip>
+              <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
+                {{ item.is_active ? 'Activo' : 'Inactivo' }}
+              </v-chip>
+              <v-chip size="small" variant="tonal" prepend-icon="mdi-cube-outline">
+                {{ item.product_variants?.length || 0 }} variante(s)
+              </v-chip>
+            </div>
+          </template>
+          <template #actions="{ item }">
+            <div class="d-flex flex-column flex-sm-row ga-1">
+              <v-tooltip text="Gestionar variantes" location="top">
+                <template #activator="{ props }">
+                  <v-btn
+                    icon="mdi-cube-outline"
+                    variant="text"
+                    size="small"
+                    color="primary"
+                    v-bind="props"
+                    @click.stop="openVariantDialogFromList(item)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
+              <v-btn
+                icon="mdi-pencil"
+                variant="text"
+                size="small"
+                @click.stop="openEditDialog(item)"
+              ></v-btn>
+              <v-btn
+                icon="mdi-delete"
+                variant="text"
+                size="small"
+                color="error"
+                @click.stop="confirmDelete(item)"
+              ></v-btn>
+            </div>
+          </template>
+        </ListView>
+      </v-window-item>
+    </v-window>
 
     <!-- Dialog Crear/Editar Producto -->
     <v-dialog v-model="dialog" max-width="700" scrollable>
@@ -99,6 +185,61 @@
                   hint="Los productos con esta opción activa deben registrarse en lotes con fecha de vencimiento"
                   persistent-hint
                 ></v-switch>
+              </v-col>
+            </v-row>
+
+            <!-- Manufactura -->
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-1 font-weight-bold mb-3">
+              <v-icon start color="primary">mdi-cog</v-icon>
+              Configuración de Manufactura
+            </div>
+            <v-row>
+              <v-col cols="12" sm="6">
+                <v-select
+                  v-model="formData.inventory_behavior"
+                  :items="inventoryBehaviorOptions"
+                  label="Tipo de Inventario"
+                  prepend-inner-icon="mdi-cube-outline"
+                  variant="outlined"
+                  hint="Define cómo se maneja el inventario"
+                  persistent-hint
+                ></v-select>
+              </v-col>
+              <v-col v-if="formData.inventory_behavior === 'MANUFACTURED'" cols="12" sm="6">
+                <v-select
+                  v-model="formData.production_type"
+                  :items="productionTypeOptions"
+                  label="Tipo de Producción"
+                  prepend-inner-icon="mdi-factory"
+                  variant="outlined"
+                  hint="Bajo demanda o para stock"
+                  persistent-hint
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-switch
+                  v-model="formData.is_component"
+                  label="Es componente de otros productos"
+                  color="warning"
+                  hint="Marca este producto como componente para poder usarlo en BOMs"
+                  persistent-hint
+                ></v-switch>
+              </v-col>
+              <v-col v-if="formData.inventory_behavior === 'MANUFACTURED' && isEditing" cols="12">
+                <v-btn
+                  color="primary"
+                  variant="tonal"
+                  block
+                  prepend-icon="mdi-file-tree"
+                  @click="openBOMEditor"
+                >
+                  {{ formData.active_bom_id ? 'Editar BOM' : 'Configurar BOM' }}
+                </v-btn>
+                <div v-if="formData.active_bom_id" class="text-caption text-success mt-1">
+                  <v-icon size="small">mdi-check-circle</v-icon>
+                  BOM configurado
+                </div>
               </v-col>
             </v-row>
 
@@ -214,8 +355,7 @@
                   variant="outlined" 
                   type="number" 
                   :rules="[rules.required, rules.positive]"
-                  :readonly="true"
-                  hint="Calculado automáticamente (promedio ponderado)"
+                  hint="Costo base de la variante"
                   persistent-hint
                 ></v-text-field>
               </v-col>
@@ -265,26 +405,25 @@
               persistent-hint
               class="mb-2"
             ></v-switch>
-            <v-switch 
-              v-model="variantData.requires_expiration" 
-              label="Requiere control de vencimiento (sobreescribe producto)" 
-              color="warning"
-              hint="Si se define aquí, sobreescribe la configuración del producto"
-              persistent-hint
-              class="mb-2"
-              :indeterminate="variantData.requires_expiration === null"
-            >
-              <template #label>
-                <div class="d-flex align-center ga-2">
-                  <span>Requiere vencimiento</span>
-                  <v-tooltip text="Null = heredar del producto, True/False = sobreescribir">
-                    <template #activator="{ props }">
-                      <v-icon v-bind="props" size="small" color="grey">mdi-information</v-icon>
-                    </template>
-                  </v-tooltip>
-                </div>
-              </template>
-            </v-switch>
+            <div class="mb-2">
+              <div class="d-flex align-center ga-2 mb-1">
+                <span class="text-body-2">Control de vencimiento</span>
+                <v-tooltip text="Null = heredar del producto, True = requerir, False = no requerir">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="small" color="grey">mdi-information</v-icon>
+                  </template>
+                </v-tooltip>
+              </div>
+              <v-radio-group 
+                v-model="variantData.requires_expiration" 
+                inline
+                hide-details
+              >
+                <v-radio label="Heredar del producto" :value="null"></v-radio>
+                <v-radio label="Sí requiere" :value="true"></v-radio>
+                <v-radio label="No requiere" :value="false"></v-radio>
+              </v-radio-group>
+            </div>
             <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
           </v-form>
         </v-card-text>
@@ -309,21 +448,27 @@
       </v-card>
     </v-dialog>
 
+    <!-- BOM Editor -->
+    <BOMEditor ref="bomEditor" @saved="onBOMSaved" />
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
+import BOMEditor from '@/components/BOMEditor.vue'
 import productsService from '@/services/products.service'
 import categoriesService from '@/services/categories.service'
+import manufacturingService from '@/services/manufacturing.service'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
+const currentTab = ref('products')
 const products = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -343,9 +488,47 @@ const editingVariant = ref(false)
 const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
+const bomEditor = ref(null)
 
-const formData = ref({ product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true, requires_expiration: false })
-const variantData = ref({ variant_id: null, product_id: null, sku: '', variant_name: '', cost: 0, price: 0, price_includes_tax: false, min_stock: 0, allow_backorder: false, requires_expiration: null, is_active: true })
+const formData = ref({ 
+  product_id: null, 
+  name: '', 
+  description: '', 
+  category_id: null, 
+  is_active: true, 
+  track_inventory: true, 
+  requires_expiration: false,
+  inventory_behavior: 'RESELL',
+  production_type: null,
+  is_component: false,
+  active_bom_id: null
+})
+
+const variantData = ref({ 
+  variant_id: null, 
+  product_id: null, 
+  sku: '', 
+  variant_name: '', 
+  cost: 0, 
+  price: 0, 
+  price_includes_tax: false, 
+  min_stock: 0, 
+  allow_backorder: false, 
+  requires_expiration: null, 
+  is_active: true 
+})
+
+const inventoryBehaviorOptions = [
+  { value: 'RESELL', title: 'Reventa (Normal)' },
+  { value: 'SERVICE', title: 'Servicio (Sin inventario)' },
+  { value: 'MANUFACTURED', title: 'Manufacturado' },
+  { value: 'BUNDLE', title: 'Combo/Bundle' }
+]
+
+const productionTypeOptions = [
+  { value: 'ON_DEMAND', title: 'Bajo Demanda (On-Demand)' },
+  { value: 'TO_STOCK', title: 'Para Stock (To-Stock)' }
+]
 
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
@@ -357,8 +540,15 @@ const loadProducts = async ({ page, pageSize, search, tenantId: tid }) => {
   loading.value = true
   try {
     const r = await productsService.getProducts(tid, page, pageSize, search)
-    if (r.success) { products.value = r.data; totalItems.value = r.total }
-    else showMsg('Error al cargar productos', 'error')
+    if (r.success) {
+      // Filtrar según el tab activo
+      const isComponentTab = currentTab.value === 'components'
+      const filtered = r.data.filter(p => p.is_component === isComponentTab)
+      products.value = filtered
+      totalItems.value = filtered.length
+    } else {
+      showMsg('Error al cargar productos', 'error')
+    }
   } finally { loading.value = false }
 }
 
@@ -388,7 +578,11 @@ const openEditDialog = async (item) => {
       category_id: r.data.category_id, 
       is_active: r.data.is_active, 
       track_inventory: r.data.track_inventory,
-      requires_expiration: r.data.requires_expiration || false
+      requires_expiration: r.data.requires_expiration || false,
+      inventory_behavior: r.data.inventory_behavior || 'RESELL',
+      production_type: r.data.production_type || null,
+      is_component: r.data.is_component || false,
+      active_bom_id: r.data.active_bom_id || null
     }
     variants.value = r.data.product_variants || []
     dialog.value = true
@@ -500,13 +694,40 @@ const autoGenerateSKU = () => {
 }
 
 const saveVariant = async () => {
-  const { valid } = await variantForm.value.validate()
-  if (!valid || !tenantId.value) return
+  console.log('saveVariant called', { 
+    hasForm: !!variantForm.value, 
+    hasTenant: !!tenantId.value,
+    variantData: variantData.value 
+  })
+  
+  if (!variantForm.value) {
+    console.error('variantForm is null!')
+    showMsg('Error: Formulario no inicializado', 'error')
+    return
+  }
+  
+  if (!tenantId.value) {
+    console.error('tenantId is null!')
+    showMsg('Error: No hay tenant seleccionado', 'error')
+    return
+  }
+  
+  const validationResult = await variantForm.value.validate()
+  console.log('Validation result:', validationResult)
+  
+  if (!validationResult.valid) {
+    console.log('Form is not valid')
+    showMsg('Por favor complete todos los campos requeridos', 'warning')
+    return
+  }
+  
   savingVariant.value = true
   try {
+    console.log('Saving variant...', { editing: editingVariant.value })
     const r = editingVariant.value
       ? await productsService.updateVariant(tenantId.value, variantData.value.variant_id, variantData.value)
       : await productsService.createVariant(tenantId.value, { ...variantData.value, product_id: formData.value.product_id })
+    console.log('Save result:', r)
     if (r.success) {
       showMsg('Variante guardada')
       variantDialog.value = false
@@ -514,7 +735,12 @@ const saveVariant = async () => {
       const pr = await productsService.getProductById(tenantId.value, formData.value.product_id)
       if (pr.success) variants.value = pr.data.product_variants || []
     } else showMsg(r.error, 'error')
-  } finally { savingVariant.value = false }
+  } catch (error) {
+    console.error('Error saving variant:', error)
+    showMsg('Error al guardar variante: ' + error.message, 'error')
+  } finally { 
+    savingVariant.value = false 
+  }
 }
 
 const confirmDeleteVariant = async (v) => {
@@ -526,10 +752,59 @@ const confirmDeleteVariant = async (v) => {
   } else showMsg(r.error, 'error')
 }
 
+const openBOMEditor = async () => {
+  if (!formData.value.product_id) return
+  
+  // Si ya tiene BOM, cargar el existente
+  if (formData.value.active_bom_id) {
+    try {
+      const result = await manufacturingService.getBOMById(tenantId.value, formData.value.active_bom_id)
+      if (result.success && bomEditor.value) {
+        bomEditor.value.open(formData.value.product_id, null, result.data)
+      }
+    } catch (error) {
+      console.error('Error loading BOM:', error)
+      showMsg('Error al cargar BOM', 'error')
+    }
+  } else {
+    // Crear nuevo BOM
+    if (bomEditor.value) {
+      bomEditor.value.open(formData.value.product_id, null, null)
+    }
+  }
+}
+
+const onBOMSaved = async (bomData) => {
+  // Activar el BOM recién creado/actualizado
+  try {
+    const result = await manufacturingService.activateBOM(
+      tenantId.value,
+      formData.value.product_id,
+      null, // Variant ID null porque es a nivel de producto
+      bomData
+    )
+    
+    if (result.success) {
+      formData.value.active_bom_id = bomData
+      showMsg('BOM guardado y activado', 'success')
+    }
+  } catch (error) {
+    console.error('Error activating BOM:', error)
+    showMsg('BOM guardado pero no se pudo activar', 'warning')
+  }
+}
+
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 
 // Lifecycle
 onMounted(async () => {
   await loadSettings()
+})
+
+// Recargar productos cuando cambie el tab
+watch(currentTab, () => {
+  if (tenantId.value) {
+    loadProducts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+  }
 })
 </script>

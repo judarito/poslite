@@ -67,7 +67,10 @@ class ProductsService {
         category_id: product.category_id || null,
         is_active: product.is_active !== false,
         track_inventory: product.track_inventory !== false,
-        requires_expiration: product.requires_expiration || false
+        requires_expiration: product.requires_expiration || false,
+        inventory_behavior: product.inventory_behavior || 'RESELL',
+        production_type: product.production_type || null,
+        is_component: product.is_component || false
       })
       if (error) throw error
       return { success: true, data: data[0] }
@@ -84,7 +87,10 @@ class ProductsService {
         category_id: updates.category_id || null,
         is_active: updates.is_active,
         track_inventory: updates.track_inventory,
-        requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : false
+        requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : false,
+        inventory_behavior: updates.inventory_behavior || 'RESELL',
+        production_type: updates.production_type || null,
+        is_component: updates.is_component || false
       }, { tenant_id: tenantId, product_id: productId })
       if (error) throw error
       return { success: true, data: data[0] }
@@ -179,8 +185,8 @@ class ProductsService {
         .select(`
           barcode,
           variant:variant_id(
-            variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
-            product:product_id(product_id, name, category_id, track_inventory)
+            variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+            product:product_id(product_id, name, category_id, track_inventory, is_component)
           )
         `)
         .eq('tenant_id', tenantId)
@@ -188,21 +194,34 @@ class ProductsService {
         .limit(1)
 
       if (error) throw error
-      if (data && data.length > 0) return { success: true, data: data[0].variant }
+      // Filtrar componentes: no se pueden vender directamente
+      if (data && data.length > 0) {
+        const variant = data[0].variant
+        if (variant.is_component || variant.product?.is_component) {
+          return { success: false, error: 'Este producto es un componente y no puede venderse directamente' }
+        }
+        return { success: true, data: variant }
+      }
 
       // Buscar por SKU
       const r = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
-          product:product_id(product_id, name, category_id, track_inventory)
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+          product:product_id(product_id, name, category_id, track_inventory, is_component)
         `)
         .eq('tenant_id', tenantId)
         .eq('sku', barcode)
         .limit(1)
 
       if (r.error) throw r.error
-      if (r.data && r.data.length > 0) return { success: true, data: r.data[0] }
+      if (r.data && r.data.length > 0) {
+        const variant = r.data[0]
+        if (variant.is_component || variant.product?.is_component) {
+          return { success: false, error: 'Este producto es un componente y no puede venderse directamente' }
+        }
+        return { success: true, data: variant }
+      }
 
       return { success: false, error: 'Producto no encontrado' }
     } catch (error) {
@@ -213,29 +232,31 @@ class ProductsService {
   // Buscar variantes por texto (para POS autocomplete)
   async searchVariants(tenantId, search, limit = 20, locationId = null) {
     try {
-      // Buscar por SKU o nombre de variante
+      // Buscar por SKU o nombre de variante (EXCLUIR COMPONENTES)
       const { data: byVariant, error: e1 } = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
-          product:product_id(product_id, name)
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+          product:product_id(product_id, name, is_component)
         `)
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
+        .eq('is_component', false)
         .or(`sku.ilike.%${search}%,variant_name.ilike.%${search}%`)
         .limit(limit)
 
       if (e1) throw e1
 
-      // Buscar por nombre de producto
+      // Buscar por nombre de producto (EXCLUIR COMPONENTES)
       const { data: byProduct, error: e2 } = await supabaseService.client
         .from(this.variantsTable)
         .select(`
-          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active,
-          product:product_id!inner(product_id, name)
+          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+          product:product_id!inner(product_id, name, is_component)
         `)
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
+        .eq('is_component', false)
         .ilike('product.name', `%${search}%`)
         .limit(limit)
 
@@ -244,7 +265,10 @@ class ProductsService {
       // Combinar y deduplicar por variant_id
       const map = new Map()
       ;[...(byVariant || []), ...(byProduct || [])].forEach(v => {
-        if (!map.has(v.variant_id)) map.set(v.variant_id, v)
+        // Filtro adicional: Excluir si el producto padre también es componente
+        if (!v.is_component && !v.product?.is_component) {
+          if (!map.has(v.variant_id)) map.set(v.variant_id, v)
+        }
       })
 
       let results = Array.from(map.values()).slice(0, limit)

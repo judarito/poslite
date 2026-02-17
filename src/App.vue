@@ -808,6 +808,7 @@ const allMenuItems = [
     children: [
       { title: 'Productos', icon: 'mdi-package-variant-closed', route: '/products', permissions: ['CATALOG.PRODUCT.CREATE', 'CATALOG.PRODUCT.UPDATE'] },
       { title: 'Categorías', icon: 'mdi-shape', route: '/categories', permissions: ['CATALOG.CATEGORY.MANAGE'] },
+      { title: 'Unidades de Medida', icon: 'mdi-ruler', route: '/units', permissions: ['CATALOG.PRODUCT.CREATE', 'CATALOG.PRODUCT.UPDATE'] },
     ]
   },
   {
@@ -818,6 +819,8 @@ const allMenuItems = [
       { title: 'Stock y Kardex', icon: 'mdi-clipboard-list', route: '/inventory', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
       { title: 'Lotes y Vencimientos', icon: 'mdi-barcode', route: '/batches', permissions: ['INVENTORY.VIEW'] },
       { title: 'Compras', icon: 'mdi-cart-plus', route: '/purchases', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
+      { title: 'Órdenes de Producción', icon: 'mdi-factory', route: '/production-orders', permissions: ['INVENTORY.VIEW'] },
+      { title: 'Listas de Materiales (BOM)', icon: 'mdi-file-tree', route: '/boms', permissions: ['INVENTORY.VIEW'] },
     ]
   },
   {

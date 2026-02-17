@@ -6,7 +6,7 @@ class PaymentMethodsService {
   }
 
   // Obtener métodos de pago con paginación
-  async getPaymentMethods(tenantId, page = 1, pageSize = 10, search = '') {
+  async getPaymentMethods(tenantId, page = 1, pageSize = 10, search = '', options = {}) {
     try {
       const from = (page - 1) * pageSize
       const to = from + pageSize - 1
@@ -20,6 +20,16 @@ class PaymentMethodsService {
 
       if (search) {
         query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      }
+
+      // Filtrar métodos activos si se especifica
+      if (options.activeOnly) {
+        query = query.eq('is_active', true)
+      }
+
+      // Excluir códigos específicos (ej: LAYAWAY para dropdowns)
+      if (options.excludeCodes && Array.isArray(options.excludeCodes) && options.excludeCodes.length > 0) {
+        query = query.not('code', 'in', `(${options.excludeCodes.join(',')})`)
       }
 
       const { data, error, count } = await query
@@ -40,6 +50,17 @@ class PaymentMethodsService {
         total: 0
       }
     }
+  }
+
+  /**
+   * Obtener métodos de pago para usar en dropdowns
+   * Excluye automáticamente LAYAWAY (método interno) y devuelve solo activos
+   */
+  async getPaymentMethodsForDropdown(tenantId, page = 1, pageSize = 100) {
+    return this.getPaymentMethods(tenantId, page, pageSize, '', {
+      activeOnly: true,
+      excludeCodes: ['LAYAWAY']
+    })
   }
 
   // Crear método de pago

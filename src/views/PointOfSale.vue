@@ -853,8 +853,8 @@ const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snack
 // Inicialización
 onMounted(async () => {
   if (!tenantId.value) return
-  // Cargar métodos de pago
-  const pm = await paymentMethodsService.getPaymentMethods(tenantId.value, 1, 100)
+  // Cargar métodos de pago (excluyendo LAYAWAY)
+  const pm = await paymentMethodsService.getPaymentMethodsForDropdown(tenantId.value, 1, 100)
   if (pm.success) {
     paymentMethods.value = pm.data
     // Inicializar con el primer método disponible

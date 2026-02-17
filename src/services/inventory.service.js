@@ -18,8 +18,8 @@ class InventoryService {
           *,
           location:location_id(name),
           variant:variant_id(
-            sku, variant_name, cost, price,
-            product:product_id(name, category:category_id(name))
+            sku, variant_name, cost, price, min_stock, is_component,
+            product:product_id(name, is_component, category:category_id(name))
           )
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)

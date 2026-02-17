@@ -9,6 +9,7 @@ import Login from '@/views/Login.vue'
 import PaymentMethods from '@/views/PaymentMethods.vue'
 import Locations from '@/views/Locations.vue'
 import Categories from '@/views/Categories.vue'
+import UnitsOfMeasure from '@/views/UnitsOfMeasure.vue'
 import Products from '@/views/Products.vue'
 import Customers from '@/views/Customers.vue'
 import Taxes from '@/views/Taxes.vue'
@@ -28,6 +29,8 @@ import LayawayContracts from '@/views/LayawayContracts.vue'
 import LayawayDetail from '@/views/LayawayDetail.vue'
 import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
 import Purchases from '@/views/Purchases.vue'
+import ProductionOrders from '@/views/ProductionOrders.vue'
+import BOMs from '@/views/BOMs.vue'
 
 const routes = [
   {
@@ -79,9 +82,27 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/units',
+    name: 'UnitsOfMeasure',
+    component: UnitsOfMeasure,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/products',
     name: 'Products',
     component: Products,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/production-orders',
+    name: 'ProductionOrders',
+    component: ProductionOrders,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/boms',
+    name: 'BOMs',
+    component: BOMs,
     meta: { requiresAuth: true }
   },
   {
