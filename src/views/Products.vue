@@ -168,6 +168,35 @@
               <v-col cols="12" sm="4">
                 <v-select v-model="formData.category_id" label="Categoría" prepend-inner-icon="mdi-shape" variant="outlined" :items="categoryOptions" item-title="name" item-value="category_id" clearable></v-select>
               </v-col>
+              <v-col cols="12" sm="4">
+                <v-autocomplete
+                  v-model="formData.unit_id"
+                  :items="unitOptions"
+                  item-title="display_name"
+                  item-value="unit_id"
+                  label="Unidad de medida"
+                  prepend-inner-icon="mdi-ruler"
+                  variant="outlined"
+                  clearable
+                  hint="Selecciona la unidad de medida del producto"
+                  persistent-hint
+                >
+                  <template #item="{ props, item }">
+                    <v-list-item v-bind="props">
+                      <template #prepend>
+                        <v-chip size="x-small" :color="item.raw.is_system ? 'blue' : 'green'">
+                          {{ item.raw.code }}
+                        </v-chip>
+                      </template>
+                      <template #append v-if="item.raw.dian_code">
+                        <v-chip size="x-small" variant="outlined" color="purple">
+                          DIAN: {{ item.raw.dian_code }}
+                        </v-chip>
+                      </template>
+                    </v-list-item>
+                  </template>
+                </v-autocomplete>
+              </v-col>
               <v-col cols="12">
                 <v-textarea v-model="formData.description" label="Descripción" prepend-inner-icon="mdi-text-long" variant="outlined" rows="2" auto-grow></v-textarea>
               </v-col>
@@ -464,6 +493,7 @@ import BOMEditor from '@/components/BOMEditor.vue'
 import productsService from '@/services/products.service'
 import categoriesService from '@/services/categories.service'
 import manufacturingService from '@/services/manufacturing.service'
+import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 
 const { tenantId } = useTenant()
@@ -483,6 +513,7 @@ const form = ref(null)
 const variantForm = ref(null)
 const itemToDelete = ref(null)
 const categoryOptions = ref([])
+const unitOptions = ref([])
 const variants = ref([])
 const editingVariant = ref(false)
 const snackbar = ref(false)
@@ -494,7 +525,8 @@ const formData = ref({
   product_id: null, 
   name: '', 
   description: '', 
-  category_id: null, 
+  category_id: null,
+  unit_id: null, 
   is_active: true, 
   track_inventory: true, 
   requires_expiration: false,
@@ -558,17 +590,30 @@ const loadCategories = async () => {
   if (r.success) categoryOptions.value = r.data
 }
 
+const loadUnits = async () => {
+  if (!tenantId.value) return
+  const r = await unitsOfMeasureService.getActiveUnits(tenantId.value)
+  if (r.success) {
+    unitOptions.value = r.data.map(u => ({
+      ...u,
+      display_name: `${u.code} - ${u.name}${u.dian_code ? ' (DIAN: ' + u.dian_code + ')' : ''}`
+    }))
+  }
+}
+
 const openCreateDialog = () => {
   isEditing.value = false
-  formData.value = { product_id: null, name: '', description: '', category_id: null, is_active: true, track_inventory: true, requires_expiration: false }
+  formData.value = { product_id: null, name: '', description: '', category_id: null, unit_id: null, is_active: true, track_inventory: true, requires_expiration: false }
   variants.value = []
   loadCategories()
+  loadUnits()
   dialog.value = true
 }
 
 const openEditDialog = async (item) => {
   isEditing.value = true
   loadCategories()
+  loadUnits()
   const r = await productsService.getProductById(tenantId.value, item.product_id)
   if (r.success) {
     formData.value = { 
@@ -799,6 +844,7 @@ const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snack
 // Lifecycle
 onMounted(async () => {
   await loadSettings()
+  await loadUnits()
 })
 
 // Recargar productos cuando cambie el tab

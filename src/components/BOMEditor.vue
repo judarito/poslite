@@ -131,13 +131,31 @@
                   ></v-text-field>
                 </td>
                 <td>
-                  <v-select
-                    v-model="comp.unit"
+                  <v-autocomplete
+                    v-model="comp.unit_id"
                     :items="unitOptions"
+                    item-title="display_name"
+                    item-value="unit_id"
                     variant="outlined"
                     density="compact"
                     hide-details
-                  ></v-select>
+                    clearable
+                  >
+                    <template #item="{ props, item }">
+                      <v-list-item v-bind="props" density="compact">
+                        <template #prepend>
+                          <v-chip size="x-small" :color="item.raw.is_system ? 'blue' : 'green'">
+                            {{ item.raw.code }}
+                          </v-chip>
+                        </template>
+                        <template #append v-if="item.raw.dian_code">
+                          <v-chip size="x-small" variant="outlined" color="purple">
+                            DIAN: {{ item.raw.dian_code }}
+                          </v-chip>
+                        </template>
+                      </v-list-item>
+                    </template>
+                  </v-autocomplete>
                 </td>
                 <td>
                   <v-text-field
@@ -254,6 +272,7 @@ import { ref, computed, watch } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import manufacturingService from '@/services/manufacturing.service'
 import productsService from '@/services/products.service'
+import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 
 export default {
   name: 'BOMEditor',
@@ -268,7 +287,7 @@ export default {
     const circularDependency = ref(false)
 
     const componentOptions = ref([])
-    const unitOptions = ['kg', 'g', 'L', 'ml', 'unidad', 'caja', 'paquete']
+    const unitOptions = ref([])
 
     const formData = ref({
       bom_id: null,
@@ -315,11 +334,26 @@ export default {
       }
     }
 
+    const loadUnits = async () => {
+      if (!tenantId.value) return
+      try {
+        const r = await unitsOfMeasureService.getActiveUnits(tenantId.value)
+        if (r.success) {
+          unitOptions.value = r.data.map(u => ({
+            ...u,
+            display_name: `${u.code} - ${u.name}${u.dian_code ? ' (DIAN: ' + u.dian_code + ')' : ''}`
+          }))
+        }
+      } catch (error) {
+        console.error('Error loading units:', error)
+      }
+    }
+
     const addComponent = () => {
       formData.value.components.push({
         component_variant_id: null,
         quantity_required: 1,
-        unit: 'unidad',
+        unit_id: null,
         waste_percentage: 0,
         is_optional: false,
         unit_cost: 0,
@@ -348,6 +382,7 @@ export default {
 
     const open = async (productId = null, variantId = null, existingBOM = null) => {
       await loadComponents()
+      await loadUnits()
       
       if (existingBOM) {
         isEditing.value = true
@@ -384,7 +419,7 @@ export default {
           components: existingBOM.bom_components?.map(c => ({
             component_variant_id: c.component_variant_id,
             quantity_required: c.quantity_required,
-            unit: c.unit,
+            unit_id: c.unit_id,
             waste_percentage: c.waste_percentage || 0,
             is_optional: c.is_optional || false,
             unit_cost: c.component_variant?.cost || 0,
@@ -429,7 +464,7 @@ export default {
           components: formData.value.components.map(c => ({
             component_variant_id: c.component_variant_id,
             quantity_required: c.quantity_required,
-            unit: c.unit,
+            unit_id: c.unit_id,
             waste_percentage: c.waste_percentage || 0,
             is_optional: c.is_optional || false
           }))

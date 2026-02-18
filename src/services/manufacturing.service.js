@@ -27,7 +27,8 @@ class ManufacturingService {
             component_variant_id,
             component_variant:component_variant_id(variant_id, sku, variant_name, price, cost),
             quantity_required,
-            unit,
+            unit_id,
+            unit:unit_id(unit_id, code, name, dian_code, is_system),
             waste_percentage,
             is_optional
           )
@@ -61,7 +62,8 @@ class ManufacturingService {
             component_variant_id,
             component_variant:component_variant_id(variant_id, sku, variant_name, price, cost),
             quantity_required,
-            unit,
+            unit_id,
+            unit:unit_id(unit_id, code, name, dian_code, is_system),
             waste_percentage,
             is_optional,
             notes

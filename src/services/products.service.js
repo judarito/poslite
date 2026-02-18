@@ -17,6 +17,7 @@ class ProductsService {
         .select(`
           *,
           category:category_id(category_id, name),
+          unit:unit_id(unit_id, code, name, dian_code, is_system),
           product_variants(variant_id, sku, variant_name, cost, price, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active)
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)
@@ -42,6 +43,7 @@ class ProductsService {
         .select(`
           *,
           category:category_id(category_id, name),
+          unit:unit_id(unit_id, code, name, dian_code, is_system),
           product_variants(
             variant_id, sku, variant_name, attrs, cost, price, price_includes_tax, pricing_method, markup_percentage, price_rounding, rounding_to, min_stock, allow_backorder, is_active,
             product_barcodes(barcode_id, barcode)
@@ -65,6 +67,7 @@ class ProductsService {
         name: product.name,
         description: product.description || null,
         category_id: product.category_id || null,
+        unit_id: product.unit_id || null,
         is_active: product.is_active !== false,
         track_inventory: product.track_inventory !== false,
         requires_expiration: product.requires_expiration || false,
@@ -85,6 +88,7 @@ class ProductsService {
         name: updates.name,
         description: updates.description || null,
         category_id: updates.category_id || null,
+        unit_id: updates.unit_id || null,
         is_active: updates.is_active,
         track_inventory: updates.track_inventory,
         requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : false,
