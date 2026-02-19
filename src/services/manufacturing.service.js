@@ -82,15 +82,33 @@ class ManufacturingService {
 
   async createBOM(tenantId, bom) {
     try {
-      // Crear el BOM
+      // Validar que se proporcione EXACTAMENTE uno: product_id O variant_id
+      const hasProductId = !!bom.product_id
+      const hasVariantId = !!bom.variant_id
+      
+      if (!hasProductId && !hasVariantId) {
+        throw new Error('Debe especificar un product_id O variant_id')
+      }
+      if (hasProductId && hasVariantId) {
+        throw new Error('Solo puede especificar product_id O variant_id, no ambos')
+      }
+
+      // Crear el BOM (solo incluir product_id/variant_id si no son null)
       const bomData = {
         tenant_id: tenantId,
-        product_id: bom.product_id || null,
-        variant_id: bom.variant_id || null,
         bom_name: bom.bom_name,
         notes: bom.notes || null,
         is_active: true,
         created_at: new Date().toISOString()
+      }
+
+      // Solo agregar product_id si tiene valor (no enviar null como string)
+      if (bom.product_id) {
+        bomData.product_id = bom.product_id
+      }
+      // Solo agregar variant_id si tiene valor
+      if (bom.variant_id) {
+        bomData.variant_id = bom.variant_id
       }
 
       const { data: bomResult, error: bomError } = await supabaseService.client
@@ -103,15 +121,28 @@ class ManufacturingService {
 
       // Crear los componentes del BOM
       if (bom.components && bom.components.length > 0) {
-        const components = bom.components.map(c => ({
-          tenant_id: tenantId,
-          bom_id: bomResult.bom_id,
-          component_variant_id: c.component_variant_id,
-          quantity_required: c.quantity_required,
-          unit: c.unit || 'unidad',
-          waste_percentage: c.waste_percentage || 0,
-          is_optional: c.is_optional || false
-        }))
+        const components = bom.components.map(c => {
+          const component = {
+            tenant_id: tenantId,
+            bom_id: bomResult.bom_id,
+            component_variant_id: c.component_variant_id,
+            quantity_required: c.quantity_required,
+            waste_percentage: c.waste_percentage || 0,
+            is_optional: c.is_optional || false
+          }
+          
+          // Incluir unit_id si existe (para migración nueva)
+          if (c.unit_id) {
+            component.unit_id = c.unit_id
+          }
+          
+          // Incluir unit (código) si existe (para compatibilidad con tabla sin migrar)
+          if (c.unit) {
+            component.unit = c.unit
+          }
+          
+          return component
+        })
 
         const { error: componentsError } = await supabaseService.client
           .from(this.componentsTable)
@@ -126,14 +157,86 @@ class ManufacturingService {
     }
   }
 
-  async updateBOM(tenantId, bomId, updates) {
+  async updateBOM(tenantId, bomId, updates, components = null) {
     try {
+      // Validar que no se viole el constraint: exactamente uno de product_id o variant_id
+      if (updates.product_id !== undefined || updates.variant_id !== undefined) {
+        const hasProductId = !!updates.product_id
+        const hasVariantId = !!updates.variant_id
+        
+        if (!hasProductId && !hasVariantId) {
+          throw new Error('Debe especificar un product_id O variant_id')
+        }
+        if (hasProductId && hasVariantId) {
+          throw new Error('Solo puede especificar product_id O variant_id, no ambos')
+        }
+      }
+
+      // Filtrar solo campos válidos de bill_of_materials (sin components)
+      const validFields = ['product_id', 'variant_id', 'bom_name', 'notes', 'is_active']
+      const bomUpdates = {}
+      validFields.forEach(field => {
+        if (updates[field] !== undefined) {
+          // Para product_id y variant_id, solo incluir si no son null (evitar error UUID)
+          if ((field === 'product_id' || field === 'variant_id') && updates[field] === null) {
+            return
+          }
+          bomUpdates[field] = updates[field]
+        }
+      })
+
+      // Actualizar tabla bill_of_materials
       const { data, error } = await supabaseService.update(
         this.bomsTable,
         { bom_id: bomId, tenant_id: tenantId },
-        updates
+        bomUpdates
       )
       if (error) throw error
+
+      // Si se proporcionan componentes, actualizar tabla bom_components
+      if (components && Array.isArray(components)) {
+        // 1. Eliminar componentes existentes
+        const { error: deleteError } = await supabaseService.client
+          .from(this.componentsTable)
+          .delete()
+          .eq('bom_id', bomId)
+          .eq('tenant_id', tenantId)
+        
+        if (deleteError) throw deleteError
+
+        // 2. Insertar nuevos componentes
+        if (components.length > 0) {
+          const newComponents = components.map(c => {
+            const component = {
+              tenant_id: tenantId,
+              bom_id: bomId,
+              component_variant_id: c.component_variant_id,
+              quantity_required: c.quantity_required,
+              waste_percentage: c.waste_percentage || 0,
+              is_optional: c.is_optional || false
+            }
+            
+            // Incluir unit_id si existe (para migración nueva)
+            if (c.unit_id) {
+              component.unit_id = c.unit_id
+            }
+            
+            // Incluir unit (código) si existe (para compatibilidad con tabla sin migrar)
+            if (c.unit) {
+              component.unit = c.unit
+            }
+            
+            return component
+          })
+
+          const { error: insertError } = await supabaseService.client
+            .from(this.componentsTable)
+            .insert(newComponents)
+          
+          if (insertError) throw insertError
+        }
+      }
+
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }

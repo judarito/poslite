@@ -272,6 +272,7 @@ DECLARE
   v_batch_id UUID;
   v_batch_number TEXT;
   v_unit_cost NUMERIC;
+  v_new_price NUMERIC;
 BEGIN
   -- Obtener orden
   SELECT * INTO v_order
@@ -333,6 +334,21 @@ BEGIN
     v_order.tenant_id, p_production_order, v_batch_id,
     p_quantity_produced, v_unit_cost, p_completed_by
   );
+  
+  -- Actualizar cost de la variante basado en componentes consumidos
+  -- Calcular precio de venta según política de pricing_rules
+  v_new_price := fn_calculate_price(
+    v_order.tenant_id,
+    v_order.product_variant_id,
+    v_unit_cost,
+    v_order.location_id
+  );
+  
+  UPDATE product_variants
+  SET cost = v_unit_cost,
+      price = v_new_price
+  WHERE tenant_id = v_order.tenant_id
+    AND variant_id = v_order.product_variant_id;
   
   -- Actualizar orden
   UPDATE production_orders

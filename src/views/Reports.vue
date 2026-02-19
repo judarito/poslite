@@ -88,6 +88,10 @@
         </v-badge>
         <span v-else>Alertas de Stock</span>
       </v-tab>
+      <v-tab value="production-costs">
+        <v-icon start>mdi-factory</v-icon>
+        Costos de Producción
+      </v-tab>
     </v-tabs>
 
     <v-window v-model="reportTab">
@@ -739,6 +743,191 @@
           </div>
         </v-card>
       </v-window-item>
+
+      <!-- Costos de Producción -->
+      <v-window-item value="production-costs">
+        <v-card>
+          <v-card-title class="d-flex align-center">
+            <v-icon start color="purple">mdi-factory</v-icon>
+            Reporte de Costos de Producción
+            <v-spacer></v-spacer>
+            <v-btn 
+              color="primary" 
+              variant="tonal" 
+              size="small" 
+              prepend-icon="mdi-refresh" 
+              @click="loadProductionCosts"
+              :loading="loadingProduction"
+            >
+              Recargar
+            </v-btn>
+          </v-card-title>
+          
+          <v-card-subtitle class="text-caption">
+            Órdenes de producción completadas y en proceso en el período seleccionado
+          </v-card-subtitle>
+
+          <!-- Desktop: Table -->
+          <v-table density="comfortable" class="d-none d-sm-table w-100">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Producto</th>
+                <th>Estado</th>
+                <th class="text-right">Cant.</th>
+                <th class="text-right">Yield %</th>
+                <th class="text-right">Costo Teórico</th>
+                <th class="text-right">Costo Real</th>
+                <th class="text-right">Variación</th>
+                <th class="text-right">Costo Unit.</th>
+                <th class="text-right">Ventas</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in productionCosts" :key="order.production_order_id">
+                <td>
+                  <div class="text-body-2 font-weight-bold">{{ order.order_number }}</div>
+                  <div class="text-caption text-grey">{{ order.location_name }}</div>
+                </td>
+                <td>
+                  <div class="text-body-2">{{ order.product_name }}</div>
+                  <div class="text-caption text-grey">{{ order.sku }}</div>
+                </td>
+                <td>
+                  <v-chip 
+                    :color="order.status === 'COMPLETED' ? 'success' : order.status === 'IN_PROGRESS' ? 'info' : 'grey'" 
+                    size="small" 
+                    variant="flat"
+                  >
+                    {{ order.status === 'COMPLETED' ? 'Completada' : order.status === 'IN_PROGRESS' ? 'En Proceso' : order.status }}
+                  </v-chip>
+                </td>
+                <td class="text-right">
+                  <div>{{ order.quantity_produced }} / {{ order.quantity_planned }}</div>
+                </td>
+                <td class="text-right">
+                  <v-chip 
+                    :color="order.yield_percentage >= 95 ? 'success' : order.yield_percentage >= 80 ? 'warning' : 'error'" 
+                    size="small"
+                    variant="tonal"
+                  >
+                    {{ order.yield_percentage }}%
+                  </v-chip>
+                </td>
+                <td class="text-right text-grey">{{ formatMoney(order.costo_teorico_total) }}</td>
+                <td class="text-right font-weight-bold">{{ formatMoney(order.costo_real_total) }}</td>
+                <td class="text-right" :class="order.variacion_costo >= 0 ? 'text-error' : 'text-success'">
+                  {{ order.variacion_costo >= 0 ? '+' : '' }}{{ formatMoney(order.variacion_costo) }}
+                </td>
+                <td class="text-right">{{ formatMoney(order.costo_unitario_real) }}</td>
+                <td class="text-right">
+                  <span v-if="order.venta_info && order.venta_info.ventas_realizadas > 0">
+                    <div class="text-caption">{{ order.venta_info.cantidad_vendida }} uds</div>
+                    <div>{{ formatMoney(order.venta_info.precio_promedio) }}</div>
+                  </span>
+                  <span v-else class="text-grey">Sin ventas</span>
+                </td>
+                <td>{{ formatDate(order.fecha_fin_real || order.fecha_creacion) }}</td>
+              </tr>
+              <tr v-if="productionCosts.length === 0">
+                <td colspan="11" class="text-center text-grey pa-4">
+                  <v-icon size="large">mdi-factory</v-icon>
+                  <div class="mt-2">No hay órdenes de producción en el período seleccionado</div>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <!-- Mobile: Cards -->
+          <div class="d-sm-none pa-2">
+            <v-card 
+              v-for="order in productionCosts" 
+              :key="order.production_order_id" 
+              :color="order.status === 'COMPLETED' ? 'success' : 'info'" 
+              variant="tonal" 
+              class="mb-3"
+            >
+              <v-card-title class="text-subtitle-1">
+                <v-icon start>mdi-factory</v-icon>
+                {{ order.order_number }}
+                <v-spacer></v-spacer>
+                <v-chip 
+                  :color="order.status === 'COMPLETED' ? 'success' : 'info'" 
+                  size="small"
+                >
+                  {{ order.status === 'COMPLETED' ? 'Completada' : 'En Proceso' }}
+                </v-chip>
+              </v-card-title>
+              <v-card-text>
+                <div class="text-body-2 font-weight-bold mb-1">{{ order.product_name }}</div>
+                <div class="text-caption text-grey mb-2">SKU: {{ order.sku }} • {{ order.location_name }}</div>
+                <v-divider class="my-2"></v-divider>
+                
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Cantidad:</span>
+                  <span>{{ order.quantity_produced }} / {{ order.quantity_planned }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Yield:</span>
+                  <v-chip 
+                    :color="order.yield_percentage >= 95 ? 'success' : order.yield_percentage >= 80 ? 'warning' : 'error'" 
+                    size="x-small"
+                  >
+                    {{ order.yield_percentage }}%
+                  </v-chip>
+                </div>
+                <v-divider class="my-2"></v-divider>
+                
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Costo Teórico:</span>
+                  <span>{{ formatMoney(order.costo_teorico_total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Costo Real:</span>
+                  <span class="font-weight-bold">{{ formatMoney(order.costo_real_total) }}</span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Variación:</span>
+                  <span :class="order.variacion_costo >= 0 ? 'text-error' : 'text-success'">
+                    {{ order.variacion_costo >= 0 ? '+' : '' }}{{ formatMoney(order.variacion_costo) }}
+                  </span>
+                </div>
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span class="text-grey">Costo Unitario:</span>
+                  <span class="font-weight-bold">{{ formatMoney(order.costo_unitario_real) }}</span>
+                </div>
+                
+                <div v-if="order.venta_info && order.venta_info.ventas_realizadas > 0">
+                  <v-divider class="my-2"></v-divider>
+                  <div class="d-flex justify-space-between text-caption mb-1">
+                    <span class="text-grey">Ventas:</span>
+                    <span>{{ order.venta_info.ventas_realizadas }} ({{ order.venta_info.cantidad_vendida }} uds)</span>
+                  </div>
+                  <div class="d-flex justify-space-between text-caption mb-1">
+                    <span class="text-grey">Ingreso Total:</span>
+                    <span>{{ formatMoney(order.venta_info.ingreso_total) }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between text-caption">
+                    <span class="text-grey">Precio Promedio:</span>
+                    <span class="font-weight-bold">{{ formatMoney(order.venta_info.precio_promedio) }}</span>
+                  </div>
+                </div>
+                
+                <v-divider class="my-2"></v-divider>
+                <div class="text-caption text-grey text-right">
+                  {{ formatDate(order.fecha_fin_real || order.fecha_creacion) }}
+                </div>
+              </v-card-text>
+            </v-card>
+            
+            <div v-if="productionCosts.length === 0" class="text-center pa-4">
+              <v-icon size="large" color="grey">mdi-factory</v-icon>
+              <div class="text-grey mt-2">No hay órdenes de producción</div>
+            </div>
+          </div>
+        </v-card>
+      </v-window-item>
     </v-window>
   </div>
 </template>
@@ -772,6 +961,10 @@ const movementTypeFilter = ref('ALL')
 
 const layawaySummary = ref(null)
 const layawayContracts = ref([])
+
+// Production Costs
+const productionCosts = ref([])
+const loadingProduction = ref(false)
 
 // Stock Alerts
 const stockAlerts = ref([])
@@ -879,9 +1072,25 @@ const loadStockAlerts = async () => {
   }
 }
 
+const loadProductionCosts = async () => {
+  if (!tenantId.value || !fromDate.value || !toDate.value) return
+  loadingProduction.value = true
+  try {
+    const fd = fromDate.value + 'T00:00:00'
+    const td = toDate.value + 'T23:59:59'
+    const loc = locationFilter.value || null
+    
+    const r = await reportsService.getProductionCostReport(tenantId.value, fd, td, loc)
+    if (r.success) productionCosts.value = r.data
+  } finally {
+    loadingProduction.value = false
+  }
+}
+
 onMounted(async () => {
   await loadLocations()
   loadAllReports()
   loadStockAlerts()
+  loadProductionCosts()
 })
 </script>

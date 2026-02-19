@@ -7,7 +7,7 @@ class ProductsService {
     this.barcodesTable = 'product_barcodes'
   }
 
-  async getProducts(tenantId, page = 1, pageSize = 10, search = '') {
+  async getProducts(tenantId, page = 1, pageSize = 10, search = '', filters = {}) {
     try {
       const from = (page - 1) * pageSize
       const to = from + pageSize - 1
@@ -26,6 +26,17 @@ class ProductsService {
 
       if (search) {
         query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+      }
+
+      // Filtros opcionales
+      if (filters.is_component !== undefined) {
+        query = query.eq('is_component', filters.is_component)
+      }
+      if (filters.is_active !== undefined) {
+        query = query.eq('is_active', filters.is_active)
+      }
+      if (filters.inventory_behavior) {
+        query = query.eq('inventory_behavior', filters.inventory_behavior)
       }
 
       const { data, error, count } = await query
@@ -68,6 +79,9 @@ class ProductsService {
         description: product.description || null,
         category_id: product.category_id || null,
         unit_id: product.unit_id || null,
+        base_cost: product.base_cost || 0,
+        base_price: product.base_price || 0,
+        base_min_stock: product.base_min_stock || 0,
         is_active: product.is_active !== false,
         track_inventory: product.track_inventory !== false,
         requires_expiration: product.requires_expiration || false,
@@ -76,6 +90,14 @@ class ProductsService {
         is_component: product.is_component || false
       })
       if (error) throw error
+      
+      // Trigger auto-creará la variante predeterminada
+      // Retornar producto con sus variantes
+      const productWithVariants = await this.getProductById(tenantId, data[0].product_id)
+      if (productWithVariants.success) {
+        return { success: true, data: productWithVariants.data }
+      }
+      
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -97,6 +119,24 @@ class ProductsService {
         is_component: updates.is_component || false
       }, { tenant_id: tenantId, product_id: productId })
       if (error) throw error
+      
+      // Si es variante única y tiene base_cost/base_price/base_min_stock, actualizar la variante predeterminada
+      if (updates.variant_mode === 'single' && 
+          (updates.base_cost !== undefined || 
+           updates.base_price !== undefined || 
+           updates.base_min_stock !== undefined)) {
+        const variantUpdates = {}
+        if (updates.base_cost !== undefined) variantUpdates.cost = updates.base_cost
+        if (updates.base_price !== undefined) variantUpdates.price = updates.base_price
+        if (updates.base_min_stock !== undefined) variantUpdates.min_stock = updates.base_min_stock
+        
+        await supabaseService.update(this.variantsTable, variantUpdates, {
+          tenant_id: tenantId,
+          product_id: productId,
+          variant_name: 'Predeterminado'
+        })
+      }
+      
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -237,6 +277,7 @@ class ProductsService {
   async searchVariants(tenantId, search, limit = 20, locationId = null) {
     try {
       // Buscar por SKU o nombre de variante (EXCLUIR COMPONENTES)
+      // Nota: is_component puede ser NULL en variantes (hereda del producto), por lo que usamos OR
       const { data: byVariant, error: e1 } = await supabaseService.client
         .from(this.variantsTable)
         .select(`
@@ -245,7 +286,7 @@ class ProductsService {
         `)
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
-        .eq('is_component', false)
+        .or('is_component.is.null,is_component.eq.false')
         .or(`sku.ilike.%${search}%,variant_name.ilike.%${search}%`)
         .limit(limit)
 
@@ -260,7 +301,7 @@ class ProductsService {
         `)
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
-        .eq('is_component', false)
+        .or('is_component.is.null,is_component.eq.false')
         .ilike('product.name', `%${search}%`)
         .limit(limit)
 
@@ -269,8 +310,10 @@ class ProductsService {
       // Combinar y deduplicar por variant_id
       const map = new Map()
       ;[...(byVariant || []), ...(byProduct || [])].forEach(v => {
-        // Filtro adicional: Excluir si el producto padre también es componente
-        if (!v.is_component && !v.product?.is_component) {
+        // Filtro adicional JS: Excluir si la variante es componente o si el producto padre es componente
+        // Lógica: effective_is_component = COALESCE(variant.is_component, product.is_component, false)
+        const effectiveIsComponent = v.is_component !== null ? v.is_component : (v.product?.is_component || false)
+        if (!effectiveIsComponent) {
           if (!map.has(v.variant_id)) map.set(v.variant_id, v)
         }
       })

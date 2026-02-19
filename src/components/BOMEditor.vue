@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="dialog" max-width="900" scrollable persistent>
+  <v-dialog v-model="dialog" max-width="1200" scrollable persistent>
     <v-card>
       <v-card-title class="d-flex align-center">
         <v-icon start color="primary">mdi-file-tree</v-icon>
@@ -24,6 +24,35 @@
                 hint="Ej: Pizza Margarita v1, Hamburguesa Especial"
                 persistent-hint
               ></v-text-field>
+            </v-col>
+
+            <!-- Selección de Producto o Variante (solo si es nuevo) -->
+            <v-col v-if="!isEditing" cols="12">
+              <v-autocomplete
+                v-model="selectedProductVariant"
+                :items="productVariantOptions"
+                item-title="display_name"
+                item-value="id"
+                label="Producto / Variante *"
+                prepend-inner-icon="mdi-package-variant"
+                variant="outlined"
+                :rules="[rules.required]"
+                hint="Selecciona el producto o variante para el cual crear este BOM"
+                persistent-hint
+                clearable
+                @update:model-value="onProductVariantChange"
+              >
+                <template #item="{ props, item }">
+                  <v-list-item
+                    v-bind="props"
+                    :subtitle="item.raw.type === 'product' ? 'Producto' : 'Variante'"
+                  >
+                    <template #prepend>
+                      <v-icon>{{ item.raw.type === 'product' ? 'mdi-package' : 'mdi-package-variant' }}</v-icon>
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
             </v-col>
 
             <v-col cols="12">
@@ -101,7 +130,7 @@
                     density="compact"
                     hide-details
                     placeholder="Buscar componente..."
-                    @update:model-value="calculateComponentCost(index)"
+                    @update:model-value="onComponentSelect(index, $event)"
                   >
                     <template #item="{ props, item }">
                       <v-list-item v-bind="props">
@@ -131,31 +160,14 @@
                   ></v-text-field>
                 </td>
                 <td>
-                  <v-autocomplete
-                    v-model="comp.unit_id"
-                    :items="unitOptions"
-                    item-title="display_name"
-                    item-value="unit_id"
+                  <v-text-field
+                    :model-value="comp.unit_code || ''"
                     variant="outlined"
                     density="compact"
+                    readonly
+                    placeholder="Auto"
                     hide-details
-                    clearable
-                  >
-                    <template #item="{ props, item }">
-                      <v-list-item v-bind="props" density="compact">
-                        <template #prepend>
-                          <v-chip size="x-small" :color="item.raw.is_system ? 'blue' : 'green'">
-                            {{ item.raw.code }}
-                          </v-chip>
-                        </template>
-                        <template #append v-if="item.raw.dian_code">
-                          <v-chip size="x-small" variant="outlined" color="purple">
-                            DIAN: {{ item.raw.dian_code }}
-                          </v-chip>
-                        </template>
-                      </v-list-item>
-                    </template>
-                  </v-autocomplete>
+                  ></v-text-field>
                 </td>
                 <td>
                   <v-text-field
@@ -264,6 +276,11 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
+      {{ snackbar.message }}
+    </v-snackbar>
   </v-dialog>
 </template>
 
@@ -288,6 +305,15 @@ export default {
 
     const componentOptions = ref([])
     const unitOptions = ref([])
+    const productVariantOptions = ref([])
+    const selectedProductVariant = ref(null)
+
+    // Snackbar
+    const snackbar = ref({
+      show: false,
+      message: '',
+      color: 'success'
+    })
 
     const formData = ref({
       bom_id: null,
@@ -323,6 +349,7 @@ export default {
                   variant_name: variant.variant_name,
                   display_name: `${product.name} - ${variant.variant_name || 'Predeterminado'}`,
                   cost: variant.cost || 0,
+                  unit_id: variant.unit_id || product.unit_id || null,
                   is_component: true
                 })
               })
@@ -349,11 +376,63 @@ export default {
       }
     }
 
+    const loadProductVariantOptions = async () => {
+      if (!tenantId.value) return
+      try {
+        const result = await productsService.getProducts(tenantId.value, 1, 1000, '')
+        if (result.success) {
+          productVariantOptions.value = []
+          
+          result.data.forEach(product => {
+            // Solo productos MANUFACTURED que pueden tener BOM
+            if (product.inventory_behavior === 'MANUFACTURED' && product.product_variants) {
+              // Opción: Producto nivel
+              productVariantOptions.value.push({
+                id: `product_${product.product_id}`,
+                display_name: `${product.name} (Producto)`,
+                type: 'product',
+                product_id: product.product_id,
+                variant_id: null
+              })
+              
+              // Opciones: Variantes específicas
+              product.product_variants.forEach(variant => {
+                productVariantOptions.value.push({
+                  id: `variant_${variant.variant_id}`,
+                  display_name: `${product.name} - ${variant.variant_name || 'Predeterminado'} (Variante)`,
+                  type: 'variant',
+                  product_id: null,
+                  variant_id: variant.variant_id
+                })
+              })
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error loading product/variant options:', error)
+      }
+    }
+
+    const onProductVariantChange = (value) => {
+      if (!value) {
+        formData.value.product_id = null
+        formData.value.variant_id = null
+        return
+      }
+      
+      const selected = productVariantOptions.value.find(opt => opt.id === value)
+      if (selected) {
+        formData.value.product_id = selected.product_id
+        formData.value.variant_id = selected.variant_id
+      }
+    }
+
     const addComponent = () => {
       formData.value.components.push({
         component_variant_id: null,
         quantity_required: 1,
         unit_id: null,
+        unit_code: '',
         waste_percentage: 0,
         is_optional: false,
         unit_cost: 0,
@@ -363,6 +442,36 @@ export default {
 
     const removeComponent = (index) => {
       formData.value.components.splice(index, 1)
+    }
+
+    const onComponentSelect = (index, variantId) => {
+      const comp = formData.value.components[index]
+      if (!variantId) {
+        comp.unit_cost = 0
+        comp.total_cost = 0
+        return
+      }
+
+      const selectedComponent = componentOptions.value.find(
+        c => c.variant_id === variantId
+      )
+      
+      if (selectedComponent) {
+        // Heredar unit_id y unit_code del componente automáticamente
+        if (selectedComponent.unit_id) {
+          comp.unit_id = selectedComponent.unit_id
+          // Buscar el código de la unidad
+          const unit = unitOptions.value.find(u => u.unit_id === selectedComponent.unit_id)
+          comp.unit_code = unit ? unit.code : ''
+        }
+        comp.unit_cost = selectedComponent.cost || 0
+      }
+      
+      calculateComponentCost(index)
+    }
+
+    const showMessage = (message, color = 'success') => {
+      snackbar.value = { show: true, message, color }
     }
 
     const calculateComponentCost = (index) => {
@@ -383,9 +492,17 @@ export default {
     const open = async (productId = null, variantId = null, existingBOM = null) => {
       await loadComponents()
       await loadUnits()
+      await loadProductVariantOptions()
       
       if (existingBOM) {
         isEditing.value = true
+        
+        // Establecer selección de producto/variante para mostrar en edición
+        if (existingBOM.product_id) {
+          selectedProductVariant.value = `product_${existingBOM.product_id}`
+        } else if (existingBOM.variant_id) {
+          selectedProductVariant.value = `variant_${existingBOM.variant_id}`
+        }
         
         // Asegurar que todos los componentes del BOM estén en componentOptions
         if (existingBOM.bom_components) {
@@ -416,21 +533,43 @@ export default {
           variant_id: existingBOM.variant_id,
           bom_name: existingBOM.bom_name,
           notes: existingBOM.notes || '',
-          components: existingBOM.bom_components?.map(c => ({
-            component_variant_id: c.component_variant_id,
-            quantity_required: c.quantity_required,
-            unit_id: c.unit_id,
-            waste_percentage: c.waste_percentage || 0,
-            is_optional: c.is_optional || false,
-            unit_cost: c.component_variant?.cost || 0,
-            total_cost: 0
-          })) || []
+          components: existingBOM.bom_components?.map(c => {
+            // Obtener código de unidad para mostrar
+            let unit_code = ''
+            if (c.unit_id) {
+              const unit = unitOptions.value.find(u => u.unit_id === c.unit_id)
+              unit_code = unit ? unit.code : ''
+            } else if (c.unit) {
+              unit_code = c.unit
+            }
+            
+            return {
+              component_variant_id: c.component_variant_id,
+              quantity_required: c.quantity_required,
+              unit_id: c.unit_id,
+              unit_code: unit_code,
+              waste_percentage: c.waste_percentage || 0,
+              is_optional: c.is_optional || false,
+              unit_cost: c.component_variant?.cost || 0,
+              total_cost: 0
+            }
+          }) || []
         }
         
         // Recalcular costos después de cargar componentes
         formData.value.components.forEach((_, index) => calculateComponentCost(index))
       } else {
         isEditing.value = false
+        
+        // Establecer selección inicial si se proporciona desde fuera
+        if (productId) {
+          selectedProductVariant.value = `product_${productId}`
+        } else if (variantId) {
+          selectedProductVariant.value = `variant_${variantId}`
+        } else {
+          selectedProductVariant.value = null
+        }
+        
         formData.value = {
           bom_id: null,
           product_id: productId,
@@ -454,27 +593,56 @@ export default {
       const { valid } = await form.value.validate()
       if (!valid || formData.value.components.length === 0) return
 
+      // Validar que tenga product_id O variant_id
+      if (!formData.value.product_id && !formData.value.variant_id) {
+        showMessage('Debe seleccionar un producto o variante para crear el BOM', 'warning')
+        return
+      }
+
       saving.value = true
       try {
-        const bomData = {
+        // Separar datos del BOM de los componentes
+        const bomMainData = {
           product_id: formData.value.product_id,
           variant_id: formData.value.variant_id,
           bom_name: formData.value.bom_name,
-          notes: formData.value.notes,
-          components: formData.value.components.map(c => ({
+          notes: formData.value.notes
+        }
+
+        const bomComponents = formData.value.components.map(c => {
+          const component = {
             component_variant_id: c.component_variant_id,
             quantity_required: c.quantity_required,
-            unit_id: c.unit_id,
             waste_percentage: c.waste_percentage || 0,
             is_optional: c.is_optional || false
-          }))
-        }
+          }
+          
+          // Incluir unit_id si existe (para migración nueva)
+          if (c.unit_id) {
+            component.unit_id = c.unit_id
+          }
+          
+          // Incluir unit (código) si existe (para compatibilidad con tabla sin migrar)
+          if (c.unit_code) {
+            component.unit = c.unit_code
+          }
+          
+          return component
+        })
 
         let result
         if (isEditing.value) {
-          result = await manufacturingService.updateBOM(tenantId.value, formData.value.bom_id, bomData)
+          result = await manufacturingService.updateBOM(
+            tenantId.value, 
+            formData.value.bom_id, 
+            bomMainData,
+            bomComponents
+          )
         } else {
-          result = await manufacturingService.createBOM(tenantId.value, bomData)
+          result = await manufacturingService.createBOM(tenantId.value, {
+            ...bomMainData,
+            components: bomComponents
+          })
         }
 
         if (result.success) {
@@ -485,7 +653,7 @@ export default {
         }
       } catch (error) {
         console.error('Error saving BOM:', error)
-        alert('Error al guardar el BOM: ' + error.message)
+        showMessage('Error al guardar el BOM: ' + error.message, 'error')
       } finally {
         saving.value = false
       }
@@ -507,10 +675,16 @@ export default {
       rules,
       componentOptions,
       unitOptions,
+      productVariantOptions,
+      selectedProductVariant,
+      snackbar,
       totalBOMCost,
       addComponent,
       removeComponent,
+      onComponentSelect,
       calculateComponentCost,
+      onProductVariantChange,
+      showMessage,
       open,
       close,
       save

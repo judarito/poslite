@@ -19,8 +19,8 @@
           title="Productos para Venta"
           icon="mdi-package-variant-closed"
           :items="products"
-          :total-items="totalItems"
-          :loading="loading"
+          :total-items="productsTotal"
+          :loading="productsLoading"
           :page-size="defaultPageSize"
           item-key="product_id"
           title-field="name"
@@ -87,9 +87,9 @@
         <ListView
           title="Insumos/Componentes"
           icon="mdi-cog"
-          :items="products"
-          :total-items="totalItems"
-          :loading="loading"
+          :items="components"
+          :total-items="componentsTotal"
+          :loading="componentsLoading"
           :page-size="defaultPageSize"
           item-key="product_id"
           title-field="name"
@@ -100,8 +100,8 @@
           @create="openCreateDialog"
           @edit="openEditDialog"
           @delete="confirmDelete"
-          @load-page="loadProducts"
-          @search="loadProducts"
+          @load-page="loadComponents"
+          @search="loadComponents"
         >
           <template #subtitle="{ item }">
             {{ item.category ? item.category.name : 'Sin categoría' }}
@@ -200,24 +200,93 @@
               <v-col cols="12">
                 <v-textarea v-model="formData.description" label="Descripción" prepend-inner-icon="mdi-text-long" variant="outlined" rows="2" auto-grow></v-textarea>
               </v-col>
-              <v-col cols="6">
-                <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details></v-switch>
-              </v-col>
-              <v-col cols="6">
-                <v-switch v-model="formData.track_inventory" label="Controlar inventario" color="info" hide-details></v-switch>
-              </v-col>
-              <v-col cols="12">
-                <v-switch 
-                  v-model="formData.requires_expiration" 
-                  label="Requiere control de vencimiento" 
-                  color="warning"
-                  hint="Los productos con esta opción activa deben registrarse en lotes con fecha de vencimiento"
-                  persistent-hint
-                ></v-switch>
-              </v-col>
             </v-row>
 
-            <!-- Manufactura -->
+            <!-- Gestión de Variantes -->
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-1 font-weight-bold mb-3">
+              <v-icon start color="primary">mdi-package-variant</v-icon>
+              Gestión de Variantes
+            </div>
+            <v-radio-group v-model="formData.variant_mode" inline hide-details class="mb-4">
+              <v-radio 
+                label="Producto Simple (variante única)" 
+                value="single"
+              >
+                <template #label>
+                  <div>
+                    <div class="font-weight-medium">Producto Simple (variante única)</div>
+                    <div class="text-caption text-grey">Un solo precio y costo para todo el producto</div>
+                  </div>
+                </template>
+              </v-radio>
+              <v-radio 
+                label="Producto con Variantes" 
+                value="multiple"
+              >
+                <template #label>
+                  <div>
+                    <div class="font-weight-medium">Producto con Variantes</div>
+                    <div class="text-caption text-grey">Múltiples variantes (tallas, colores, etc.) con precios diferentes</div>
+                  </div>
+                </template>
+              </v-radio>
+            </v-radio-group>
+
+            <!-- Información de Precio (solo para variante única) -->
+            <div v-if="formData.variant_mode === 'single'">
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-1 font-weight-bold mb-3">
+              <v-icon start color="success">mdi-currency-usd</v-icon>
+              Información de Precio
+            </div>
+            <v-row>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model.number="formData.base_cost"
+                  label="Costo Base"
+                  prepend-inner-icon="mdi-cash-minus"
+                  variant="outlined"
+                  type="number"
+                  hint="Costo del producto (se aplicará a la variante predeterminada)"
+                  persistent-hint
+                  :rules="[rules.positive]"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model.number="formData.base_price"
+                  label="Precio Base"
+                  prepend-inner-icon="mdi-cash-plus"
+                  variant="outlined"
+                  type="number"
+                  hint="Precio de venta (se aplicará a la variante predeterminada)"
+                  persistent-hint
+                  :rules="[rules.positive]"
+                ></v-text-field>
+              </v-col>
+              <v-col v-if="formData.track_inventory" cols="12" sm="6">
+                <v-text-field
+                  v-model.number="formData.base_min_stock"
+                  label="Stock Mínimo"
+                  prepend-inner-icon="mdi-alert-outline"
+                  variant="outlined"
+                  type="number"
+                  hint="Genera alerta cuando stock <= este valor (0 = sin alerta)"
+                  persistent-hint
+                  :rules="[rules.positiveOrZero]"
+                ></v-text-field>
+              </v-col>
+            </v-row>
+            <v-alert type="info" density="compact" class="my-3" variant="tonal">
+              <template #text>
+                <v-icon start size="small">mdi-information</v-icon>
+                El producto se creará con una variante predeterminada usando este costo y precio. Podrás agregar más variantes después si lo necesitas.
+              </template>
+            </v-alert>
+            </div>
+
+            <!-- Configuración de Manufactura -->
             <v-divider class="my-4"></v-divider>
             <div class="text-subtitle-1 font-weight-bold mb-3">
               <v-icon start color="primary">mdi-cog</v-icon>
@@ -231,9 +300,20 @@
                   label="Tipo de Inventario"
                   prepend-inner-icon="mdi-cube-outline"
                   variant="outlined"
-                  hint="Define cómo se maneja el inventario"
+                  hint="Define cómo se maneja el inventario del producto"
                   persistent-hint
-                ></v-select>
+                >
+                  <template #item="{ props, item }">
+                    <v-list-item v-bind="props">
+                      <template #append>
+                        <v-icon v-if="item.value === 'SERVICE'" color="blue" size="small">mdi-hand-extended</v-icon>
+                        <v-icon v-else-if="item.value === 'MANUFACTURED'" color="orange" size="small">mdi-factory</v-icon>
+                        <v-icon v-else-if="item.value === 'BUNDLE'" color="purple" size="small">mdi-package-variant</v-icon>
+                        <v-icon v-else color="green" size="small">mdi-cart</v-icon>
+                      </template>
+                    </v-list-item>
+                  </template>
+                </v-select>
               </v-col>
               <v-col v-if="formData.inventory_behavior === 'MANUFACTURED'" cols="12" sm="6">
                 <v-select
@@ -246,12 +326,49 @@
                   persistent-hint
                 ></v-select>
               </v-col>
+            </v-row>
+
+            <!-- Controles de inventario -->
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-1 font-weight-bold mb-3">
+              <v-icon start color="info">mdi-package-variant-closed</v-icon>
+              Control de Inventario
+            </div>
+            <v-row>
+              <v-col cols="6">
+                <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details></v-switch>
+              </v-col>
+              <v-col cols="6">
+                <v-switch 
+                  v-model="formData.track_inventory" 
+                  label="Controlar inventario" 
+                  color="info" 
+                  :disabled="!canTrackInventory"
+                  :hint="!canTrackInventory ? 'No disponible para ' + (formData.inventory_behavior === 'SERVICE' ? 'Servicios' : 'Combos') : 'Registrar entradas/salidas de stock'"
+                  persistent-hint
+                ></v-switch>
+              </v-col>
+              <v-col cols="12">
+                <v-switch 
+                  v-model="formData.requires_expiration" 
+                  label="Requiere control de vencimiento" 
+                  color="warning"
+                  :disabled="!canRequireExpiration"
+                  :hint="!canRequireExpiration ? 'No disponible para ' + (formData.inventory_behavior === 'SERVICE' ? 'Servicios' : 'Combos') : 'Los productos con esta opción deben registrarse en lotes con fecha de vencimiento'"
+                  persistent-hint
+                ></v-switch>
+              </v-col>
               <v-col cols="12">
                 <v-switch
                   v-model="formData.is_component"
                   label="Es componente de otros productos"
-                  color="warning"
-                  hint="Marca este producto como componente para poder usarlo en BOMs"
+                  color="purple"
+                  :disabled="!canBeComponent"
+                  :hint="!canBeComponent 
+                    ? (formData.inventory_behavior === 'SERVICE' ? 'Los servicios no son componentes físicos' 
+                      : formData.inventory_behavior === 'MANUFACTURED' ? 'Los productos manufacturados son resultado final, no componentes. Marca los insumos como componentes.' 
+                      : 'Los combos no pueden ser componentes de otros productos')
+                    : 'Marca este producto como insumo/materia prima para poder usarlo en BOMs de manufactura'"
                   persistent-hint
                 ></v-switch>
               </v-col>
@@ -272,7 +389,8 @@
               </v-col>
             </v-row>
 
-            <!-- Variantes -->
+            <!-- Variantes (solo si modo múltiple O si está editando con variante única y quiere agregar más) -->
+            <div v-if="formData.variant_mode === 'multiple' || (isEditing && formData.variant_mode === 'single')">
             <v-divider class="my-4"></v-divider>
             <div class="d-flex align-center mb-2">
               <span class="text-subtitle-1 font-weight-bold">Variantes</span>
@@ -280,9 +398,23 @@
               <v-btn v-if="isEditing" size="small" color="primary" prepend-icon="mdi-plus" variant="tonal" @click="addVariant">Agregar</v-btn>
             </div>
 
-            <div v-if="!isEditing" class="text-body-2 text-grey mb-2">
-              Guarde el producto primero, luego agregue variantes.
+            <div v-if="!isEditing && formData.variant_mode === 'multiple'" class="text-body-2 text-grey mb-2">
+              Guarde el producto primero, luego agregue variantes manualmente.
             </div>
+            
+            <v-alert v-if="isEditing && formData.variant_mode === 'single' && variants.length === 1" type="success" density="compact" class="mb-3" variant="tonal">
+              <template #text>
+                <v-icon start size="small">mdi-check-circle</v-icon>
+                Producto con variante predeterminada. Si necesitas agregar variantes adicionales (tallas, colores), usa el botón "Agregar" arriba.
+              </template>
+            </v-alert>
+            
+            <v-alert v-if="isEditing && formData.variant_mode === 'multiple' && variants.length === 0" type="warning" density="compact" class="mb-3" variant="tonal">
+              <template #text>
+                <v-icon start size="small">mdi-alert</v-icon>
+                Este producto requiere al menos una variante. Usa el botón "Agregar" para crear variantes con diferentes precios, tallas, colores, etc.
+              </template>
+            </v-alert>
 
             <!-- Desktop: List -->
             <v-list v-if="isEditing && variants.length > 0" density="compact" class="d-none d-sm-block">
@@ -326,6 +458,7 @@
                   </div>
                 </v-card-text>
               </v-card>
+            </div>
             </div>
           </v-form>
         </v-card-text>
@@ -413,7 +546,10 @@
             </v-row>
 
             <v-divider class="my-4"></v-divider>
-            <div class="text-subtitle-2 mb-3">Control de Inventario</div>
+            <div class="text-subtitle-2 mb-3">
+              <v-icon start color="info" size="small">mdi-package-variant-closed</v-icon>
+              Control de Inventario
+            </div>
 
             <v-text-field 
               v-model.number="variantData.min_stock" 
@@ -422,7 +558,10 @@
               variant="outlined" 
               type="number" 
               min="0"
-              hint="Genera alerta cuando stock en cualquier sede esté bajo este valor"
+              :disabled="!variantCanTrackInventory"
+              :hint="!variantCanTrackInventory 
+                ? 'No disponible para productos tipo ' + (formData.inventory_behavior === 'SERVICE' ? 'Servicio' : 'Combo') 
+                : 'Genera alerta cuando stock en cualquier sede esté bajo este valor'"
               persistent-hint
               class="mb-2"
             ></v-text-field>
@@ -430,7 +569,10 @@
               v-model="variantData.allow_backorder" 
               label="Permitir sobreventa" 
               color="warning"
-              hint="Si está activo, permite vender aunque no haya stock (inventario negativo)"
+              :disabled="!variantCanTrackInventory"
+              :hint="!variantCanTrackInventory 
+                ? 'No disponible para productos tipo ' + (formData.inventory_behavior === 'SERVICE' ? 'Servicio' : 'Combo') 
+                : 'Permite vender aunque no haya stock (inventario negativo)'"
               persistent-hint
               class="mb-2"
             ></v-switch>
@@ -447,11 +589,15 @@
                 v-model="variantData.requires_expiration" 
                 inline
                 hide-details
+                :disabled="!variantCanRequireExpiration"
               >
                 <v-radio label="Heredar del producto" :value="null"></v-radio>
                 <v-radio label="Sí requiere" :value="true"></v-radio>
                 <v-radio label="No requiere" :value="false"></v-radio>
               </v-radio-group>
+              <div v-if="!variantCanRequireExpiration" class="text-caption text-grey mt-1">
+                No disponible para productos tipo {{ formData.inventory_behavior === 'SERVICE' ? 'Servicio' : 'Combo' }}
+              </div>
             </div>
             <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
           </v-form>
@@ -485,7 +631,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
@@ -499,9 +645,16 @@ import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
 const currentTab = ref('products')
+
+// Estado independiente para productos y componentes
 const products = ref([])
-const totalItems = ref(0)
-const loading = ref(false)
+const productsTotal = ref(0)
+const productsLoading = ref(false)
+
+const components = ref([])
+const componentsTotal = ref(0)
+const componentsLoading = ref(false)
+
 const dialog = ref(false)
 const deleteDialog = ref(false)
 const variantDialog = ref(false)
@@ -526,9 +679,13 @@ const formData = ref({
   name: '', 
   description: '', 
   category_id: null,
-  unit_id: null, 
+  unit_id: null,
+  variant_mode: 'single',
+  base_cost: 0,
+  base_price: 0,
+  base_min_stock: 0,
   is_active: true, 
-  track_inventory: true, 
+  track_inventory: false, 
   requires_expiration: false,
   inventory_behavior: 'RESELL',
   production_type: null,
@@ -562,26 +719,101 @@ const productionTypeOptions = [
   { value: 'TO_STOCK', title: 'Para Stock (To-Stock)' }
 ]
 
+// Lógica condicional para habilitar/deshabilitar campos según tipo de inventario
+const canTrackInventory = computed(() => {
+  // Solo RESELL y MANUFACTURED pueden controlar inventario
+  return formData.value.inventory_behavior === 'RESELL' || formData.value.inventory_behavior === 'MANUFACTURED'
+})
+
+const canRequireExpiration = computed(() => {
+  // Solo RESELL y MANUFACTURED pueden requerir vencimiento
+  return formData.value.inventory_behavior === 'RESELL' || formData.value.inventory_behavior === 'MANUFACTURED'
+})
+
+const canBeComponent = computed(() => {
+  // Solo RESELL puede ser componente (insumos/materias primas)
+  return formData.value.inventory_behavior === 'RESELL'
+})
+
+// Lógica condicional para variantes según el tipo de inventario del producto padre
+const variantCanTrackInventory = computed(() => {
+  // Las variantes solo pueden controlar inventario si el producto padre lo permite
+  return formData.value.inventory_behavior === 'RESELL' || formData.value.inventory_behavior === 'MANUFACTURED'
+})
+
+const variantCanRequireExpiration = computed(() => {
+  // Las variantes solo pueden requerir vencimiento si el producto padre lo permite
+  return formData.value.inventory_behavior === 'RESELL' || formData.value.inventory_behavior === 'MANUFACTURED'
+})
+
+// Watcher para ajustar valores cuando cambia el tipo de inventario
+watch(() => formData.value.inventory_behavior, (newValue) => {
+  // SERVICE: forzar todo a false
+  if (newValue === 'SERVICE') {
+    formData.value.track_inventory = false
+    formData.value.requires_expiration = false
+    formData.value.is_component = false
+    // Resetear valores de variante si el diálogo está abierto
+    if (variantDialog.value) {
+      variantData.value.min_stock = 0
+      variantData.value.allow_backorder = false
+      variantData.value.requires_expiration = null
+    }
+  }
+  // BUNDLE: forzar todo a false
+  else if (newValue === 'BUNDLE') {
+    formData.value.track_inventory = false
+    formData.value.requires_expiration = false
+    formData.value.is_component = false
+    // Resetear valores de variante si el diálogo está abierto
+    if (variantDialog.value) {
+      variantData.value.min_stock = 0
+      variantData.value.allow_backorder = false
+      variantData.value.requires_expiration = null
+    }
+  }
+  // MANUFACTURED: habilitar inventario/vencimiento, deshabilitar componente
+  else if (newValue === 'MANUFACTURED') {
+    formData.value.is_component = false
+  }
+  // RESELL: todo habilitado (valores por defecto)
+  else if (newValue === 'RESELL') {
+    if (!formData.value.track_inventory) formData.value.track_inventory = true
+  }
+})
+
 const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
-  positive: v => v >= 0 || 'Debe ser >= 0'
+  positive: v => v >= 0 || 'Debe ser >= 0',
+  positiveOrZero: v => v >= 0 || 'Debe ser >= 0'
 }
 
 const loadProducts = async ({ page, pageSize, search, tenantId: tid }) => {
   if (!tid) return
-  loading.value = true
+  productsLoading.value = true
   try {
-    const r = await productsService.getProducts(tid, page, pageSize, search)
+    const r = await productsService.getProducts(tid, page, pageSize, search, { is_component: false })
     if (r.success) {
-      // Filtrar según el tab activo
-      const isComponentTab = currentTab.value === 'components'
-      const filtered = r.data.filter(p => p.is_component === isComponentTab)
-      products.value = filtered
-      totalItems.value = filtered.length
+      products.value = r.data
+      productsTotal.value = r.total
     } else {
       showMsg('Error al cargar productos', 'error')
     }
-  } finally { loading.value = false }
+  } finally { productsLoading.value = false }
+}
+
+const loadComponents = async ({ page, pageSize, search, tenantId: tid }) => {
+  if (!tid) return
+  componentsLoading.value = true
+  try {
+    const r = await productsService.getProducts(tid, page, pageSize, search, { is_component: true })
+    if (r.success) {
+      components.value = r.data
+      componentsTotal.value = r.total
+    } else {
+      showMsg('Error al cargar componentes', 'error')
+    }
+  } finally { componentsLoading.value = false }
 }
 
 const loadCategories = async () => {
@@ -603,7 +835,23 @@ const loadUnits = async () => {
 
 const openCreateDialog = () => {
   isEditing.value = false
-  formData.value = { product_id: null, name: '', description: '', category_id: null, unit_id: null, is_active: true, track_inventory: true, requires_expiration: false }
+  formData.value = { 
+    product_id: null, 
+    name: '', 
+    description: '', 
+    category_id: null, 
+    unit_id: null,
+    variant_mode: 'single',
+    base_cost: 0,
+    base_price: 0,
+    base_min_stock: 0,
+    is_active: true, 
+    track_inventory: false, 
+    requires_expiration: false,
+    inventory_behavior: 'RESELL',
+    production_type: null,
+    is_component: false
+  }
   variants.value = []
   loadCategories()
   loadUnits()
@@ -616,11 +864,23 @@ const openEditDialog = async (item) => {
   loadUnits()
   const r = await productsService.getProductById(tenantId.value, item.product_id)
   if (r.success) {
+    const variantsData = r.data.product_variants || []
+    
+    // Detectar si es variante única o múltiple
+    const isSingleVariant = variantsData.length === 1 && 
+                           (variantsData[0].variant_name === 'Predeterminado' || 
+                            variantsData[0].variant_name === null)
+    
     formData.value = { 
       product_id: r.data.product_id, 
       name: r.data.name, 
       description: r.data.description, 
-      category_id: r.data.category_id, 
+      category_id: r.data.category_id,
+      unit_id: r.data.unit_id || null,
+      variant_mode: isSingleVariant ? 'single' : 'multiple',
+      base_cost: isSingleVariant ? (variantsData[0]?.cost || 0) : 0,
+      base_price: isSingleVariant ? (variantsData[0]?.price || 0) : 0,
+      base_min_stock: isSingleVariant ? (variantsData[0]?.min_stock || 0) : 0,
       is_active: r.data.is_active, 
       track_inventory: r.data.track_inventory,
       requires_expiration: r.data.requires_expiration || false,
@@ -629,7 +889,7 @@ const openEditDialog = async (item) => {
       is_component: r.data.is_component || false,
       active_bom_id: r.data.active_bom_id || null
     }
-    variants.value = r.data.product_variants || []
+    variants.value = variantsData
     dialog.value = true
   } else showMsg('Error al cargar producto', 'error')
 }
@@ -644,7 +904,8 @@ const openVariantDialogFromList = async (item) => {
       product_id: r.data.product_id, 
       name: r.data.name, 
       description: r.data.description, 
-      category_id: r.data.category_id, 
+      category_id: r.data.category_id,
+      unit_id: r.data.unit_id || null,
       is_active: r.data.is_active, 
       track_inventory: r.data.track_inventory,
       requires_expiration: r.data.requires_expiration || false
@@ -660,18 +921,36 @@ const save = async () => {
   if (!valid || !tenantId.value) return
   saving.value = true
   try {
+    // Preparar datos según el modo de variante
+    const productData = { ...formData.value }
+    
+    // Si es modo 'multiple', no enviar base_cost/base_price/base_min_stock
+    if (formData.value.variant_mode === 'multiple') {
+      delete productData.base_cost
+      delete productData.base_price
+      delete productData.base_min_stock
+    }
+    
     const r = isEditing.value
-      ? await productsService.updateProduct(tenantId.value, formData.value.product_id, formData.value)
-      : await productsService.createProduct(tenantId.value, formData.value)
+      ? await productsService.updateProduct(tenantId.value, formData.value.product_id, productData)
+      : await productsService.createProduct(tenantId.value, productData)
+      
     if (r.success) {
-      showMsg(isEditing.value ? 'Producto actualizado' : 'Producto creado')
-      if (!isEditing.value) {
-        // Abrir para editar y poder agregar variantes
-        formData.value.product_id = r.data.product_id
-        isEditing.value = true
-        variants.value = []
-      } else {
+      if (isEditing.value) {
+        showMsg('Producto actualizado')
         dialog.value = false
+      } else {
+        // Producto nuevo creado
+        if (formData.value.variant_mode === 'single') {
+          showMsg('Producto creado con variante predeterminada')
+          dialog.value = false
+        } else {
+          // Modo múltiple: cambiar a edición para agregar variantes
+          showMsg('Producto creado. Agrega las variantes ahora.')
+          formData.value.product_id = r.data.product_id
+          isEditing.value = true
+          variants.value = r.data.product_variants || []
+        }
       }
       loadProducts({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value })
     } else showMsg(r.error || 'Error al guardar', 'error')

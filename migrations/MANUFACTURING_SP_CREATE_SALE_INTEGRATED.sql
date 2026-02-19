@@ -265,11 +265,29 @@ BEGIN
       INTO v_production_cost
       FROM jsonb_array_elements(v_components_consumed) AS item;
       
- -- Actualizar línea con datos de producción
+      -- Actualizar línea con datos de producción
       UPDATE sale_lines
       SET production_cost = v_production_cost,
           components_consumed = v_components_consumed
       WHERE sale_line_id = v_sale_line_id;
+      
+      -- Actualizar cost y price de la variante basado en producción ON_DEMAND
+      DECLARE
+        v_unit_cost NUMERIC;
+        v_new_price NUMERIC;
+      BEGIN
+        v_unit_cost := v_production_cost / v_qty;
+        
+        -- Calcular nuevo precio según política de pricing_rules
+        v_new_price := fn_calculate_price(p_tenant, v_variant, v_unit_cost, p_location);
+        
+        -- Actualizar variante
+        UPDATE product_variants
+        SET cost = v_unit_cost,
+            price = v_new_price
+        WHERE tenant_id = p_tenant
+          AND variant_id = v_variant;
+      END;
       
       RAISE NOTICE 'ON_DEMAND: Componentes consumidos. Costo producción: %', v_production_cost;
       

@@ -373,6 +373,69 @@ class ReportsService {
       return { success: false, error: error.message, data: [] }
     }
   }
+
+  // Reporte de costos de producción (órdenes manufacturadas)
+  async getProductionCostReport(tenantId, fromDate, toDate, locationId = null, status = null) {
+    try {
+      let query = supabaseService.client
+        .from('vw_production_cost_report')
+        .select('*')
+        .eq('tenant_id', tenantId)
+
+      // Filtrar por fecha de finalización
+      if (fromDate && toDate) {
+        query = query
+          .gte('fecha_fin_real', fromDate)
+          .lte('fecha_fin_real', toDate)
+      }
+
+      if (locationId) query = query.eq('location_id', locationId)
+      if (status) query = query.eq('status', status)
+
+      query = query.order('fecha_fin_real', { ascending: false, nullsFirst: false })
+
+      const { data, error } = await query
+      if (error) throw error
+
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  // Resumen de costos por producto manufacturado (últimos 90 días)
+  async getProductionCostSummary(tenantId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('vw_production_cost_summary_by_product')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('total_ordenes', { ascending: false })
+
+      if (error) throw error
+
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  // Top productos manufacturados por margen
+  async getTopManufacturedByMargin(tenantId, limit = 10) {
+    try {
+      const { data, error } = await supabaseService.client
+        .rpc('fn_top_manufactured_products_by_margin', {
+          p_tenant_id: tenantId,
+          p_limit: limit
+        })
+
+      if (error) throw error
+
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
 }
 
 export default new ReportsService()
