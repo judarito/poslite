@@ -390,7 +390,7 @@
             <tbody>
               <tr v-for="line in selectedOrder.production_order_lines" :key="line.line_id">
                 <td>{{ line.component_variant?.variant_name || line.component_variant?.sku }}</td>
-                <td class="text-right">{{ line.quantity_planned }}</td>
+                <td class="text-right">{{ line.quantity_required || 0 }}</td>
                 <td class="text-right">{{ line.quantity_consumed || 0 }}</td>
                 <td class="text-right">${{ (line.unit_cost || 0).toLocaleString() }}</td>
                 <td class="text-right font-weight-bold">

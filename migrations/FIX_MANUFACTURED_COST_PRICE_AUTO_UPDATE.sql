@@ -42,7 +42,6 @@ DECLARE
   v_order RECORD;
   v_consumption RECORD;
   v_batch_id UUID;
-  v_batch_number TEXT;
   v_unit_cost NUMERIC;
   v_new_price NUMERIC;
 BEGIN
@@ -72,40 +71,20 @@ BEGIN
     p_completed_by
   );
   
-  -- Crear lote de producto terminado
-  v_batch_number := 'PRD-' || v_order.order_number;
+  -- Calcular costo unitario
   v_unit_cost := v_consumption.total_cost / p_quantity_produced;
   
-  INSERT INTO inventory_batches (
-    tenant_id, location_id, variant_id,
-    batch_number, received_at, on_hand, reserved,
-    expiration_date, physical_location, notes, is_active, unit_cost
+  -- Registrar output (el trigger fn_generate_production_inventory creará inventory_batch e inventory_move automáticamente)
+  INSERT INTO production_outputs (
+    tenant_id, production_order_id, 
+    quantity_produced, unit_cost, produced_by,
+    expiration_date, physical_location
   ) VALUES (
-    v_order.tenant_id, v_order.location_id, v_order.product_variant_id,
-    v_batch_number, NOW(), p_quantity_produced, 0,
-    p_expiration_date, COALESCE(p_physical_location, 'PRODUCCIÓN'),
-    'Lote de producción orden ' || v_order.order_number,
-    TRUE, v_unit_cost
+    v_order.tenant_id, p_production_order, 
+    p_quantity_produced, v_unit_cost, p_completed_by,
+    p_expiration_date, p_physical_location
   )
   RETURNING batch_id INTO v_batch_id;
-  
-  -- Crear inventory_move IN
-  INSERT INTO inventory_moves (
-    tenant_id, location_id, variant_id,
-    move_type, quantity, source, source_id, created_by
-  ) VALUES (
-    v_order.tenant_id, v_order.location_id, v_order.product_variant_id,
-    'PRODUCTION_IN', p_quantity_produced, 'PRODUCTION', p_production_order, p_completed_by
-  );
-  
-  -- Registrar output
-  INSERT INTO production_outputs (
-    tenant_id, production_order_id, batch_id,
-    quantity_produced, unit_cost, produced_by
-  ) VALUES (
-    v_order.tenant_id, p_production_order, v_batch_id,
-    p_quantity_produced, v_unit_cost, p_completed_by
-  );
   
   -- ✅ NUEVO: Actualizar cost de la variante basado en componentes consumidos
   -- Calcular precio de venta según política de pricing_rules
@@ -138,7 +117,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION fn_complete_production IS 
-  'v2.0: Completa orden TO_STOCK. Consume componentes, crea lote, actualiza cost/price de variante según BOM y pricing_rules.';
+  'v3.0: Completa orden TO_STOCK. Consume componentes, inserta production_output (trigger crea lote automáticamente), actualiza cost/price de variante.';
 
 -- ============================================================================
 -- 2. MODIFICAR sp_create_sale PARA ON_DEMAND (opcional, si no está integrado)

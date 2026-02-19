@@ -492,7 +492,7 @@ class ManufacturingService {
           production_order_lines(
             line_id,
             component_variant:component_variant_id(variant_id, sku, variant_name, cost),
-            quantity_planned,
+            quantity_required,
             quantity_consumed,
             unit_cost
           )
@@ -558,46 +558,38 @@ class ManufacturingService {
 
   async completeProduction(tenantId, orderId, quantityProduced, completedBy, expirationDate = null, physicalLocation = null) {
     try {
-      // Actualizar orden a completada
+      // Llamar a la función PostgreSQL fn_complete_production() que:
+      // 1. Consume componentes con FEFO
+      // 2. Calcula actual_cost basado en componentes reales consumidos
+      // 3. Crea lote de inventario con unit_cost correcto
+      // 4. Actualiza product_variants.cost y product_variants.price automáticamente
       const { data, error } = await supabaseService.client
-        .from(this.productionOrdersTable)
-        .update({
-          status: 'COMPLETED',
-          quantity_produced: quantityProduced,
-          completed_by: completedBy,
-          completed_at: new Date().toISOString()
+        .rpc('fn_complete_production', {
+          p_production_order: orderId,
+          p_quantity_produced: quantityProduced,
+          p_completed_by: completedBy,
+          p_expiration_date: expirationDate,
+          p_physical_location: physicalLocation
         })
-        .eq('production_order_id', orderId)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single()
 
       if (error) throw error
 
-      // Crear registro de producción output (inventario generado)
-      // Nota: El trigger de backend maneja la creación del lote de inventario automáticamente
-      const outputData = {
-        tenant_id: tenantId,
-        production_order_id: orderId,
-        variant_id: data.product_variant_id,
-        quantity_produced: quantityProduced,
-        expiration_date: expirationDate,
-        physical_location: physicalLocation,
-        produced_by: completedBy,
-        produced_at: new Date().toISOString()
-      }
+      // La función retorna el batch_id del lote creado
+      const batchId = data
 
-      const { error: outputError } = await supabaseService.client
-        .from('production_outputs')
-        .insert(outputData)
+      // Obtener datos actualizados de la orden
+      const { data: orderData, error: orderError } = await supabaseService.client
+        .from(this.productionOrdersTable)
+        .select()
+        .eq('production_order_id', orderId)
+        .eq('tenant_id', tenantId)
+        .single()
 
-      if (outputError) {
-        console.error('Error inserting production_output:', outputError)
-        throw new Error(`Error al registrar producción: ${outputError.message}`)
-      }
+      if (orderError) throw orderError
 
-      return { success: true, data }
+      return { success: true, data: orderData, batchId }
     } catch (error) {
+      console.error('Error completing production:', error)
       return { success: false, error: error.message }
     }
   }

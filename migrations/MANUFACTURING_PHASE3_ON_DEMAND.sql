@@ -233,13 +233,13 @@ BEGIN
       END IF;
     END LOOP;
     
-    -- Crear inventory_move para el componente
+    -- Crear inventory_move para el componente (cantidad positiva, tipo indica salida)
     INSERT INTO inventory_moves (
       tenant_id, location_id, variant_id,
-      move_type, quantity, reference_type, reference_id, created_by
+      move_type, quantity, source, source_id, created_by
     ) VALUES (
       p_tenant, p_location, v_component_record.component_variant_id,
-      'COMPONENT_CONSUMPTION', -v_adjusted_qty, p_source_type, p_source_id, p_created_by
+      'COMPONENT_CONSUMPTION', v_adjusted_qty, p_source_type, p_source_id, p_created_by
     );
     
     v_total_cost := v_total_cost + v_component_cost;

@@ -67,24 +67,23 @@ WHERE po.bom_id = (
 ORDER BY po.created_at DESC
 LIMIT 5;
 
--- 4. TRANSACCIONES DE CONSUMO DE TELA DRILL (si existen)
+-- 4. MOVIMIENTOS DE CONSUMO DE TELA DRILL (si existen)
 SELECT 
   'CONSUMOS TELA DRILL' AS seccion,
-  it.transaction_id,
-  it.transaction_type,
-  it.quantity,
-  it.unit_cost,
-  it.reference_id,
-  it.reference_type,
-  it.created_at,
-  ib.batch_number
-FROM inventory_transactions it
-LEFT JOIN inventory_batches ib ON ib.batch_id = it.batch_id
-WHERE it.variant_id = (
+  im.inventory_move_id,
+  im.move_type,
+  im.quantity,
+  im.source,
+  im.source_id,
+  im.created_at,
+  l.name AS sede
+FROM inventory_moves im
+LEFT JOIN locations l ON l.location_id = im.location_id
+WHERE im.variant_id = (
   SELECT variant_id 
   FROM product_variants 
   WHERE sku = 'INSUM-TELADRILL-UNICA-ZNJE'
 )
-  AND it.transaction_type IN ('PRODUCTION', 'ADJUSTMENT', 'CONSUMPTION')
-ORDER BY it.created_at DESC
+  AND im.move_type IN ('PRODUCTION_OUT', 'ADJUSTMENT_OUT', 'CONSUMPTION')
+ORDER BY im.created_at DESC
 LIMIT 10;

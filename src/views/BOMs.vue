@@ -168,7 +168,7 @@
                 <tr v-for="comp in selectedBOM.bom_components" :key="comp.component_id">
                   <td>{{ comp.component_variant?.sku }}</td>
                   <td>{{ comp.component_variant?.variant_name }}</td>
-                  <td class="text-right">{{ comp.quantity_required }} {{ comp.unit }}</td>
+                  <td class="text-right">{{ comp.quantity_required }} {{ comp.unit?.name || comp.unit?.code || '' }}</td>
                   <td class="text-right">{{ comp.waste_percentage || 0 }}%</td>
                   <td class="text-center">
                     <v-icon v-if="comp.is_optional" color="success" size="small">mdi-check</v-icon>
