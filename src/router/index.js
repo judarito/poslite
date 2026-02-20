@@ -31,6 +31,7 @@ import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
 import Purchases from '@/views/Purchases.vue'
 import ProductionOrders from '@/views/ProductionOrders.vue'
 import BOMs from '@/views/BOMs.vue'
+import SetupWizard from '@/components/SetupWizard.vue'
 
 const routes = [
   {
@@ -200,6 +201,12 @@ const routes = [
     name: 'TenantManagement',
     component: TenantManagement,
     meta: { requiresAuth: true, requiresSuperAdmin: true }
+  },
+  {
+    path: '/setup',
+    name: 'SetupWizard',
+    component: SetupWizard,
+    meta: { requiresAuth: true }
   },
   {
     path: '/layaway',

@@ -54,9 +54,10 @@
                 v-if="!section?.children"
                 :prepend-icon="section?.icon"
                 :title="section?.title"
-                :to="section?.route"
+                :to="section?.action ? undefined : section?.route"
                 :value="section?.title"
                 color="primary"
+                @click="section?.action ? handleMenuAction(section.action) : undefined"
               ></v-list-item>
 
               <!-- Grupo colapsable -->
@@ -73,9 +74,10 @@
                   :key="`child-${child?.title || childIdx}`"
                   :prepend-icon="child?.icon"
                   :title="child?.title"
-                  :to="child?.route"
+                  :to="child?.action ? undefined : child?.route"
                   :value="child?.title"
                   color="primary"
+                  @click="child?.action ? handleMenuAction(child.action) : undefined"
                 ></v-list-item>
               </v-list-group>
             </template>
@@ -845,6 +847,7 @@ const allMenuItems = [
     icon: 'mdi-cog',
     permissions: [], // Visible si tiene algún hijo visible
     children: [
+      { title: 'Asistente de Configuración', icon: 'mdi-rocket-launch', route: '/setup', permissions: [] },
       { title: 'Empresa', icon: 'mdi-domain', route: '/tenant-config', permissions: ['SETTINGS.TENANT.MANAGE'] },
       { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
       { title: 'Sedes', icon: 'mdi-store', route: '/locations', permissions: ['SETTINGS.LOCATIONS.MANAGE'] },
@@ -855,6 +858,7 @@ const allMenuItems = [
       { title: 'Usuarios', icon: 'mdi-account-cog', route: '/auth', permissions: ['SECURITY.USERS.MANAGE'] },
     ]
   },
+  { title: 'Manual de Usuario', icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
   { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
 ]
 
@@ -868,6 +872,7 @@ const superAdminMenuItems = [
       { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
     ]
   },
+  { title: 'Manual de Usuario', icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
   { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
 ]
 
@@ -971,6 +976,12 @@ const handleProfileClick = () => {
     console.error('Error en handleProfileClick:', error)
     // Fallback seguro
     router.push('/tenant-config')
+  }
+}
+
+const handleMenuAction = (action) => {
+  if (action === 'openManual') {
+    window.open('/MANUAL_USUARIO.html', '_blank')
   }
 }
 

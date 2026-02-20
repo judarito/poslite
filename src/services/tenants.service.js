@@ -24,7 +24,7 @@ const tenantsService = {
   },
 
   /**
-   * Crea un nuevo tenant completo
+   * Crea un nuevo tenant completo con configuración por defecto
    * @param {Object} tenantData - Datos del tenant
    * @param {string} tenantData.name - Nombre del tenant *
    * @param {string} tenantData.legal_name - Razón social
@@ -39,9 +39,8 @@ const tenantsService = {
    * @param {string} adminData.full_name - Nombre completo *
    * @param {string} adminData.password - Contraseña
    * @param {string} adminData.user_id - UUID del usuario en auth (si ya existe)
-   * @param {string} sourceTenantId - UUID del tenant origen para copiar configs (opcional)
    */
-  async createTenant(tenantData, adminData, sourceTenantId = null) {
+  async createTenant(tenantData, adminData) {
     try {
       // 1. Validar y sanitizar email
       const adminEmail = adminData.email?.trim().toLowerCase()
@@ -51,17 +50,43 @@ const tenantsService = {
 
       console.log('📧 Email sanitizado:', adminEmail)
 
-      // 2. Generar UUID temporal para desarrollo (evitar rate limit)
+      // 2. Crear usuario en Supabase Auth
       let authUserId = adminData.user_id
-
+      
       if (!authUserId) {
-        // Para desarrollo: generar UUID temporal
-        authUserId = crypto.randomUUID()
-        console.log('🔧 UUID temporal generado (desarrollo):', authUserId)
-        console.log('⚠️ NOTA: Usuario Auth no creado - solo para testing')
+        // Generar contraseña temporal si no viene
+        const tempPassword = adminData.password || `Temp${crypto.randomUUID().substring(0, 12)}!`
+        
+        console.log('🔐 Creando usuario en Supabase Auth...')
+        
+        // Usar signUp (requiere deshabilitar email confirmation en Dashboard)
+        const { data: authData, error: authError } = await supabaseService.client.auth.signUp({
+          email: adminEmail,
+          password: tempPassword,
+          options: {
+            data: {
+              full_name: adminData.full_name,
+              tenant_name: tenantData.name
+            }
+          }
+        })
+
+        if (authError) {
+          console.error('❌ Error creando Auth user:', authError)
+          throw new Error(`Error creando usuario Auth: ${authError.message}`)
+        }
+
+        if (!authData?.user?.id) {
+          throw new Error('No se obtuvo ID de usuario Auth')
+        }
+
+        authUserId = authData.user.id
+        console.log('✅ Usuario Auth creado:', authUserId)
+        console.log('📧 Contraseña temporal:', tempPassword)
+        console.log('⚠️  IMPORTANTE: Deshabilita "Enable email confirmations" en Supabase Dashboard')
       }
 
-      // 3. Llamar al SP para crear tenant completo
+      // 3. Llamar al SP para crear tenant completo (con defaults)
       const { data, error } = await supabaseService.client.rpc('fn_create_tenant', {
         p_tenant_data: {
           name: tenantData.name,
@@ -78,8 +103,7 @@ const tenantsService = {
           user_id: authUserId,
           email: adminEmail,  // Usar email sanitizado
           full_name: adminData.full_name
-        },
-        p_copy_from_tenant_id: sourceTenantId
+        }
       })
 
       if (error) throw error
@@ -93,9 +117,7 @@ const tenantsService = {
         success: true, 
         data: {
           ...data,
-          auth_user_id: authUserId,
-          dev_mode: !adminData.user_id, // Indica si es modo desarrollo
-          note: !adminData.user_id ? 'Usuario Auth no creado - solo para testing' : undefined
+          auth_user_id: authUserId
         }
       }
     } catch (error) {

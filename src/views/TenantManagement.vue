@@ -187,79 +187,25 @@
                   ></v-text-field>
                 </v-col>
 
-                <!-- OPCIONES -->
+                <!-- INFORMACIÓN DE CONFIGURACIÓN -->
                 <v-col cols="12" class="mt-2">
-                  <v-divider></v-divider>
-                  <div class="text-h6 my-2">
-                    <v-icon start color="info">mdi-cog</v-icon>
-                    Opciones de Configuración
-                  </div>
-                </v-col>
-
-                <v-col cols="12">
-                  <v-switch
-                    v-model="copyFromTemplate"
-                    color="primary"
-                    density="comfortable"
-                    hide-details
-                    :disabled="loadingTenants || tenants.length === 0"
-                  >
-                    <template v-slot:label>
-                      <div>
-                        <strong>Copiar configuraciones de un tenant existente</strong>
-                        <div class="text-caption text-grey">
-                          Incluye métodos de pago, roles, permisos, reglas de precios e impuestos
-                          <span v-if="tenants.length === 0 && !loadingTenants" class="text-warning">
-                            (No disponible: no hay tenants)
-                          </span>
-                        </div>
-                      </div>
-                    </template>
-                  </v-switch>
-                </v-col>
-
-                <v-col cols="12" v-show="copyFromTemplate">
-                  <v-select
-                    v-model="selectedTemplateTenant"
-                    :items="tenants"
-                    item-title="name"
-                    item-value="tenant_id"
-                    label="Seleccionar tenant plantilla"
-                    hint="Elige de qué tenant copiar las configuraciones"
-                    persistent-hint
-                    variant="outlined"
-                    density="comfortable"
-                    :loading="loadingTenants"
-                    :rules="copyFromTemplate ? [v => !!v || 'Debes seleccionar un tenant plantilla'] : []"
-                    :no-data-text="loadingTenants ? 'Cargando...' : 'No hay tenants disponibles'"
-                  >
-                    <template v-slot:item="{ props, item }">
-                      <v-list-item v-bind="props">
-                        <v-list-item-subtitle>{{ item.raw.legal_name }}</v-list-item-subtitle>
-                      </v-list-item>
-                    </template>
-                  </v-select>
-                  
-                  <!-- Alerta cuando no hay tenants -->
-                  <v-alert 
-                    v-if="!loadingTenants && tenants.length === 0" 
-                    type="warning" 
-                    variant="tonal" 
-                    class="mt-2"
-                  >
-                    <v-icon start>mdi-alert</v-icon>
-                    No hay tenants disponibles para usar como plantilla. El nuevo tenant se creará con configuración por defecto.
-                  </v-alert>
-                  
-                  <!-- Información del tenant seleccionado -->
-                  <v-alert 
-                    v-if="selectedTemplateTenant && selectedTenantName !== 'Ninguno seleccionado'" 
-                    type="info" 
-                    variant="tonal" 
-                    class="mt-2"
-                  >
+                  <v-alert type="info" variant="tonal">
                     <v-icon start>mdi-information</v-icon>
-                    Se copiarán las configuraciones de: <strong>{{ selectedTenantName }}</strong>
+                    <strong>Configuración Automática</strong>
+                    <div class="mt-2 text-body-2">
+                      El nuevo tenant se creará con:
+                      <ul class="mt-2 ml-4">
+                        <li>12 unidades de medida predefinidas (Unidad, Kg, Metro, Litro, etc.)</li>
+                        <li>3 impuestos básicos (IVA 19%, 5%, 0%)</li>
+                        <li>5 métodos de pago comunes (Efectivo, Tarjetas, Transferencia, etc.)</li>
+                        <li>4 roles con permisos (Administrador, Gerente, Cajero, Bodeguero)</li>
+                        <li>1 ubicación principal y 1 caja registradora</li>
+                      </ul>
+                    </div>
+                    <div class="mt-2 text-body-2">
+                      <v-icon start size="small">mdi-rocket-launch</v-icon>
+                      Después de crear el tenant, se abrirá un <strong>Asistente de Configuración</strong> para guiar los pasos restantes.
+                    </div>
                   </v-alert>
                 </v-col>
               </v-row>
@@ -428,8 +374,6 @@ const tab = ref('create')
 const form = ref(null)
 const creating = ref(false)
 const showPassword = ref(false)
-const copyFromTemplate = ref(false) // Cambio: ya no por defecto true
-const selectedTemplateTenant = ref(null) // Nuevo: tenant seleccionado para copiar
 const resultDialog = ref(false)
 const createdResult = ref({})
 const loadingTenants = ref(false)
@@ -458,19 +402,6 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
-const selectedTenantName = computed(() => {
-  const selected = tenants.value.find(t => t.tenant_id === selectedTemplateTenant.value)
-  return selected?.name || 'Ninguno seleccionado'
-})
-
-// Watcher: resetear copyFromTemplate si no hay tenants disponibles
-watch(() => tenants.value.length, (newLength) => {
-  if (newLength === 0) {
-    copyFromTemplate.value = false
-    selectedTemplateTenant.value = null
-  }
-})
-
 const rules = {
   required: v => !!v || 'Campo requerido',
   email: v => /.+@.+\..+/.test(v) || 'Email inválido',
@@ -492,12 +423,6 @@ const createTenant = async () => {
     return
   }
 
-  // Validación adicional para template
-  if (copyFromTemplate.value && !selectedTemplateTenant.value) {
-    showMsg('Debes seleccionar un tenant plantilla o desactivar la opción', 'error')
-    return
-  }
-
   const { valid } = await form.value.validate()
   if (!valid) {
     showMsg('Por favor completa todos los campos requeridos', 'error')
@@ -509,8 +434,7 @@ const createTenant = async () => {
   try {
     const result = await tenantsService.createTenant(
       tenantData.value,
-      adminData.value,
-      copyFromTemplate.value ? selectedTemplateTenant.value : null
+      adminData.value
     )
 
     if (result.success) {
@@ -546,8 +470,6 @@ const resetForm = () => {
     password: ''
   }
   confirmPassword.value = ''
-  copyFromTemplate.value = false // Limpiar switch
-  selectedTemplateTenant.value = null // Limpiar selección
   form.value?.resetValidation()
 }
 
