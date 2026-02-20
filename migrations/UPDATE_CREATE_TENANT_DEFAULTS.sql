@@ -230,7 +230,7 @@ BEGIN
   FROM roles
   WHERE tenant_id = v_tenant_id AND name = 'ADMINISTRADOR';
 
-  -- Asignar TODOS los permisos al rol ADMINISTRATOR
+  -- Asignar TODOS los permisos al rol ADMINISTRADOR
   IF v_role_id IS NOT NULL THEN
     INSERT INTO role_permissions (role_id, permission_id)
     SELECT v_role_id, p.permission_id
@@ -238,6 +238,15 @@ BEGIN
     ON CONFLICT DO NOTHING;
     
     RAISE NOTICE '✓ Permisos asignados al rol ADMINISTRADOR';
+  END IF;
+
+  -- ============================================================
+  -- 8.5. APLICAR PLANTILLAS DE MENÚ A TODOS LOS ROLES DEL TENANT
+  --      (requiere que ROLES_MENUS_SYSTEM.sql haya sido ejecutado)
+  -- ============================================================
+  IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = 'fn_apply_role_menu_templates') THEN
+    PERFORM fn_apply_role_menu_templates(v_tenant_id);
+    RAISE NOTICE '✓ Plantillas de menú aplicadas a los roles del tenant';
   END IF;
 
   -- ============================================================

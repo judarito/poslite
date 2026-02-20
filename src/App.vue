@@ -646,6 +646,7 @@ import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useDisplay } from 'vuetify'
 import alertsService from '@/services/alerts.service'
 import locationsService from '@/services/locations.service'
+import rolesService from '@/services/roles.service'
 
 const router = useRouter()
 const route = useRoute()
@@ -659,6 +660,38 @@ const { mobile: isMobile } = useDisplay()
 
 const drawer = ref(true)
 const windowWidth = ref(window.innerWidth)
+
+// Menús dinámicos cargados desde DB (fn_get_user_menus)
+const dynamicMenuTree = ref(null)  // null = sin cargar, [] = cargado vacío, [{...}] = árbol
+const loadingDynamicMenus = ref(false)
+
+/**
+ * Carga el árbol de menús del usuario desde la base de datos.
+ * fn_get_user_menus ya resuelve la jerarquía: incluye grupos padre
+ * automáticamente aunque solo estén asignados los hijos.
+ */
+async function loadDynamicMenus(authUserId) {
+  if (!authUserId) return
+  loadingDynamicMenus.value = true
+  try {
+    const result = await rolesService.getUserMenus(authUserId)
+    if (result.success && result.data.length > 0) {
+      dynamicMenuTree.value = result.data  // árbol con children ya armado
+    } else {
+      // Función existe pero sin menús asignados, O error de red/404
+      // → mantener null para que menuSections use el menú estático como fallback
+      dynamicMenuTree.value = null
+      if (!result.success) {
+        console.debug('Menús dinámicos no disponibles (fn_get_user_menus), usando menú estático:', result.error)
+      }
+    }
+  } catch (e) {
+    console.debug('fn_get_user_menus no disponible, usando menú estático:', e.message)
+    dynamicMenuTree.value = null
+  } finally {
+    loadingDynamicMenus.value = false
+  }
+}
 
 // Alerts Dialog
 const alertsDialog = ref(false)
@@ -784,84 +817,6 @@ const filteredLayawayAlerts = computed(() => layawayAlerts.value)
 // Verificar si estamos en una ruta de autenticación
 const isAuthRoute = computed(() => route.path === '/login')
 
-// Menú con permisos requeridos
-const allMenuItems = [
-  { title: 'Inicio', icon: 'mdi-home', route: '/', permissions: [] },
-  { 
-    title: 'Punto de Venta', 
-    icon: 'mdi-point-of-sale', 
-    route: '/pos',
-    permissions: ['SALES.CREATE']
-  },
-  {
-    title: 'Ventas',
-    icon: 'mdi-cart',
-    permissions: [], // Visible si tiene algún hijo visible
-    children: [
-      { title: 'Historial Ventas', icon: 'mdi-receipt-text', route: '/sales', permissions: ['SALES.VIEW'] },
-      { title: 'Clientes', icon: 'mdi-account-group', route: '/customers', permissions: ['CUSTOMERS.VIEW'] },
-      { title: 'Plan Separe', icon: 'mdi-calendar-clock', route: '/layaway', permissions: ['LAYAWAY.VIEW'] },
-    ]
-  },
-  {
-    title: 'Catálogo',
-    icon: 'mdi-tag-multiple',
-    permissions: [], // Visible si tiene algún hijo visible
-    children: [
-      { title: 'Productos', icon: 'mdi-package-variant-closed', route: '/products', permissions: ['CATALOG.PRODUCT.CREATE', 'CATALOG.PRODUCT.UPDATE'] },
-      { title: 'Categorías', icon: 'mdi-shape', route: '/categories', permissions: ['CATALOG.CATEGORY.MANAGE'] },
-      { title: 'Unidades de Medida', icon: 'mdi-ruler', route: '/units', permissions: ['CATALOG.PRODUCT.CREATE', 'CATALOG.PRODUCT.UPDATE'] },
-    ]
-  },
-  {
-    title: 'Inventario',
-    icon: 'mdi-warehouse',
-    permissions: [], // Visible si tiene algún hijo visible
-    children: [
-      { title: 'Stock y Kardex', icon: 'mdi-clipboard-list', route: '/inventory', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
-      { title: 'Lotes y Vencimientos', icon: 'mdi-barcode', route: '/batches', permissions: ['INVENTORY.VIEW'] },
-      { title: 'Compras', icon: 'mdi-cart-plus', route: '/purchases', permissions: ['INVENTORY.VIEW', 'INVENTORY.ADJUST'] },
-      { title: 'Órdenes de Producción', icon: 'mdi-factory', route: '/production-orders', permissions: ['INVENTORY.VIEW'] },
-      { title: 'Listas de Materiales (BOM)', icon: 'mdi-file-tree', route: '/boms', permissions: ['INVENTORY.VIEW'] },
-    ]
-  },
-  {
-    title: 'Caja',
-    icon: 'mdi-cash-register',
-    permissions: [], // Visible si tiene algún hijo visible
-    children: [
-      { title: 'Sesiones de Caja', icon: 'mdi-cash-register', route: '/cash-sessions', permissions: ['CASH.SESSION.OPEN', 'CASH.SESSION.CLOSE'] },
-      { title: 'Cajas Registradoras', icon: 'mdi-desktop-classic', route: '/cash-registers', permissions: ['CASH.REGISTER.MANAGE'] },
-      { title: 'Asignación de Cajas', icon: 'mdi-account-cash', route: '/cash-assignments', permissions: ['CASH.ASSIGN', 'SECURITY.USERS.MANAGE'] },
-      { title: 'Métodos de Pago', icon: 'mdi-credit-card', route: '/payment-methods', permissions: ['SETTINGS.PAYMENT_METHODS.MANAGE'] },
-    ]
-  },
-  { 
-    title: 'Reportes', 
-    icon: 'mdi-chart-bar', 
-    route: '/reports',
-    permissions: ['REPORTS.SALES.VIEW', 'REPORTS.INVENTORY.VIEW', 'REPORTS.CASH.VIEW']
-  },
-  {
-    title: 'Configuración',
-    icon: 'mdi-cog',
-    permissions: [], // Visible si tiene algún hijo visible
-    children: [
-      { title: 'Asistente de Configuración', icon: 'mdi-rocket-launch', route: '/setup', permissions: [] },
-      { title: 'Empresa', icon: 'mdi-domain', route: '/tenant-config', permissions: ['SETTINGS.TENANT.MANAGE'] },
-      { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
-      { title: 'Sedes', icon: 'mdi-store', route: '/locations', permissions: ['SETTINGS.LOCATIONS.MANAGE'] },
-      { title: 'Impuestos', icon: 'mdi-percent', route: '/taxes', permissions: ['SETTINGS.TAXES.MANAGE'] },
-      { title: 'Reglas de Impuestos', icon: 'mdi-file-tree', route: '/tax-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
-      { title: 'Políticas de Precio', icon: 'mdi-tag-multiple', route: '/pricing-rules', permissions: ['SETTINGS.TAXES.MANAGE'] },
-      { title: 'Roles y Permisos', icon: 'mdi-shield-account', route: '/roles', permissions: ['SECURITY.ROLES.MANAGE'] },
-      { title: 'Usuarios', icon: 'mdi-account-cog', route: '/auth', permissions: ['SECURITY.USERS.MANAGE'] },
-    ]
-  },
-  { title: 'Manual de Usuario', icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
-  { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
-]
-
 // Menú específico para Super Admin (usuarios sin tenant)
 const superAdminMenuItems = [
   {
@@ -870,6 +825,7 @@ const superAdminMenuItems = [
     permissions: [],
     children: [
       { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
+      { title: 'Roles, Permisos y Menús', icon: 'mdi-shield-crown', route: '/superadmin/roles-menus', permissions: ['SUPER_ADMIN_ONLY'] },
     ]
   },
   { title: 'Manual de Usuario', icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
@@ -883,70 +839,40 @@ const menuSections = computed(() => {
     return []
   }
 
-  // Definir función de filtrado
-  const filterItems = (items) => {
-    if (!Array.isArray(items)) return []
-    
-    const result = []
-    
-    for (const item of items) {
-      if (!item) continue // Guarda contra items null/undefined
-      
-      // Crear copia del item
-      const newItem = { ...item }
-      
-      // Si tiene hijos, filtrarlos recursivamente
-      if (newItem.children && newItem.children.length > 0) {
-        newItem.children = filterItems(newItem.children)
-        // Si después de filtrar no tiene hijos visibles, omitir este grupo
-        if (newItem.children.length === 0) {
-          continue
-        }
-      }
-      
-      // Si tiene permisos requeridos, verificar acceso
-      if (newItem.permissions && newItem.permissions.length > 0) {
-        // Validación especial para Gestión de Tenants (solo Super Admin)
-        if (newItem.permissions.includes('SUPER_ADMIN_ONLY')) {
-          if (!canManageTenants.value) {
-            continue // No es super admin, omitir
-          }
-        } else {
-          // Para usuarios normales, verificar permisos si tienen perfil
-          if (userProfile.value && !hasAnyPermission(newItem.permissions)) {
-            continue // No tiene permiso, omitir
-          }
-          // Si no tiene perfil, también omitir (excepto SUPER_ADMIN_ONLY)
-          if (!userProfile.value) {
-            continue
-          }
-        }
-      }
-      
-      // Si llegó aquí, el item es válido
-      result.push(newItem)
-    }
-    
-    return result
+  // Superadmin (sin perfil de tenant): menú especial hardcodeado
+  if (!userProfile.value && canManageTenants.value) {
+    return superAdminMenuItems
   }
 
-  try {
-    // Si es Super Admin (sin perfil), mostrar menú especial
-    if (!userProfile.value && canManageTenants.value) {
-      return filterItems(JSON.parse(JSON.stringify(superAdminMenuItems || [])))
-    }
-    
-    // Si no tiene perfil y tampoco es super admin, no mostrar nada
-    if (!userProfile.value) {
-      return []
-    }
-
-    // Usuario normal: usar menú completo filtrado por permisos
-    return filterItems(JSON.parse(JSON.stringify(allMenuItems || [])))
-  } catch (error) {
-    console.warn('Error procesando menú:', error)
-    return [] // Retornar array vacío en caso de error
+  // Si no tiene perfil, no mostrar menú
+  if (!userProfile.value) {
+    return []
   }
+
+  // ── MENÚ DINÁMICO (DB-driven) ─────────────────────────────────
+  // fn_get_user_menus resuelve jerarquía (padres auto-incluidos)
+  if (!dynamicMenuTree.value || dynamicMenuTree.value.length === 0) {
+    return []  // Aún cargando, error de red, o sin menús asignados
+  }
+
+  // Convertir árbol de DB al formato que espera el sidebar
+  return dynamicMenuTree.value.map(root => {
+    const item = {
+      title: root.label,
+      icon: root.icon,
+      route: root.route || undefined,
+      action: root.action || undefined,
+    }
+    if (root.children && root.children.length > 0) {
+      item.children = root.children.map(child => ({
+        title: child.label,
+        icon: child.icon,
+        route: child.route || undefined,
+        action: child.action || undefined,
+      }))
+    }
+    return item
+  })
 })
 
 const handleResize = () => {
@@ -1241,7 +1167,33 @@ onMounted(async () => {
       setTheme(theme.value)
     }
   }
+
+  // Cargar menús dinámicos si hay usuario con perfil (tenant user)
+  if (user.value?.id && userProfile.value) {
+    loadDynamicMenus(user.value.id)
+  }
 })
+
+// Recargar menús dinámicos cuando el usuario inicia sesión o cambia de tenant
+watch(
+  () => user.value?.id,
+  (newUserId) => {
+    if (newUserId && userProfile.value) {
+      loadDynamicMenus(newUserId)
+    } else {
+      dynamicMenuTree.value = null  // Limpiar al cerrar sesión
+    }
+  }
+)
+
+watch(
+  () => tenantId.value,
+  (newTenantId) => {
+    if (newTenantId && user.value?.id) {
+      loadDynamicMenus(user.value.id)  // Recargar menús al cambiar tenant
+    }
+  }
+)
 
 // Aplicar tema cuando cambie la configuración
 watch(theme, (newTheme) => {

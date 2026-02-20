@@ -1,5 +1,19 @@
 <template>
   <div>
+    <!-- Banner: solo lectura para administradores de tenant -->
+    <v-alert
+      v-if="!isSuperAdmin"
+      type="info"
+      variant="tonal"
+      icon="mdi-shield-lock-outline"
+      class="mb-4"
+      border="start"
+    >
+      <v-alert-title>Configuración gestionada por Superadmin</v-alert-title>
+      Los roles, permisos y menús son definidos globalmente por el Superadministrador del sistema.
+      Esta vista es <strong>solo lectura</strong>.
+    </v-alert>
+
     <ListView
       title="Roles y Permisos"
       icon="mdi-shield-account"
@@ -12,10 +26,11 @@
       avatar-icon="mdi-account-key"
       avatar-color="red-darken-1"
       empty-message="No hay roles configurados"
-      create-button-text="Nuevo Rol"
-      @create="openCreateDialog"
-      @edit="openEditDialog"
-      @delete="confirmDelete"
+      :create-button-text="isSuperAdmin ? 'Nuevo Rol' : undefined"
+      :hide-actions="!isSuperAdmin"
+      @create="isSuperAdmin ? openCreateDialog() : undefined"
+      @edit="isSuperAdmin ? openEditDialog($event) : undefined"
+      @delete="isSuperAdmin ? confirmDelete($event) : undefined"
       @load-page="loadRoles"
       @search="loadRoles"
     >
@@ -79,11 +94,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import ListView from '@/components/ListView.vue'
 import rolesService from '@/services/roles.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
+const { isSuperAdmin } = useSuperAdmin()
 const roles = ref([])
 const totalItems = ref(0)
 const loading = ref(false)

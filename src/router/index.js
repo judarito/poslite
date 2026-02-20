@@ -134,7 +134,13 @@ const routes = [
     path: '/roles',
     name: 'Roles',
     component: Roles,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true } // Read-only para tenant admins; edición solo en /superadmin/roles-menus
+  },
+  {
+    path: '/superadmin/roles-menus',
+    name: 'SuperAdminRolesMenus',
+    component: () => import('@/views/SuperAdminRolesMenus.vue'),
+    meta: { requiresAuth: true, requiresSuperAdmin: true }
   },
   {
     path: '/cash-sessions',

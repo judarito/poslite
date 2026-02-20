@@ -163,6 +163,73 @@ class RolesService {
     }
   }
 
+  // ============================================================
+  // MENÚS DEL ROL (role_menus) — lectura para tenant admin
+  // ============================================================
+
+  /**
+   * Obtener los menu_items asignados a un rol específico
+   * Usado por el frontend para mostrar menús dinámicamente
+   */
+  async getRoleMenus(roleId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('role_menus')
+        .select(`
+          menu_item_id,
+          menu_items:menu_item_id(
+            menu_item_id, code, label, icon, route, action,
+            parent_code, sort_order, is_superadmin_only
+          )
+        `)
+        .eq('role_id', roleId)
+
+      if (error) throw error
+      return { success: true, data: (data || []).map(d => d.menu_items).filter(Boolean) }
+    } catch (error) {
+      return { success: false, data: [], error: error.message }
+    }
+  }
+
+  /**
+   * Obtener todos los menús accesibles para un usuario dado su auth_user_id.
+   * Usa fn_get_user_menus (CTE recursivo) que auto-incluye grupos padre.
+   * Retorna árbol listo para el sidebar: raíces con array children.
+   */
+  async getUserMenus(authUserId) {
+    try {
+      if (!authUserId) throw new Error('authUserId es requerido')
+
+      const { data, error } = await supabaseService.client
+        .rpc('fn_get_user_menus', { p_auth_user_id: authUserId })
+
+      if (error) throw error
+
+      const items = data || []
+
+      // Construir árbol: raíces (parent_code = null) + hijos agrupados
+      const childrenMap = {}
+      items.forEach(item => {
+        if (item.parent_code) {
+          if (!childrenMap[item.parent_code]) childrenMap[item.parent_code] = []
+          childrenMap[item.parent_code].push(item)
+        }
+      })
+
+      const tree = items
+        .filter(i => !i.parent_code)
+        .map(root => ({
+          ...root,
+          children: (childrenMap[root.code] || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        }))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+      return { success: true, data: tree, flat: items }
+    } catch (error) {
+      return { success: false, data: [], flat: [], error: error.message }
+    }
+  }
+
   async setUserRoles(tenantId, userId, roleIds) {
     try {
       if (!tenantId) throw new Error('Tenant ID is required')
