@@ -12,7 +12,7 @@ DECLARE
 BEGIN
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════════════════════';
-  RAISE NOTICE '🔧 ASIGNANDO PERMISOS A ROLES ADMINISTRATOR';
+  RAISE NOTICE '🔧 ASIGNANDO PERMISOS A ROLES ADMINISTRADOR';
   RAISE NOTICE '════════════════════════════════════════════════════════';
   RAISE NOTICE '';
 
@@ -22,19 +22,19 @@ BEGIN
   LOOP
     RAISE NOTICE '📂 Procesando tenant: % (ID: %)', v_tenant.name, v_tenant.tenant_id;
     
-    -- Buscar el rol ADMINISTRATOR de este tenant
+    -- Buscar el rol ADMINISTRADOR de este tenant
     SELECT role_id INTO v_role_id
     FROM roles
     WHERE tenant_id = v_tenant.tenant_id 
-      AND name = 'ADMINISTRATOR'
+      AND name = 'ADMINISTRADOR'
     LIMIT 1;
     
     IF v_role_id IS NULL THEN
-      RAISE NOTICE '  ⚠ No se encontró rol ADMINISTRATOR para este tenant';
+      RAISE NOTICE '  ⚠ No se encontró rol ADMINISTRADOR para este tenant';
       CONTINUE;
     END IF;
     
-    RAISE NOTICE '  ✓ Rol ADMINISTRATOR encontrado: %', v_role_id;
+    RAISE NOTICE '  ✓ Rol ADMINISTRADOR encontrado: %', v_role_id;
     
     -- Eliminar permisos existentes (por si acaso hay algunos)
     DELETE FROM role_permissions WHERE role_id = v_role_id;
@@ -50,7 +50,7 @@ BEGIN
     FROM role_permissions
     WHERE role_id = v_role_id;
     
-    RAISE NOTICE '  ✅ % permisos asignados al rol ADMINISTRATOR', v_count;
+    RAISE NOTICE '  ✅ % permisos asignados al rol ADMINISTRADOR', v_count;
     RAISE NOTICE '';
     
   END LOOP;

@@ -154,10 +154,12 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
+import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
 const { signIn, resetPassword, loading } = useAuth()
 const { saveTenant } = useTenant()
+const { syncThemeFromTenant } = useTheme()
 
 const showPassword = ref(false)
 const rememberMe = ref(false)
@@ -199,6 +201,9 @@ const handleLogin = async () => {
         tenant_name: result.tenant.name,
         currency_code: result.tenant.currency_code
       })
+      
+      // Sincronizar tema del tenant
+      await syncThemeFromTenant(result.tenant.tenant_id)
     }
 
     // Redirigir al home

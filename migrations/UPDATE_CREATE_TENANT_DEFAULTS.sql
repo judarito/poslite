@@ -216,19 +216,19 @@ BEGIN
   -- ============================================================
   
   INSERT INTO roles (tenant_id, name) VALUES
-    (v_tenant_id, 'ADMINISTRATOR'),
-    (v_tenant_id, 'MANAGER'),
-    (v_tenant_id, 'CASHIER'),
-    (v_tenant_id, 'WAREHOUSE');
+    (v_tenant_id, 'ADMINISTRADOR'),
+    (v_tenant_id, 'GERENTE'),
+    (v_tenant_id, 'CAJERO'),
+    (v_tenant_id, 'BODEGUERO');
 
   RAISE NOTICE '✓ Roles básicos creados (4 roles)';
 
   -- ============================================================
-  -- 8. ASIGNAR PERMISOS AL ROL ADMINISTRATOR
+  -- 8. ASIGNAR PERMISOS AL ROL ADMINISTRADOR
   -- ============================================================
   SELECT role_id INTO v_role_id
   FROM roles
-  WHERE tenant_id = v_tenant_id AND name = 'ADMINISTRATOR';
+  WHERE tenant_id = v_tenant_id AND name = 'ADMINISTRADOR';
 
   -- Asignar TODOS los permisos al rol ADMINISTRATOR
   IF v_role_id IS NOT NULL THEN
@@ -237,7 +237,7 @@ BEGIN
     FROM permissions p
     ON CONFLICT DO NOTHING;
     
-    RAISE NOTICE '✓ Permisos asignados al rol ADMINISTRATOR';
+    RAISE NOTICE '✓ Permisos asignados al rol ADMINISTRADOR';
   END IF;
 
   -- ============================================================
@@ -307,7 +307,7 @@ BEGIN
   RAISE NOTICE '  ✓ Eliminado parámetro p_copy_from_tenant_id';
   RAISE NOTICE '  ✓ Agregados 3 impuestos por defecto (IVA 19%%, 5%%, 0%%)';
   RAISE NOTICE '  ✓ Agregados 5 métodos de pago por defecto';
-  RAISE NOTICE '  ✓ Agregados 4 roles básicos (Admin, Manager, Cashier, Warehouse)';
+  RAISE NOTICE '  ✓ Agregados 4 roles básicos (ADMINISTRADOR, GERENTE, CAJERO, BODEGUERO)';
   RAISE NOTICE '';
   RAISE NOTICE 'Cada nuevo tenant ahora se crea con:';
   RAISE NOTICE '  - Configuraciones básicas completas';
@@ -315,8 +315,8 @@ BEGIN
   RAISE NOTICE '  - 1 Caja (CAJA PRINCIPAL)';
   RAISE NOTICE '  - 3 Impuestos + reglas';
   RAISE NOTICE '  - 5 Métodos de pago';
-  RAISE NOTICE '  - 4 Roles básicos';
-  RAISE NOTICE '  - Rol ADMINISTRATOR con TODOS los permisos asignados';
+  RAISE NOTICE '  - 4 Roles básicos (ADMINISTRADOR, GERENTE, CAJERO, BODEGUERO)';
+  RAISE NOTICE '  - Rol ADMINISTRADOR con TODOS los permisos asignados';
   RAISE NOTICE '  - 1 Usuario administrador';
   RAISE NOTICE '';
   RAISE NOTICE '⚠ NOTA: Las unidades de medida son globales (ya existen)';

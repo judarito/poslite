@@ -1,5 +1,6 @@
 import { ref, watch, onMounted } from 'vue'
 import { useTheme as useVuetifyTheme } from 'vuetify'
+import supabaseService from '@/services/supabase.service'
 
 const THEME_STORAGE_KEY = 'poslite_theme'
 
@@ -18,6 +19,32 @@ export function useTheme() {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       isDark.value = prefersDark
       vuetifyTheme.global.name.value = prefersDark ? 'dark' : 'light'
+    }
+  }
+
+  // Sincronizar tema desde tenant_settings (al hacer login o cambiar de tenant)
+  const syncThemeFromTenant = async (tenantId) => {
+    if (!tenantId) {
+      console.warn('No se puede sincronizar tema: tenantId no proporcionado')
+      return
+    }
+
+    try {
+      const { data, error } = await supabaseService.client
+        .from('tenant_settings')
+        .select('theme')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+
+      if (error) throw error
+
+      if (data?.theme) {
+        console.log(`🎨 Sincronizando tema del tenant: ${data.theme}`)
+        setTheme(data.theme)
+      }
+    } catch (error) {
+      console.error('Error sincronizando tema del tenant:', error)
+      // Si falla, mantener el tema actual (no romper la app)
     }
   }
 
@@ -74,6 +101,7 @@ export function useTheme() {
     isDark,
     toggleTheme,
     setTheme,
+    syncThemeFromTenant,
     currentTheme: vuetifyTheme.global.name
   }
 }

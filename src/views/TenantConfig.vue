@@ -457,10 +457,12 @@ import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAICache } from '@/composables/useAICache'
+import { useTheme } from '@/composables/useTheme'
 import tenantSettingsService from '@/services/tenantSettings.service'
 
 const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()
+const { syncThemeFromTenant } = useTheme()
 const { 
   cacheStats, 
   validCacheCount, 
@@ -640,12 +642,20 @@ const saveAll = async () => {
 
     if (tRes.success && sRes.success) {
       showMsg('Configuración guardada exitosamente')
-      // Recargar settings para que se propague el cambio (especialmente el tema)
+      
+      // Recargar settings del composable
       await loadSettings(true)
+      
+      // Sincronizar tema si cambió
+      await syncThemeFromTenant(tenantId.value)
+      
+      // Recargar datos del formulario
+      await loadData()
     } else {
       showMsg(tRes.error || sRes.error || 'Error al guardar', 'error')
     }
   } catch (error) {
+    console.error('Error guardando configuración:', error)
     showMsg('Error al guardar configuración', 'error')
   } finally { saving.value = false }
 }
