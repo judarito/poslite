@@ -578,6 +578,26 @@
                 ></v-select>
               </v-col>
               <v-col cols="12" md="6">
+                <v-autocomplete
+                  v-model="purchaseData.supplier_id"
+                  :items="suppliers"
+                  item-title="legal_name"
+                  item-value="third_party_id"
+                  label="Proveedor"
+                  prepend-inner-icon="mdi-truck"
+                  variant="outlined"
+                  clearable
+                  :loading="suppliersLoading"
+                  :no-data-text="'Sin proveedores'"
+                  @update:search="loadSuppliers"
+                >
+                  <template #item="{ props, item }">
+                    <v-list-item v-bind="props" :subtitle="item.raw.document_number || ''">
+                    </v-list-item>
+                  </template>
+                </v-autocomplete>
+              </v-col>
+              <v-col cols="12" md="12">
                 <v-text-field
                   v-model="purchaseData.note"
                   label="Nota (opcional)"
@@ -749,6 +769,19 @@
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
+                    <div class="text-caption text-grey">Proveedor</div>
+                    <div class="text-body-1">
+                      <v-icon size="small" class="mr-1">mdi-truck</v-icon>
+                      <span v-if="purchaseDetail.supplier">
+                        {{ purchaseDetail.supplier.legal_name }}
+                        <span v-if="purchaseDetail.supplier.document_number" class="text-caption text-grey ml-1">
+                          ({{ purchaseDetail.supplier.document_number }})
+                        </span>
+                      </span>
+                      <span v-else class="text-grey font-italic">Sin proveedor</span>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
                     <div class="text-caption text-grey">Fecha</div>
                     <div class="text-body-1">
                       <v-icon size="small" class="mr-1">mdi-calendar</v-icon>
@@ -842,6 +875,7 @@ import { useAuth } from '@/composables/useAuth'
 import supabaseService from '@/services/supabase.service'
 import purchasesService from '@/services/purchases.service'
 import batchesService from '@/services/batches.service'
+import thirdPartiesService from '@/services/thirdParties.service'
 import ListView from '@/components/ListView.vue'
 
 const { isMobile } = useDisplay()
@@ -877,9 +911,21 @@ const search = ref('')
 
 const purchaseData = ref({
   location_id: null,
+  supplier_id: null,
   note: '',
   lines: []
 })
+
+const suppliers = ref([])
+const suppliersLoading = ref(false)
+
+const loadSuppliers = async (search = '') => {
+  suppliersLoading.value = true
+  try {
+    suppliers.value = await thirdPartiesService.list({ search, type: 'supplier', limit: 50 })
+  } catch (e) { console.error('Error cargando proveedores', e) }
+  finally { suppliersLoading.value = false }
+}
 
 // Sugerencias IA
 const suggestionsDialog = ref(false)
@@ -1236,11 +1282,12 @@ const searchVariants = async (searchTerm) => {
 const openCreateDialog = async () => {
   purchaseData.value = {
     location_id: locations.value.length === 1 ? locations.value[0].location_id : null,
+    supplier_id: null,
     note: '',
     lines: []
   }
   dialog.value = true
-  await loadInitialVariants()
+  await Promise.all([loadInitialVariants(), loadSuppliers()])
 }
 
 const addLine = () => {
@@ -1326,7 +1373,7 @@ const savePurchase = async () => {
     const { data, error } = await supabaseService.client.rpc('sp_create_purchase', {
       p_tenant: tenantId.value,
       p_location: purchaseData.value.location_id,
-      p_supplier_id: null, // Puedes agregar proveedor después
+      p_supplier_id: purchaseData.value.supplier_id || null,
       p_created_by: userProfile.value.user_id,
       p_lines: formattedLines,
       p_note: purchaseData.value.note || null

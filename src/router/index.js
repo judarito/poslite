@@ -12,6 +12,7 @@ import Categories from '@/views/Categories.vue'
 import UnitsOfMeasure from '@/views/UnitsOfMeasure.vue'
 import Products from '@/views/Products.vue'
 import Customers from '@/views/Customers.vue'
+import ThirdParties from '@/views/ThirdParties.vue'
 import Taxes from '@/views/Taxes.vue'
 import TaxRules from '@/views/TaxRules.vue'
 import PricingRules from '@/views/PricingRules.vue'
@@ -110,6 +111,12 @@ const routes = [
     path: '/customers',
     name: 'Customers',
     component: Customers,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/third-parties',
+    name: 'ThirdParties',
+    component: ThirdParties,
     meta: { requiresAuth: true }
   },
   {

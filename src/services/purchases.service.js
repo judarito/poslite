@@ -212,6 +212,19 @@ class PurchasesService {
    */
   async getPurchaseDetail(tenantId, purchaseId) {
     try {
+      // Obtener cabecera de la compra (incluye proveedor)
+      const { data: header } = await supabaseService.client
+        .from('purchases')
+        .select(`
+          purchase_id, note, total, created_at,
+          location:location_id(name),
+          supplier:supplier_id(third_party_id, legal_name, trade_name, phone, document_number),
+          created_by_user:created_by(full_name)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('purchase_id', purchaseId)
+        .maybeSingle()
+
       const { data, error } = await supabaseService.client
         .from('inventory_moves')
         .select(`
@@ -260,7 +273,6 @@ class PurchasesService {
         line_total: item.quantity * item.unit_cost
       }))
 
-      // Calcular totales
       const total = lines.reduce((sum, line) => sum + line.line_total, 0)
 
       return {
@@ -268,12 +280,13 @@ class PurchasesService {
         data: {
           purchase_id: purchaseId,
           location_id: firstLine.location_id,
-          location_name: firstLine.location?.name || '',
-          created_at: firstLine.created_at,
-          created_by_name: firstLine.created_by_user?.full_name || '',
-          note: firstLine.note || '',
+          location_name: header?.location?.name || firstLine.location?.name || '',
+          created_at: header?.created_at || firstLine.created_at,
+          created_by_name: header?.created_by_user?.full_name || firstLine.created_by_user?.full_name || '',
+          note: header?.note || firstLine.note || '',
+          supplier: header?.supplier || null,
           lines: lines,
-          total: total,
+          total: header?.total || total,
           items_count: lines.length
         }
       }
