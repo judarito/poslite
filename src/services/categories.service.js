@@ -46,6 +46,43 @@ class CategoriesService {
     }
   }
 
+  async findOrCreateByName(tenantId, name) {
+    if (!tenantId || !name) {
+      return null
+    }
+
+    const normalized = name.trim()
+    if (!normalized) {
+      return null
+    }
+
+    const { data: existing, error: searchError } = await supabaseService.client
+      .from(this.table)
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .ilike('name', normalized)
+      .limit(1)
+
+    if (searchError) {
+      throw searchError
+    }
+
+    if (existing && existing.length > 0) {
+      return existing[0]
+    }
+
+    const { data: created, error: insertError } = await supabaseService.insert(this.table, {
+      tenant_id: tenantId,
+      name: normalized
+    })
+
+    if (insertError) {
+      throw insertError
+    }
+
+    return created[0]
+  }
+
   async createCategory(tenantId, category) {
     try {
       const { data, error } = await supabaseService.insert(this.table, {

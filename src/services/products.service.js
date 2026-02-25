@@ -346,6 +346,165 @@ class ProductsService {
       return { success: false, error: error.message, data: [] }
     }
   }
+
+  async createOrUpdateSimpleProduct(tenantId, payload) {
+    if (!tenantId) {
+      throw new Error('tenant_id es requerido para crear productos desde importación masiva')
+    }
+
+    const productName = payload.product_name?.trim()
+    if (!productName) {
+      throw new Error('product_name es requerido en la plantilla de importación')
+    }
+
+    const variantName = (payload.variant_name?.trim()) || 'Predeterminada'
+    const description = payload.description?.trim() || null
+    const isActive = payload.is_active !== false
+    const controlExpiration = Boolean(payload.control_expiration)
+    const isComponent = Boolean(payload.is_component)
+
+    const behaviorMap = {
+      RESELL: 'RESELL',
+      REVENTA: 'RESELL',
+      MANUFACTURED: 'MANUFACTURED',
+      SERVICE: 'SERVICE',
+      BUNDLE: 'BUNDLE',
+      TO_STOCK: 'MANUFACTURED',
+      ON_DEMAND: 'MANUFACTURED'
+    }
+
+    const inventoryBehavior = behaviorMap[(payload.inventory_type || 'RESELL').toUpperCase()] || 'RESELL'
+
+    let unitId = null
+    if (payload.unit_code) {
+      const { data: unitData, error: unitError } = await supabaseService.client.rpc('fn_get_unit_by_code', {
+        p_tenant_id: tenantId,
+        p_code: payload.unit_code
+      })
+      if (unitError) throw unitError
+      unitId = unitData
+    }
+
+    const { data: existingProducts, error: searchError } = await supabaseService.client
+      .from(this.table)
+      .select('product_id')
+      .eq('tenant_id', tenantId)
+      .ilike('name', productName)
+      .limit(1)
+
+    if (searchError) throw searchError
+
+    const upsertPayload = {
+      name: productName,
+      description,
+      category_id: payload.category_id || null,
+      unit_id: unitId,
+      is_active: isActive,
+      track_inventory: true,
+      inventory_behavior: inventoryBehavior,
+      is_component: isComponent,
+      requires_expiration: controlExpiration
+    }
+
+    let productId
+    if (existingProducts && existingProducts.length > 0) {
+      productId = existingProducts[0].product_id
+      const { data: updated, error: updateError } = await supabaseService.update(this.table, upsertPayload, {
+        tenant_id: tenantId,
+        product_id: productId
+      })
+
+      if (updateError) throw updateError
+      productId = updated[0].product_id
+    } else {
+      const { data: created, error: insertError } = await supabaseService.insert(this.table, {
+        ...upsertPayload,
+        tenant_id: tenantId
+      })
+      if (insertError) throw insertError
+      productId = created[0].product_id
+    }
+
+    // Para productos simples siempre hay una única variante (creada por el trigger o manualmente).
+    // Buscamos por product_id sin filtrar por nombre para no crear duplicados cuando
+    // el trigger generó "Predeterminado" y el importador busca "Predeterminada".
+    const variantSearch = await supabaseService.client
+      .from(this.variantsTable)
+      .select('variant_id, sku')
+      .eq('tenant_id', tenantId)
+      .eq('product_id', productId)
+      .ilike('variant_name', variantName)
+      .limit(1)
+
+    // Si no encontró por nombre exacto, buscar cualquier variante del producto
+    let variantSearchData = variantSearch.data
+    let variantSearchError = variantSearch.error
+    if (variantSearchError) throw variantSearchError
+
+    if (!variantSearchData || variantSearchData.length === 0) {
+      const fallback = await supabaseService.client
+        .from(this.variantsTable)
+        .select('variant_id, sku')
+        .eq('tenant_id', tenantId)
+        .eq('product_id', productId)
+        .limit(1)
+      if (fallback.error) throw fallback.error
+      variantSearchData = fallback.data
+    }
+
+    const variantPayload = {
+      variant_name: variantName,
+      cost: payload.unit_cost || 0,
+      price: payload.unit_price || 0,
+      price_includes_tax: Boolean(payload.price_includes_tax),
+      is_active: isActive,
+      requires_expiration: controlExpiration,
+      unit_id: unitId
+    }
+
+    let variantId
+    if (variantSearchData && variantSearchData.length > 0) {
+      variantId = variantSearchData[0].variant_id
+      const { data: updatedVariant, error: variantUpdateError } = await supabaseService.update(this.variantsTable, {
+        ...variantPayload,
+        sku: variantSearchData[0].sku
+      }, {
+        tenant_id: tenantId,
+        variant_id: variantId
+      })
+
+      if (variantUpdateError) throw variantUpdateError
+      variantId = updatedVariant[0].variant_id
+    } else {
+      const generatedSku = generateSku(productName)
+      const { data: createdVariant, error: variantInsertError } = await supabaseService.insert(this.variantsTable, {
+        tenant_id: tenantId,
+        product_id: productId,
+        sku: generatedSku,
+        ...variantPayload
+      })
+
+      if (variantInsertError) throw variantInsertError
+      variantId = createdVariant[0].variant_id
+    }
+
+    return {
+      success: true,
+      tenant_id: tenantId,
+      product_id: productId,
+      variant_id: variantId
+    }
+  }
 }
 
 export default new ProductsService()
+
+function generateSku(value) {
+  const normalized = (value || 'PRD')
+    .trim()
+    .replace(/[^A-Za-z0-9]/g, '')
+    .substring(0, 3)
+    .toUpperCase()
+  const suffix = Math.floor(Math.random() * 900000) + 100000
+  return `${normalized || 'PRD'}-${suffix}`
+}

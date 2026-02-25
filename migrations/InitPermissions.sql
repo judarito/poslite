@@ -52,6 +52,7 @@ insert into permissions(code, description) values
   ('CATALOG.PRODUCT.UPDATE','Editar producto'),
   ('CATALOG.PRODUCT.DELETE','Eliminar producto'),
   ('CATALOG.CATEGORY.MANAGE','Gestionar categorías'),
+  ('CATALOG.BULK_IMPORT','Importar productos desde Excel'),
 
   -- Reportes
   ('REPORTS.SALES.VIEW','Ver reportes de ventas'),
@@ -125,6 +126,7 @@ begin
   where p.code in (
     'INVENTORY.VIEW','INVENTORY.ADJUST','INVENTORY.TRANSFER','INVENTORY.PURCHASE',
     'CATALOG.PRODUCT.CREATE','CATALOG.PRODUCT.UPDATE','CATALOG.CATEGORY.MANAGE',
+    'CATALOG.BULK_IMPORT',
     'REPORTS.INVENTORY.VIEW'
   );
 

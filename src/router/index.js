@@ -11,6 +11,7 @@ import Locations from '@/views/Locations.vue'
 import Categories from '@/views/Categories.vue'
 import UnitsOfMeasure from '@/views/UnitsOfMeasure.vue'
 import Products from '@/views/Products.vue'
+import BulkImports from '@/views/BulkImports.vue'
 import Customers from '@/views/Customers.vue'
 import ThirdParties from '@/views/ThirdParties.vue'
 import Taxes from '@/views/Taxes.vue'
@@ -93,6 +94,12 @@ const routes = [
     path: '/products',
     name: 'Products',
     component: Products,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/bulk-imports',
+    name: 'BulkImports',
+    component: BulkImports,
     meta: { requiresAuth: true }
   },
   {

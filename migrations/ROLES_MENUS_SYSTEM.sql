@@ -138,7 +138,8 @@ ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label, icon = EXCLUDED.icon, r
 INSERT INTO menu_items (code, label, icon, route, parent_code, sort_order) VALUES
   ('CATALOGO.PRODUCTOS',   'Productos',           'mdi-package-variant-closed', '/products',   'CATALOGO', 31),
   ('CATALOGO.CATEGORIAS',  'Categorías',          'mdi-shape',                  '/categories', 'CATALOGO', 32),
-  ('CATALOGO.UNIDADES',    'Unidades de Medida',  'mdi-ruler',                  '/units',      'CATALOGO', 33)
+  ('CATALOGO.UNIDADES',    'Unidades de Medida',  'mdi-ruler',                  '/units',      'CATALOGO', 33),
+  ('CATALOGO.CARGA_MASIVA','Carga masiva de productos','mdi-file-import','/bulk-imports','CATALOGO',34)
 ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label, icon = EXCLUDED.icon, route = EXCLUDED.route, parent_code = EXCLUDED.parent_code, sort_order = EXCLUDED.sort_order;
 
 -- Submenús de INVENTARIO
@@ -207,6 +208,7 @@ FROM (VALUES
   ('CATALOGO.PRODUCTOS',  'CATALOG.PRODUCT.UPDATE'),
   ('CATALOGO.CATEGORIAS', 'CATALOG.CATEGORY.MANAGE'),
   ('CATALOGO.UNIDADES',   'CATALOG.PRODUCT.CREATE'),
+  ('CATALOGO.CARGA_MASIVA','CATALOG.BULK_IMPORT'),
   ('INV.STOCK',        'INVENTORY.VIEW'),
   ('INV.STOCK',        'INVENTORY.ADJUST'),
   ('INV.LOTES',        'INVENTORY.VIEW'),
@@ -264,6 +266,7 @@ WHERE mi.code IN (
   'VENTAS.HISTORIAL', 'VENTAS.CLIENTES', 'VENTAS.LAYAWAY',
   -- Hojas de CATÁLOGO
   'CATALOGO.PRODUCTOS', 'CATALOGO.CATEGORIAS', 'CATALOGO.UNIDADES',
+  'CATALOGO.CARGA_MASIVA',
   -- Hojas de INVENTARIO
   'INV.STOCK', 'INV.LOTES', 'INV.COMPRAS', 'INV.PRODUCCION', 'INV.BOM',
   -- Hojas de CAJA
@@ -296,6 +299,7 @@ FROM menu_items mi
 WHERE mi.code IN (
   'HOME',
   'CATALOGO.PRODUCTOS', 'CATALOGO.CATEGORIAS', 'CATALOGO.UNIDADES',
+  'CATALOGO.CARGA_MASIVA',
   'INV.STOCK', 'INV.LOTES', 'INV.COMPRAS', 'INV.PRODUCCION', 'INV.BOM',
   'MANUAL', 'ACERCA'
 )

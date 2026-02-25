@@ -794,13 +794,22 @@ const processSale = async () => {
 
   processing.value = true
   try {
-    const lines = cart.value.map(l => ({
-      variant_id: l.variant_id,
-      qty: l.quantity,
-      unit_price: l.unit_price,
-      discount: l.discount || 0,
-      discount_type: l.discount_type || 'AMOUNT'
-    }))
+    const lines = cart.value.map(l => {
+      // When price_includes_tax=true, the stored price already contains tax.
+      // The SP (sp_create_sale) always treats unit_price as pre-tax base and adds
+      // tax on top, so we must decompose the price before sending it.
+      const taxRate = l.tax_rate || 0
+      const inclTax = l.price_includes_tax && taxRate > 0
+      const factor = inclTax ? (1 + taxRate) : 1
+      return {
+        variant_id: l.variant_id,
+        qty: l.quantity,
+        unit_price: inclTax ? Math.round(l.unit_price / factor) : l.unit_price,
+        // Discount is a total-line amount; also decompose it to base terms
+        discount: inclTax ? Math.round((l.discount || 0) / factor) : (l.discount || 0),
+        discount_type: 'AMOUNT'
+      }
+    })
 
     // Ajustar pagos: si hay cambio, reducir el monto del último pago al total exacto
     const adjustedPayments = [...payments.value]

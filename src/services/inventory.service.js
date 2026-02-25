@@ -212,6 +212,60 @@ class InventoryService {
     }
   }
 
+  async adjustInitialStock({ tenant_id, location_code, variant_id, quantity, unit_cost }) {
+    if (!tenant_id || !variant_id || !location_code) {
+      throw new Error('tenant_id, location_code y variant_id son necesarios para ajustar stock inicial')
+    }
+
+    const quantityNumber = Number(quantity)
+    if (Number.isNaN(quantityNumber) || quantityNumber <= 0) {
+      return { success: true, warning: 'Cantidad inicial debe ser mayor a cero' }
+    }
+
+    const locationValue = location_code.trim()
+    const locationSearch = await supabaseService.client
+      .from('locations')
+      .select('location_id')
+      .eq('tenant_id', tenant_id)
+      .ilike('name', locationValue)
+      .eq('is_active', true)
+      .limit(1)
+
+    if (locationSearch.error) throw locationSearch.error
+
+    const locationId = locationSearch.data?.[0]?.location_id
+
+    if (!locationId) {
+      throw new Error(`Ubicación "${location_code}" no encontrada. Verifica que exista y esté activa.`)
+    }
+
+    const { data: moveData, error: moveError } = await supabaseService.insert(this.movesTable, {
+      tenant_id,
+      move_type: 'INITIAL_STOCK',
+      location_id: locationId,
+      variant_id,
+      quantity: quantityNumber,
+      unit_cost: unit_cost || 0,
+      source: 'BULK_IMPORT',
+      note: 'Stock inicial vía importación masiva'
+    })
+
+    if (moveError) throw moveError
+
+    const { error: stockErr } = await supabaseService.client.rpc('fn_apply_stock_delta', {
+      p_tenant: tenant_id,
+      p_location: locationId,
+      p_variant: variant_id,
+      p_delta: quantityNumber
+    })
+
+    if (stockErr) throw stockErr
+
+    await this.refreshStockAlerts()
+
+    return { success: true, data: moveData[0] }
+  }
+
   // Actualizar stock mínimo
   async updateMinStock(tenantId, variantId, minStock) {
     try {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:templates": "node scripts/generate-templates.js"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
@@ -15,7 +16,8 @@
     "jspdf-autotable": "^5.0.7",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
-    "vuetify": "^3.5.4"
+    "vuetify": "^3.5.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.3",
