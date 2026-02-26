@@ -24,7 +24,12 @@ import PointOfSale from '@/views/PointOfSale.vue'
 import Sales from '@/views/Sales.vue'
 import Inventory from '@/views/Inventory.vue'
 import BatchManagement from '@/views/BatchManagement.vue'
-import Reports from '@/views/Reports.vue'
+import ReportsHub from '@/views/ReportsHub.vue'
+import SalesReport from '@/views/SalesReport.vue'
+import InventoryReport from '@/views/InventoryReport.vue'
+import ProductionReport from '@/views/ProductionReport.vue'
+import CashReport from '@/views/CashReport.vue'
+import FinancialReport from '@/views/FinancialReport.vue'
 import TenantConfig from '@/views/TenantConfig.vue'
 import TenantManagement from '@/views/TenantManagement.vue'
 import LayawayContracts from '@/views/LayawayContracts.vue'
@@ -207,7 +212,37 @@ const routes = [
   {
     path: '/reports',
     name: 'Reports',
-    component: Reports,
+    component: ReportsHub,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports/ventas',
+    name: 'SalesReport',
+    component: SalesReport,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports/inventario',
+    name: 'InventoryReport',
+    component: InventoryReport,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports/produccion',
+    name: 'ProductionReport',
+    component: ProductionReport,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports/cajas',
+    name: 'CashReport',
+    component: CashReport,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports/financiero',
+    name: 'FinancialReport',
+    component: FinancialReport,
     meta: { requiresAuth: true }
   },
   {

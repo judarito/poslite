@@ -12,10 +12,12 @@
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "@supabase/supabase-js": "^2.39.3",
+    "apexcharts": "^5.6.0",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
+    "vue3-apexcharts": "^1.10.0",
     "vuetify": "^3.5.4",
     "xlsx": "^0.18.5"
   },
