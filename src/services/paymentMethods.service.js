@@ -15,6 +15,7 @@ class PaymentMethodsService {
         .from(this.table)
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
         .range(from, to)
 
@@ -70,7 +71,8 @@ class PaymentMethodsService {
         tenant_id: tenantId,
         code: paymentMethod.code.toUpperCase(),
         name: paymentMethod.name,
-        is_active: paymentMethod.is_active !== false
+        is_active: paymentMethod.is_active !== false,
+        sort_order: paymentMethod.sort_order ?? 0
       })
 
       if (error) throw error
@@ -87,7 +89,8 @@ class PaymentMethodsService {
     try {
       const updateData = {
         name: updates.name,
-        is_active: updates.is_active
+        is_active: updates.is_active,
+        sort_order: updates.sort_order ?? 0
       }
 
       if (updates.code) {

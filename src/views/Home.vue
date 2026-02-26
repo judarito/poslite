@@ -1,5 +1,25 @@
 <template>
   <div>
+    <!-- Alerta: sesiones de caja con más de 24h abiertas -->
+    <v-alert
+      v-if="expiredSessions.length > 0"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      prepend-icon="mdi-clock-alert"
+      :title="`${expiredSessions.length} caja${expiredSessions.length > 1 ? 's' : ''} con sesión abierta por más de 24 horas`"
+    >
+      <div class="text-body-2 mt-1">
+        <span v-for="(s, i) in expiredSessions" :key="s.cash_session_id">
+          <strong>{{ s.cash_register?.name }}</strong>
+          ({{ s.cash_register?.location?.name }}) — {{ Math.floor((Date.now()-new Date(s.opened_at))/3600000) }}h abierta por {{ s.opened_by_user?.full_name }}<span v-if="i < expiredSessions.length-1">, </span>
+        </span>
+      </div>
+      <template #append>
+        <v-btn size="small" variant="outlined" color="error" to="/cash-sessions">Ver cajas</v-btn>
+      </template>
+    </v-alert>
+
     <!-- Sesión de caja (solo si no hay sesión abierta) -->
     <v-row v-if="!hasOpenSession">
       <v-col cols="12">
@@ -201,9 +221,11 @@ import { useCashSession } from '@/composables/useCashSession'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import CashSessionCard from '@/components/CashSessionCard.vue'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
+import cashService from '@/services/cash.service'
 
 const apexchart = VueApexCharts
 
@@ -212,6 +234,7 @@ const { hasOpenSession, loadPOSContext } = useCashSession()
 const { userProfile } = useAuth()
 const { tenantId } = useTenant()
 const { isDark } = useTheme()
+const { cashSessionMaxHours } = useTenantSettings()
 
 // ─── KPIs & charts ────────────────────────────────────────────────────────
 const kpiLoading     = ref(true)
@@ -219,6 +242,7 @@ const kpis           = ref(null)
 const dailySeries    = ref([])
 const topProducts    = ref([])
 const paymentMethods = ref([])
+const expiredSessions = ref([])
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseFloat(val) || 0)
@@ -290,6 +314,10 @@ async function loadKPIs() {
 onMounted(async () => {
   await loadPOSContext()
   await loadKPIs()
+  if (tenantId.value) {
+    const r = await cashService.getExpiredSessions(tenantId.value, cashSessionMaxHours.value)
+    if (r.success) expiredSessions.value = r.data
+  }
 })
 
 const cards = ref([

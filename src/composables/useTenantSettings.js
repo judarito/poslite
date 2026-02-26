@@ -55,6 +55,9 @@ export function useTenantSettings() {
   const expiryAlertDays = computed(() => settings.value?.expiry_alert_days || 30)
   const reserveStockOnLayaway = computed(() => settings.value?.reserve_stock_on_layaway !== false)
 
+  // Configuración de Caja
+  const cashSessionMaxHours = computed(() => settings.value?.cash_session_max_hours || 24)
+
   // Configuración de Ventas
   const maxDiscountWithoutAuth = computed(() => settings.value?.max_discount_without_auth || 5)
   const roundingMethod = computed(() => settings.value?.rounding_method || 'normal')
@@ -147,6 +150,9 @@ export function useTenantSettings() {
     // Inventario
     expiryAlertDays,
     reserveStockOnLayaway,
+
+    // Caja
+    cashSessionMaxHours,
 
     // Ventas
     maxDiscountWithoutAuth,

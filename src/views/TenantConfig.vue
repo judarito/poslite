@@ -328,6 +328,19 @@
                     persistent-hint
                   ></v-select>
                 </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field
+                    v-model.number="settings.cash_session_max_hours"
+                    type="number"
+                    label="Máximo de horas de sesión de caja"
+                    variant="outlined"
+                    prepend-inner-icon="mdi-cash-clock"
+                    min="1"
+                    max="720"
+                    hint="Sesiones de caja abiertas más de estas horas se marcan como vencidas (ej: 24)"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
               </v-row>
             </v-window-item>
 
@@ -750,6 +763,7 @@ const settings = ref({
   date_format: 'DD/MM/YYYY',
   locale: 'es-CO',
   session_timeout_minutes: 60,
+  cash_session_max_hours: 24,
   
   // IA
   ai_forecast_days_back: 90,
@@ -845,6 +859,7 @@ const loadData = async () => {
       date_format: data.date_format || 'DD/MM/YYYY',
       locale: data.locale || 'es-CO',
       session_timeout_minutes: data.session_timeout_minutes || 60,
+      cash_session_max_hours: data.cash_session_max_hours || 24,
       
       // IA
       ai_forecast_days_back: data.ai_forecast_days_back || 90,

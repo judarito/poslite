@@ -379,7 +379,7 @@ const variants = ref([])
 const dashboardData = ref([])
 const topAtRisk = ref([])
 const currentPage = ref(1)
-const pageSize = ref(20)
+const { defaultPageSize: pageSize } = useTenantSettings()
 const totalBatches = ref(0)
 const criticalAlerts = ref(0)
 

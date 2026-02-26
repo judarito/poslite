@@ -25,13 +25,16 @@
     >
       <!-- Slot personalizado para el contenido -->
       <template #content="{ item }">
-        <div class="mt-2">
+        <div class="mt-2 d-flex align-center ga-2">
           <v-chip
             :color="item.is_active ? 'success' : 'error'"
             size="small"
             variant="flat"
           >
             {{ item.is_active ? 'Activo' : 'Inactivo' }}
+          </v-chip>
+          <v-chip size="small" variant="tonal" color="blue" prepend-icon="mdi-sort-numeric-ascending">
+            Orden: {{ item.sort_order ?? 0 }}
           </v-chip>
         </div>
       </template>
@@ -66,6 +69,19 @@
               variant="outlined"
               :rules="[rules.required]"
               class="mb-2"
+            ></v-text-field>
+
+            <v-text-field
+              v-model.number="formData.sort_order"
+              label="Orden de aparición"
+              prepend-inner-icon="mdi-sort-numeric-ascending"
+              variant="outlined"
+              type="number"
+              :min="0"
+              density="compact"
+              hint="Número menor aparece primero (0 = primero)"
+              persistent-hint
+              class="mb-3"
             ></v-text-field>
 
             <v-switch
@@ -163,7 +179,8 @@ const formData = ref({
   payment_method_id: null,
   code: '',
   name: '',
-  is_active: true
+  is_active: true,
+  sort_order: 0
 })
 
 const rules = {
@@ -205,7 +222,8 @@ const openCreateDialog = () => {
     payment_method_id: null,
     code: '',
     name: '',
-    is_active: true
+    is_active: true,
+    sort_order: 0
   }
   dialog.value = true
 }

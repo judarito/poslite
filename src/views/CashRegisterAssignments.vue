@@ -209,6 +209,7 @@
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import cashAssignmentService from '@/services/cashAssignment.service'
 import { getAllUsers } from '@/services/users.service'
 import cashService from '@/services/cash.service'
@@ -216,6 +217,7 @@ import locationsService from '@/services/locations.service'
 import { useNotification } from '@/composables/useNotification'
 
 const { tenantId } = useTenant()
+const { defaultPageSize } = useTenantSettings()
 const { userProfile } = useAuth()
 const { showSuccess, showError } = useNotification()
 
@@ -237,10 +239,11 @@ const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO', {
   minute: '2-digit'
 }) : ''
 
-const loadAssignments = async (page = 1, pageSize = 20) => {
+const loadAssignments = async (page = 1, pageSize = null) => {
   if (!tenantId.value) return
+  const ps = pageSize ?? defaultPageSize.value
   try {
-    const r = await cashAssignmentService.getAllAssignments(tenantId.value, page, pageSize, filters.value)
+    const r = await cashAssignmentService.getAllAssignments(tenantId.value, page, ps, filters.value)
     console.log('loadAssignments result:', r)
     if (r.success) {
       assignments.value = r.data

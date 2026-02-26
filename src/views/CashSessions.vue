@@ -29,8 +29,11 @@
       </template>
       <template #content="{ item }">
         <div class="mt-2 d-flex flex-wrap ga-2">
-          <v-chip :color="item.status === 'OPEN' ? 'success' : 'grey'" size="small" variant="flat">
-            {{ item.status === 'OPEN' ? 'Abierta' : 'Cerrada' }}
+          <v-chip
+            :color="item.status === 'OPEN' ? 'success' : item.status === 'FORCE_CLOSED' ? 'error' : 'grey'"
+            size="small" variant="flat"
+          >
+            {{ item.status === 'OPEN' ? 'Abierta' : item.status === 'FORCE_CLOSED' ? 'Forzado cierre' : 'Cerrada' }}
           </v-chip>
           <v-chip size="small" variant="tonal" prepend-icon="mdi-cash">
             Apertura: {{ formatMoney(item.opening_amount) }}
@@ -38,11 +41,15 @@
           <v-chip v-if="item.status === 'CLOSED'" size="small" variant="tonal" :color="item.difference >= 0 ? 'success' : 'error'" prepend-icon="mdi-swap-vertical">
             Dif: {{ formatMoney(item.difference) }}
           </v-chip>
+          <v-chip v-if="item.status === 'OPEN' && isExpired(item)" size="small" variant="tonal" color="error" prepend-icon="mdi-clock-alert">
+            {{ sessionHours(item) }}h abierta
+          </v-chip>
         </div>
         <!-- Botones en móvil - debajo del contenido -->
         <div v-if="item.status === 'OPEN'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
           <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
           <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+          <v-btn v-if="isAdmin && isExpired(item)" size="small" color="deep-orange" variant="flat" prepend-icon="mdi-lock-alert" @click.stop="confirmForceClose(item)">Forzar cierre</v-btn>
         </div>
       </template>
       <template #actions="{ item }">
@@ -50,6 +57,7 @@
         <div class="d-none d-sm-flex ga-1">
           <v-btn v-if="item.status === 'OPEN'" size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
           <v-btn v-if="item.status === 'OPEN'" size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+          <v-btn v-if="isAdmin && item.status === 'OPEN' && isExpired(item)" size="small" color="deep-orange" variant="flat" prepend-icon="mdi-lock-alert" @click.stop="confirmForceClose(item)">Forzar cierre</v-btn>
         </div>
       </template>
     </ListView>
@@ -280,6 +288,34 @@
       </v-card>
     </v-dialog>
 
+    <!-- Dialog Forzar Cierre -->
+    <v-dialog v-model="forceCloseDialogVisible" max-width="460">
+      <v-card border="error lg">
+        <v-card-title>
+          <v-icon start color="deep-orange">mdi-lock-alert</v-icon>
+          Forzar cierre de caja
+        </v-card-title>
+        <v-card-text>
+          <v-alert type="warning" variant="tonal" class="mb-3">
+            Esta acción cierra la sesión sin hacer arqueo. Las ventas quedan registradas pero <strong>no habrá conteo de efectivo</strong>.
+          </v-alert>
+          <div v-if="selectedSession" class="text-body-2">
+            <strong>Caja:</strong> {{ selectedSession.cash_register?.name }}<br>
+            <strong>Abierta:</strong> {{ formatDate(selectedSession.opened_at) }}<br>
+            <strong>Por:</strong> {{ selectedSession.opened_by_user?.full_name }}<br>
+            <strong>Tiempo abierta:</strong> {{ sessionHours(selectedSession) }} horas
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="forceCloseDialogVisible = false">Cancelar</v-btn>
+          <v-btn color="deep-orange" variant="flat" :loading="forcingClose" prepend-icon="mdi-lock-alert" @click="doForceClose">
+            Forzar cierre
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
 </template>
@@ -294,7 +330,7 @@ import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
 
 const { tenantId } = useTenant()
-const { defaultPageSize, loadSettings } = useTenantSettings()
+const { defaultPageSize, cashSessionMaxHours, loadSettings } = useTenantSettings()
 const { userProfile } = useAuth()
 
 // Sesiones
@@ -323,6 +359,14 @@ const registerOptions = ref([])
 const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
+
+// Forzar cierre
+const forceCloseDialogVisible = ref(false)
+const forcingClose = ref(false)
+
+const isAdmin = computed(() => userProfile.value?.roles?.some(r => r.name === 'ADMINISTRADOR') ?? false)
+const isExpired = (item) => item?.status === 'OPEN' && (Date.now() - new Date(item.opened_at)) / 3600000 >= cashSessionMaxHours.value
+const sessionHours = (item) => Math.floor((Date.now() - new Date(item?.opened_at)) / 3600000)
 
 const rules = {
   required: v => (v !== '' && v !== null && v !== undefined) || 'Campo requerido',
@@ -525,6 +569,32 @@ const saveMovement = async () => {
       loadSessions({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error, 'error')
   } finally { savingMovement.value = false }
+}
+
+const confirmForceClose = (item) => {
+  selectedSession.value = item
+  forceCloseDialogVisible.value = true
+}
+
+const doForceClose = async () => {
+  if (!selectedSession.value) return
+  forcingClose.value = true
+  try {
+    const r = await cashService.forceCloseSession(
+      tenantId.value,
+      selectedSession.value.cash_session_id,
+      userProfile.value?.user_id
+    )
+    if (r.success) {
+      showMsg('Sesión cerrada forzosamente')
+      forceCloseDialogVisible.value = false
+      loadSessions({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+    } else {
+      showMsg(r.error || 'Error al forzar cierre', 'error')
+    }
+  } finally {
+    forcingClose.value = false
+  }
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }

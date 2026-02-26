@@ -1000,7 +1000,7 @@ const save = async () => {
           variants.value = r.data.product_variants || []
         }
       }
-      loadProducts({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value })
+      loadProducts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
     } else showMsg(r.error || 'Error al guardar', 'error')
   } finally { saving.value = false }
 }
@@ -1011,7 +1011,7 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await productsService.deleteProduct(tenantId.value, itemToDelete.value.product_id)
-    if (r.success) { showMsg('Producto eliminado'); deleteDialog.value = false; loadProducts({ page: 1, pageSize: 10, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg('Producto eliminado'); deleteDialog.value = false; loadProducts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }

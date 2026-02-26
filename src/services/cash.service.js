@@ -209,6 +209,42 @@ class CashService {
     }
   }
 
+  async forceCloseSession(tenantId, sessionId, userId) {
+    try {
+      const { data, error } = await supabaseService.update(
+        this.sessionsTable,
+        {
+          closed_by: userId,
+          closed_at: new Date().toISOString(),
+          status: 'FORCE_CLOSED'
+        },
+        { tenant_id: tenantId, cash_session_id: sessionId }
+      )
+      if (error) throw error
+      return { success: true, data: data[0] }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Retorna sesiones OPEN que llevan más de hoursThreshold horas abiertas
+  async getExpiredSessions(tenantId, hoursThreshold = 24) {
+    try {
+      const cutoff = new Date(Date.now() - hoursThreshold * 3600 * 1000).toISOString()
+      const { data, error } = await supabaseService.client
+        .from(this.sessionsTable)
+        .select('*, cash_register:cash_register_id(name, location:location_id(name)), opened_by_user:opened_by(full_name)')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'OPEN')
+        .lt('opened_at', cutoff)
+        .order('opened_at', { ascending: true })
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, data: [], error: error.message }
+    }
+  }
+
   // ---- Movimientos de caja (gastos/ingresos) ----
   async getCashMovements(tenantId, sessionId, page = 1, pageSize = 20) {
     try {

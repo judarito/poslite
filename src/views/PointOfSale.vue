@@ -9,9 +9,9 @@
           <span class="text-subtitle-1 d-sm-none">POS</span>
         </div>
         <v-spacer class="d-none d-sm-flex"></v-spacer>
-        <v-chip v-if="currentSession" color="success" size="small" prepend-icon="mdi-cash-register">
-          <span class="d-none d-sm-inline">{{ currentSession.cash_register?.name || 'Caja' }}</span>
-          <span class="d-sm-none">{{ currentSession.cash_register?.name?.substring(0, 10) || 'Caja' }}</span>
+        <v-chip v-if="currentSession" :color="sessionExpired ? 'error' : 'success'" size="small" :prepend-icon="sessionExpired ? 'mdi-clock-alert' : 'mdi-cash-register'">
+          <span class="d-none d-sm-inline">{{ currentSession.cash_register?.name || 'Caja' }}{{ sessionExpired ? ' (⚠️ '+sessionAgeHours+'h)' : '' }}</span>
+          <span class="d-sm-none">{{ currentSession.cash_register?.name?.substring(0, 10) || 'Caja' }}{{ sessionExpired ? ' !' : '' }}</span>
         </v-chip>
         <v-chip v-else color="warning" size="small" prepend-icon="mdi-alert">
           <span class="d-none d-sm-inline">Sin caja abierta</span>
@@ -191,6 +191,21 @@
               </template>
             </v-autocomplete>
 
+            <!-- Info de crédito del cliente -->
+            <div v-if="selectedCustomer && customerCreditInfo" class="mt-2">
+              <v-chip
+                :color="availableCreditAmount > 0 ? 'success' : 'error'"
+                size="small" variant="tonal"
+                prepend-icon="mdi-account-credit-card"
+              >
+                Cupo disponible:
+                {{ new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(availableCreditAmount) }}
+              </v-chip>
+            </div>
+            <div v-else-if="selectedCustomer && hasCreditPayment && !customerCreditInfo" class="mt-2">
+              <v-chip color="warning" size="small" variant="tonal" prepend-icon="mdi-alert">Sin cupo de crédito asignado</v-chip>
+            </div>
+
             <!-- Receptor Fiscal: solo visible cuando FE está habilitada -->
             <v-autocomplete
               v-if="electronicInvoicingEnabled"
@@ -345,6 +360,14 @@
             ></v-textarea>
           </v-card-text>
 
+          <!-- Alerta sesión expirada -->
+          <v-card-text v-if="sessionExpired" class="pa-2 pa-sm-3 pt-0">
+            <v-alert type="error" variant="tonal" density="compact" prepend-icon="mdi-clock-alert">
+              <strong>Sesión vencida ({{ sessionAgeHours }}h abierta).</strong>
+              Cierra y reabre la caja para continuar vendiendo.
+            </v-alert>
+          </v-card-text>
+
           <v-card-actions class="pa-2 pa-sm-3">
             <v-btn 
               block 
@@ -352,7 +375,7 @@
               :size="$vuetify.display.xs ? 'default' : 'large'" 
               prepend-icon="mdi-check-circle" 
               :loading="processing" 
-              :disabled="cart.length === 0 || remaining > 0" 
+              :disabled="cart.length === 0 || remaining > 0 || sessionExpired" 
               @click="processSale"
             >
               Cobrar {{ formatMoney(totals.total) }}
@@ -409,10 +432,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+
 import productsService from '@/services/products.service'
 import customersService from '@/services/customers.service'
 import thirdPartiesService from '@/services/thirdParties.service'
@@ -421,11 +445,12 @@ import cashService from '@/services/cash.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import taxesService from '@/services/taxes.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
+import creditService from '@/services/credit.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
-const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, loadSettings } = useTenantSettings()
+const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, cashSessionMaxHours, loadSettings } = useTenantSettings()
 
 const searchTerm = ref('')
 const searchResults = ref([])
@@ -433,6 +458,14 @@ const cart = ref([])
 const selectedCustomer = ref(null)
 const customerResults = ref([])
 const searchingCustomer = ref(false)
+const customerCreditInfo = ref(null)
+
+// Cargar info de crédito cuando cambie el cliente
+watch(selectedCustomer, async (customer) => {
+  if (!customer?.customer_id) { customerCreditInfo.value = null; return }
+  const r = await creditService.getCreditAccount(tenantId.value, customer.customer_id)
+  customerCreditInfo.value = r.success ? r.data : null
+})
 // Receptor fiscal FE (third_parties)
 const selectedThirdParty = ref(null)
 const thirdPartyResults  = ref([])
@@ -445,6 +478,28 @@ const saleNote = ref('')
 const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
+
+// Sesión expirada (configurable via parámetros de empresa)
+const sessionAgeHours = computed(() => {
+  if (!currentSession.value?.opened_at) return 0
+  return Math.floor((Date.now() - new Date(currentSession.value.opened_at)) / 3600000)
+})
+const sessionExpired = computed(() => sessionAgeHours.value >= cashSessionMaxHours.value)
+
+// ─── Crédito ──────────────────────────────────────────────────────────────
+const hasCreditPayment = computed(() => payments.value.some(p => p.method === 'CREDITO'))
+const creditPaymentAmount = computed(() =>
+  payments.value.filter(p => p.method === 'CREDITO').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
+)
+const availableCreditAmount = computed(() => creditService.availableCredit(customerCreditInfo.value))
+const creditError = computed(() => {
+  if (!hasCreditPayment.value) return null
+  if (!selectedCustomer.value) return 'Selecciona un cliente para venta a crédito'
+  if (!customerCreditInfo.value || !customerCreditInfo.value.is_active) return 'Este cliente no tiene cupo de crédito activo'
+  if (creditPaymentAmount.value > availableCreditAmount.value)
+    return `Cupo insuficiente. Disponible: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(availableCreditAmount.value)}`
+  return null
+})
 
 // Descuentos (solo admin)
 const showGlobalDiscountDialog = ref(false)
@@ -827,9 +882,22 @@ const processSale = async () => {
   if (cart.value.length === 0 || remaining.value > 0) return
   if (!tenantId.value || !userProfile.value) return
 
+  // Validar pagos a crédito
+  if (creditError.value) {
+    showMsg(creditError.value, 'error')
+    return
+  }
+
   // Validar que haya una caja abierta
   if (!currentSession.value) {
     snackbarMessage.value = 'Debe abrir una caja antes de realizar ventas'
+    snackbarColor.value = 'error'
+    snackbar.value = true
+    return
+  }
+
+  if (sessionExpired.value) {
+    snackbarMessage.value = `La sesión lleva ${sessionAgeHours.value}h abierta. Cierra y reabre la caja.`
     snackbarColor.value = 'error'
     snackbar.value = true
     return
@@ -881,6 +949,18 @@ const processSale = async () => {
 
     if (r.success) {
       showMsg('¡Venta registrada exitosamente!')
+
+      // ── Registrar movimiento de crédito si aplica ────────────────
+      if (hasCreditPayment.value && customerCreditInfo.value && r.data?.sale_id) {
+        creditService.registerCreditSale(
+          tenantId.value,
+          customerCreditInfo.value.credit_account_id,
+          r.data.sale_id,
+          creditPaymentAmount.value,
+          userProfile.value.user_id
+        ).catch(err => console.warn('Error registrando crédito:', err))
+      }
+
       // ── Facturación Electrónica (dual mode: fire-and-forget) ────────
       if (r.data?.sale_id) {
         const saleId = r.data.sale_id

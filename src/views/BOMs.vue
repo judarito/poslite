@@ -230,6 +230,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import BOMEditor from '@/components/BOMEditor.vue'
 import manufacturingService from '@/services/manufacturing.service'
@@ -240,7 +241,7 @@ const { tenantId } = useTenant()
 const boms = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
-const defaultPageSize = ref(10)
+const { defaultPageSize } = useTenantSettings()
 const detailDialog = ref(false)
 const deleteDialog = ref(false)
 const selectedBOM = ref(null)

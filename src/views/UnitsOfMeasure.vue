@@ -211,6 +211,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 
@@ -220,7 +221,7 @@ const { tenantId } = useTenant()
 const units = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
-const defaultPageSize = ref(20)
+const { defaultPageSize } = useTenantSettings()
 const searchQuery = ref('')
 
 // Dialogs

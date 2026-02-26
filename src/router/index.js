@@ -38,6 +38,7 @@ import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
 import Purchases from '@/views/Purchases.vue'
 import ProductionOrders from '@/views/ProductionOrders.vue'
 import BOMs from '@/views/BOMs.vue'
+import Cartera from '@/views/Cartera.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
 const routes = [
@@ -273,6 +274,12 @@ const routes = [
     path: '/layaway/:id',
     name: 'LayawayDetail',
     component: LayawayDetail,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/cartera',
+    name: 'Cartera',
+    component: Cartera,
     meta: { requiresAuth: true }
   },
 ]

@@ -424,13 +424,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
 
 const { tenantId } = useTenant()
+const { defaultPageSize } = useTenantSettings()
 const { userProfile } = useAuth()
 
 const tab = ref('stock')
@@ -440,14 +442,14 @@ const locations = ref([])
 const stockItems = ref([])
 const stockTotal = ref(0)
 const stockPage = ref(1)
-const stockPageSize = 20
+const stockPageSize = computed(() => defaultPageSize.value)
 const stockLocationFilter = ref(null)
 
 // Kardex
 const kardexItems = ref([])
 const kardexTotal = ref(0)
 const kardexPage = ref(1)
-const kardexPageSize = 20
+const kardexPageSize = computed(() => defaultPageSize.value)
 const kardexLocationFilter = ref(null)
 const kardexTypeFilter = ref(null)
 
@@ -455,7 +457,7 @@ const kardexTypeFilter = ref(null)
 const componentItems = ref([])
 const componentTotal = ref(0)
 const componentPage = ref(1)
-const componentPageSize = 20
+const componentPageSize = computed(() => defaultPageSize.value)
 const componentLocationFilter = ref(null)
 
 // Operations
@@ -549,7 +551,7 @@ const searchVariant3 = (s) => doSearchVariant(s, variantResults3, searchingVaria
 // Cargar stock (solo productos para venta, excluir insumos)
 const loadStock = async () => {
   if (!tenantId.value) return
-  const r = await inventoryService.getStockBalances(tenantId.value, stockPage.value, stockPageSize, {
+  const r = await inventoryService.getStockBalances(tenantId.value, stockPage.value, stockPageSize.value, {
     location_id: stockLocationFilter.value || undefined
   })
   if (r.success) {
@@ -565,7 +567,7 @@ const loadStock = async () => {
 // Cargar kardex
 const loadKardex = async () => {
   if (!tenantId.value) return
-  const r = await inventoryService.getInventoryMoves(tenantId.value, kardexPage.value, kardexPageSize, {
+  const r = await inventoryService.getInventoryMoves(tenantId.value, kardexPage.value, kardexPageSize.value, {
     location_id: kardexLocationFilter.value || undefined,
     move_type: kardexTypeFilter.value || undefined
   })
@@ -575,7 +577,7 @@ const loadKardex = async () => {
 // Cargar componentes/insumos (solo productos marcados como componentes)
 const loadComponents = async () => {
   if (!tenantId.value) return
-  const r = await inventoryService.getStockBalances(tenantId.value, componentPage.value, componentPageSize, {
+  const r = await inventoryService.getStockBalances(tenantId.value, componentPage.value, componentPageSize.value, {
     location_id: componentLocationFilter.value || undefined
   })
   if (r.success) { 
