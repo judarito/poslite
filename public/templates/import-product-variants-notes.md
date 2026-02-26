@@ -20,6 +20,8 @@ Cada columna se mapea así:
 - `control_expiration`: TRUE/FALSE (en productos simples lo dejamos FALSE).
 - `is_component`: TRUE/FALSE para marcar el producto como insumo.
 - `location_code`: código de la ubicación donde se entregará el stock inicial.
+- `standard_code`: código estándar del producto para el XML de Facturación Electrónica DIAN (ej. código UNSPSC). Opcional.
+- `standard_code_type`: tipo de código estándar — `UNSPSC` (default), `EAN`, `GTIN` o `PARTNUM`. Usa el desplegable en la plantilla.
 
 Los SKU se asignan automáticamente como cuando usas la UI (producto simple con variante única), así que no necesitas escribirlos.
 

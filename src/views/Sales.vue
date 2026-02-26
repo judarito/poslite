@@ -123,6 +123,14 @@
               <v-chip :color="statusColor(item.status)" size="small" variant="flat">{{ statusLabel(item.status) }}</v-chip>
               <v-chip size="small" variant="tonal" prepend-icon="mdi-cash" color="success">Total: {{ formatMoney(item.total) }}</v-chip>
               <v-chip size="small" variant="tonal" prepend-icon="mdi-calculator" color="info">Impuestos: {{ formatMoney(item.tax_total) }}</v-chip>
+              <!-- Badge FE -->
+              <v-chip v-if="item.invoice_type === 'FE'" size="small" variant="flat"
+                :color="feStatusColor(item.dian_status)" prepend-icon="mdi-file-certificate">
+                FE · {{ feStatusLabel(item.dian_status) }}
+              </v-chip>
+              <v-chip v-else-if="item.invoice_type === 'FV'" size="small" variant="tonal" color="blue-grey" prepend-icon="mdi-receipt">
+                Tiquete POS
+              </v-chip>
             </div>
             <!-- Botones en móvil - debajo del contenido -->
             <div v-if="item.status === 'COMPLETED'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
@@ -221,6 +229,79 @@
           <v-chip v-for="p in saleDetail.sale_payments" :key="p.sale_payment_id" size="small" variant="tonal" class="mr-1 mb-1">
             {{ p.payment_method?.name }}: {{ formatMoney(p.amount) }} {{ p.reference ? '(' + p.reference + ')' : '' }}
           </v-chip>
+
+          <!-- Sección Facturación Electrónica -->
+          <template v-if="saleDetail.invoice_type">
+            <v-divider class="my-3"></v-divider>
+            <div class="d-flex align-center mb-2">
+              <v-icon start :color="saleDetail.invoice_type === 'FE' ? feStatusColor(saleDetail.dian_status) : 'blue-grey'" size="small">mdi-file-certificate</v-icon>
+              <span class="text-subtitle-2">
+                {{ saleDetail.invoice_type === 'FE' ? 'Factura Electrónica' : 'Tiquete POS (sin FE)' }}
+              </span>
+              <v-spacer></v-spacer>
+              <v-chip v-if="saleDetail.invoice_type === 'FE'" size="x-small" variant="flat"
+                :color="feStatusColor(saleDetail.dian_status)">
+                {{ feStatusLabel(saleDetail.dian_status) }}
+              </v-chip>
+            </div>
+
+            <template v-if="saleDetail.invoice_type === 'FE'">
+              <v-row dense>
+                <v-col cols="12" sm="6" v-if="saleDetail.dian_consecutive">
+                  <div class="text-caption text-medium-emphasis">Consecutivo DIAN</div>
+                  <div class="text-body-2 font-weight-medium">
+                    {{ saleDetail.resolution?.prefix || '' }}{{ saleDetail.dian_consecutive }}
+                  </div>
+                </v-col>
+                <v-col cols="12" sm="6" v-if="saleDetail.third_party">
+                  <div class="text-caption text-medium-emphasis">Receptor fiscal</div>
+                  <div class="text-body-2 font-weight-medium">{{ saleDetail.third_party.legal_name }}</div>
+                  <div class="text-caption text-grey">
+                    {{ saleDetail.third_party.document_type }} {{ saleDetail.third_party.document_number }}
+                    {{ saleDetail.third_party.dv ? '-' + saleDetail.third_party.dv : '' }}
+                  </div>
+                </v-col>
+                <v-col cols="12" v-if="saleDetail.cufe">
+                  <div class="text-caption text-medium-emphasis">CUFE</div>
+                  <div class="text-caption font-weight-medium text-mono" style="word-break:break-all">{{ saleDetail.cufe }}</div>
+                </v-col>
+                <v-col cols="12" v-if="saleDetail.dian_sent_at">
+                  <div class="text-caption text-medium-emphasis">Enviado al proveedor</div>
+                  <div class="text-body-2">{{ formatDate(saleDetail.dian_sent_at) }}</div>
+                </v-col>
+                <v-col cols="12" sm="6" v-if="saleDetail.email_sent_at">
+                  <div class="text-caption text-medium-emphasis">Enviado al receptor</div>
+                  <div class="text-body-2">{{ formatDate(saleDetail.email_sent_at) }}</div>
+                </v-col>
+              </v-row>
+
+              <!-- QR de validación -->
+              <div v-if="saleDetail.qr_url" class="mt-2 d-flex align-center ga-2">
+                <v-btn size="small" variant="tonal" color="indigo" prepend-icon="mdi-qrcode"
+                  :href="saleDetail.qr_url" target="_blank">Validar en DIAN</v-btn>
+              </div>
+
+              <!-- Alerta de rechazo -->
+              <v-alert v-if="saleDetail.dian_status === 'REJECTED'" type="error" variant="tonal" density="compact" class="mt-3">
+                <div class="font-weight-medium">Factura rechazada por DIAN</div>
+                <div class="text-caption" v-if="saleDetail.dian_response?.message">{{ saleDetail.dian_response.message }}</div>
+              </v-alert>
+
+              <!-- Reenviar si no fue aceptada -->
+              <div v-if="!saleDetail.dian_status || ['PENDING','ERROR','REJECTED'].includes(saleDetail.dian_status)" class="mt-2">
+                <v-btn size="small" variant="tonal" color="orange" prepend-icon="mdi-send-clock"
+                  :loading="retrying" @click="retryFE(saleDetail)">
+                  Reintentar envío FE
+                </v-btn>
+              </div>
+            </template>
+
+            <!-- FV: explicación -->
+            <v-alert v-else type="info" variant="tonal" density="compact">
+              Esta venta se registró como tiquete POS. Para emitir FE a este cliente, asegúrate de que el tercero tenga activo
+              <strong>Acepta Factura Electrónica</strong> y que la FE esté habilitada en Configuración.
+            </v-alert>
+          </template>
         </v-card-text>
         <v-card-actions>
           <v-btn color="primary" prepend-icon="mdi-printer" :loading="printing" @click="handlePrintSale(saleDetail)">
@@ -368,11 +449,12 @@ import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
 import locationsService from '@/services/locations.service'
 import supabaseService from '@/services/supabase.service'
+import electronicInvoicingService from '@/services/electronicInvoicing.service'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
 const { printing, printSaleTicket } = usePrint()
-const { defaultPageSize, loadSettings } = useTenantSettings()
+const { defaultPageSize, loadSettings, electronicInvoicingEnabled } = useTenantSettings()
 
 const tab = ref('sales')
 const sales = ref([])
@@ -423,6 +505,25 @@ const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', c
 const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO') : ''
 const statusColor = (s) => ({ COMPLETED: 'success', VOIDED: 'error', RETURNED: 'warning', PARTIAL_RETURN: 'orange' }[s] || 'grey')
 const statusLabel = (s) => ({ COMPLETED: 'Completada', VOIDED: 'Anulada', RETURNED: 'Devuelta', PARTIAL_RETURN: 'Dev. Parcial' }[s] || s)
+
+const feStatusColor = (s) => ({ ACCEPTED: 'success', PROCESSING: 'blue', PENDING: 'grey', REJECTED: 'error', ERROR: 'orange' }[s] || 'grey')
+const feStatusLabel = (s) => ({ ACCEPTED: 'Aceptada DIAN', PROCESSING: 'Procesando', PENDING: 'Pendiente', REJECTED: 'Rechazada', ERROR: 'Error envío' }[s] || (s ? s : 'Sin enviar'))
+
+const retrying = ref(false)
+const retryFE = async (sale) => {
+  retrying.value = true
+  try {
+    const r = await electronicInvoicingService.submitInvoice(sale.sale_id, tenantId.value, true)
+    if (r.success) {
+      showMsg(r.cufe ? '¡Factura electrónica aceptada!' : 'Enviada al proveedor, esperando respuesta', 'success')
+      // Refrescar detalle
+      const fresh = await salesService.getSaleById(tenantId.value, sale.sale_id)
+      if (fresh.success) saleDetail.value = fresh.data
+    } else {
+      showMsg('Error: ' + r.error, 'error')
+    }
+  } finally { retrying.value = false }
+}
 
 const loadSales = async ({ page, pageSize, search, tenantId: tid }) => {
   if (!tid) return

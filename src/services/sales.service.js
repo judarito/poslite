@@ -14,14 +14,15 @@ class SalesService {
   async createSale(tenantId, saleData) {
     try {
       const { data, error } = await supabaseService.client.rpc('sp_create_sale', {
-        p_tenant: tenantId,
-        p_location: saleData.location_id,
-        p_cash_session: saleData.cash_session_id || null,
-        p_customer: saleData.customer_id || null,
-        p_sold_by: saleData.sold_by,
-        p_lines: saleData.lines,
-        p_payments: saleData.payments,
-        p_note: saleData.note || null
+        p_tenant:       tenantId,
+        p_location:     saleData.location_id,
+        p_cash_session: saleData.cash_session_id  || null,
+        p_customer:     saleData.customer_id      || null,
+        p_sold_by:      saleData.sold_by,
+        p_lines:        saleData.lines,
+        p_payments:     saleData.payments,
+        p_note:         saleData.note             || null,
+        p_third_party:  saleData.third_party_id   || null   // v6.0: receptor fiscal FE
       })
 
       if (error) throw error
@@ -43,7 +44,8 @@ class SalesService {
           *,
           location:location_id(name),
           customer:customer_id(full_name, document),
-          sold_by_user:sold_by(full_name)
+          sold_by_user:sold_by(full_name),
+          third_party:third_party_id(legal_name, document_number, document_type, dv)
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)
         .order('sold_at', { ascending: false })
@@ -72,6 +74,8 @@ class SalesService {
           location:location_id(name),
           customer:customer_id(full_name, document, phone),
           sold_by_user:sold_by(full_name),
+          third_party:third_party_id(legal_name, document_number, document_type, dv, fiscal_email, phone),
+          resolution:resolution_id(prefix, resolution_number, document_type),
           sale_lines(
             sale_line_id, quantity, unit_price, unit_cost,
             discount_amount, tax_amount, line_total, tax_detail,

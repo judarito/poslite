@@ -22,6 +22,12 @@ INVENTORY_TYPES = [
     ("BUNDLE",      "Paquete/combo"),
 ]
 BOOL_VALUES = ["TRUE", "FALSE"]
+STD_CODE_TYPES = [
+    ("UNSPSC", "Codigo global de producto/servicio"),
+    ("EAN",    "Codigo de barras EAN-13"),
+    ("GTIN",   "Numero global de articulo comercial"),
+    ("PARTNUM","Numero de parte fabricante"),
+]
 
 COLUMNS = [
     ("product_name",       "product_name *",     "R"),
@@ -39,6 +45,8 @@ COLUMNS = [
     ("control_expiration", "control_expiration",  "O"),
     ("is_component",       "is_component",        "O"),
     ("location_code",      "location_code",       "O"),
+    ("standard_code",      "standard_code",       "O"),
+    ("standard_code_type", "standard_code_type",  "O"),
 ]
 
 EXAMPLE = {
@@ -48,6 +56,7 @@ EXAMPLE = {
     "tax_code": "IVA19", "price_includes_tax": "FALSE", "inventory_type": "REVENTA",
     "is_active": "TRUE", "control_expiration": "FALSE", "is_component": "FALSE",
     "location_code": "PRINCIPAL",
+    "standard_code": "", "standard_code_type": "UNSPSC",
 }
 
 INST = [
@@ -68,6 +77,8 @@ INST = [
     ("  * control_expiration  -> TRUE para activar gestion de lotes y vencimientos.", None),
     ("  * is_component        -> TRUE si es un insumo (no aparece en POS).", None),
     ("  * location_code       -> Nombre exacto de la bodega para el stock inicial.", None),
+    ("  * standard_code       -> Codigo UNSPSC/EAN del producto para el XML FE (opcional).", None),
+    ("  * standard_code_type  -> Tipo de codigo: UNSPSC | EAN | GTIN | PARTNUM (default UNSPSC).", None),
     ("", None),
     ("NOTAS:", "NOTE"),
     ("  * No modifiques los nombres de las columnas (fila 1).", None),
@@ -100,6 +111,7 @@ def build():
     for col, items, hdr in [
         (1, TAX_CODES, "tax_code"),
         (4, INVENTORY_TYPES, "inventory_type"),
+        (9, STD_CODE_TYPES, "standard_code_type"),
     ]:
         wr.cell(1, col, hdr).fill = hf; wr.cell(1, col).font = hfont
         wr.cell(1, col+1, "Descripcion").fill = hf; wr.cell(1, col+1).font = hfont
@@ -127,7 +139,7 @@ def build():
         c = ws.cell(2, ci, EXAMPLE.get(name,""))
         c.fill = ef; c.border = tb()
         c.alignment = Alignment(horizontal="left", vertical="center")
-    for i, w in enumerate([22,18,14,28,18,14,14,14,12,18,16,12,18,14,18], 1):
+    for i, w in enumerate([22,18,14,28,18,14,14,14,12,18,16,12,18,14,18,22,18], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.freeze_panes = "A2"
 
@@ -136,6 +148,7 @@ def build():
     add_dv(ws, "I", "listas_ref", "A", len(TAX_CODES)+1)
     add_dv(ws, "K", "listas_ref", "D", len(INVENTORY_TYPES)+1)
     for bc in ["J","L","M","N"]: add_dv(ws, bc, "listas_ref", "G", 3)
+    add_dv(ws, "Q", "listas_ref", "I", len(STD_CODE_TYPES)+1)
 
     # Instrucciones
     if "Instrucciones" in wb.sheetnames: del wb["Instrucciones"]

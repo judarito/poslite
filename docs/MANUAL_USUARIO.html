@@ -331,7 +331,7 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <h1>📘 Manual POS Lite</h1>
-            <div class="version">Versión 1.0 - 2026</div>
+            <div class="version">Versión 1.1 - 2026</div>
 
             <nav>
                 <div class="nav-section">
@@ -373,10 +373,16 @@
                 <div class="nav-section">
                     <h3>Operaciones</h3>
                     <a href="#compras" class="nav-item">Registro de Compras</a>
-                    <a href="#clientes" class="nav-item">Gestión de Clientes</a>
+                    <a href="#terceros" class="nav-item">Terceros (Clientes/Prov.)</a>
+                    <a href="#carga-masiva" class="nav-item">Carga Masiva Excel</a>
                     <a href="#pos" class="nav-item">Punto de Venta (POS)</a>
                     <a href="#ventas" class="nav-item">Consulta de Ventas</a>
                     <a href="#layaway" class="nav-item">Plan Separe</a>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Facturación DIAN</h3>
+                    <a href="#facturacion-electronica" class="nav-item">Facturación Electrónica</a>
                 </div>
 
                 <div class="nav-section">
@@ -391,7 +397,7 @@
         <main class="main-content">
             <div class="header">
                 <h1>Manual de Usuario - Sistema POS Lite</h1>
-                <p>Guía completa para el uso del sistema de punto de venta con gestión de inventario, manufactura y multi-tenant</p>
+                <p>Guía completa para el uso del sistema de punto de venta con gestión de inventario, manufactura, multi-tenant y Facturación Electrónica DIAN</p>
             </div>
 
             <!-- INTRODUCCIÓN -->
@@ -426,6 +432,14 @@
                         <h4>🔒 Seguridad</h4>
                         <p>Sistema de roles y permisos por usuario, RLS a nivel de base de datos</p>
                     </div>
+                    <div class="feature-card">
+                        <h4>🧾 Facturación Electrónica</h4>
+                        <p>Generación de XML FE en modo dual, integración con proveedores tecnológicos DIAN (CUFE, resoluciones, firmas)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📥 Carga Masiva</h4>
+                        <p>Importación masiva de productos y terceros desde Excel con validaciones y seguimiento de errores</p>
+                    </div>
                 </div>
 
                 <h3>Características Principales</h3>
@@ -434,6 +448,9 @@
                     <li><strong>Productos Flexibles:</strong> Productos simples, con variantes, kits, servicios y manufacturados</li>
                     <li><strong>Descuentos Duales:</strong> Aplique descuentos por porcentaje o monto fijo simultáneamente</li>
                     <li><strong>Impuestos Automáticos:</strong> Reglas de impuestos por producto, categoría o ubicación</li>
+                    <li><strong>Facturación Electrónica DIAN:</strong> Modo dual con XML FE, CUFE, resoluciones y seguimiento por venta</li>
+                    <li><strong>Terceros Completos:</strong> Clientes y proveedores con datos fiscales, código DANE, régimen tributario</li>
+                    <li><strong>Carga Masiva Excel:</strong> Importación de productos y terceros con plantillas descargables y log de errores</li>
                     <li><strong>Plan Separe:</strong> Sistema completo de apartados con pagos parciales</li>
                     <li><strong>Trazabilidad Completa:</strong> Seguimiento de lotes, consumo de componentes, historial de movimientos</li>
                 </ul>
@@ -1075,6 +1092,34 @@
                 <div class="alert alert-info">
                     <strong>💡 Sugerencia:</strong> Use la pestaña "Insumos/Componentes" para gestionar solo sus materias primas, separadas de los productos finales.
                 </div>
+
+                <h3>🧾 Campos de Facturación Electrónica en Variantes</h3>
+                <p>Cada variante de producto tiene una sección opcional <strong>"Facturación Electrónica (DIAN)"</strong> en su formulario:</p>
+                <table>
+                    <thead>
+                        <tr><th>Campo</th><th>Descripción</th><th>Ejemplo</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Unidad DIAN</strong></td>
+                            <td>Unidad de medida reconocida por la DIAN para el XML FE. Autocomplete de la tabla de unidades del sistema.</td>
+                            <td>UND — Unidad</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Código Estándar</strong></td>
+                            <td>Código universal del producto/servicio para el XML. Normalmente un código UNSPSC de 8 dígitos.</td>
+                            <td><code>43211500</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tipo de Código</strong></td>
+                            <td>Estándar al que pertenece el código.</td>
+                            <td>UNSPSC / EAN / GTIN / PARTNUM</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-info">
+                    <strong>💡 Consejo:</strong> Si su empresa maneja muchos productos, puede cargar masivamente estos campos usando la plantilla Excel (columnas <code>standard_code</code> y <code>standard_code_type</code>).
+                </div>
             </section>
 
             <!-- INVENTARIO -->
@@ -1536,36 +1581,188 @@
             </section>
 
             <!-- CLIENTES -->
-            <section id="clientes" class="section">
-                <h2>👤 Gestión de Clientes</h2>
+            <!-- TERCEROS -->
+            <section id="terceros" class="section">
+                <h2>🏢 Terceros (Clientes y Proveedores)</h2>
 
-                <h3>Crear Cliente</h3>
+                <p>El módulo de Terceros centraliza toda la información de clientes, proveedores, empleados y terceros en general, incluyendo los datos fiscales necesarios para la Facturación Electrónica DIAN.</p>
+
+                <div class="alert alert-info">
+                    <strong>👤 Rol requerido:</strong> <span class="badge badge-primary">Gerente</span> o <span class="badge badge-danger">Administrador</span>
+                </div>
+
+                <h3>Tipos de Terceros</h3>
+                <table>
+                    <thead>
+                        <tr><th>Tipo</th><th>Descripción</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>customer</strong></td><td>Solo cliente (aparece en POS y en Receptor Fiscal FE)</td></tr>
+                        <tr><td><strong>supplier</strong></td><td>Solo proveedor (aparece en módulo de Compras)</td></tr>
+                        <tr><td><strong>both</strong></td><td>Cliente y proveedor a la vez</td></tr>
+                        <tr><td><strong>employee</strong></td><td>Empleado</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Crear Nuevo Tercero</h3>
                 <div class="step">
                     <span class="step-number">1</span>
-                    Vaya a <strong>Catálogos → Clientes</strong>
+                    Vaya a <strong>Catálogos → Terceros</strong>
                 </div>
                 <div class="step">
                     <span class="step-number">2</span>
-                    Haga clic en <strong>"+ Nuevo Cliente"</strong>
+                    Haga clic en <strong>"+ Nuevo Tercero"</strong>
                 </div>
                 <div class="step">
                     <span class="step-number">3</span>
-                    Complete:
+                    Complete la información básica:
                     <ul>
-                        <li><strong>Tipo:</strong> Persona / Empresa</li>
-                        <li><strong>Nombre/Razón Social:</strong></li>
-                        <li><strong>Documento:</strong> CC, NIT, Pasaporte</li>
-                        <li><strong>Email:</strong></li>
-                        <li><strong>Teléfono:</strong></li>
-                        <li><strong>Dirección:</strong></li>
+                        <li><strong>Razón Social / Nombre:</strong> Nombre legal completo (requerido)</li>
+                        <li><strong>Nombre Comercial:</strong> Alias o marca</li>
+                        <li><strong>Tipo:</strong> customer / supplier / both / employee</li>
+                        <li><strong>Tipo de Documento:</strong> NIT, CC, CE, TI, PPN</li>
+                        <li><strong>Número de Documento:</strong> Sin dígito de verificación si es NIT</li>
+                        <li><strong>DV:</strong> Dígito de verificación (solo NIT)</li>
+                        <li><strong>Teléfono / Email</strong></li>
                     </ul>
                 </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    Complete la información fiscal (requerida para Facturación Electrónica):
+                    <ul>
+                        <li><strong>Email Fiscal:</strong> Correo para recibir facturas electrónicas</li>
+                        <li><strong>Dirección:</strong> Dirección física completa</li>
+                        <li><strong>Ciudad:</strong> Ciudad de ubicación</li>
+                        <li><strong>Código DANE Municipio:</strong> Código de 5 dígitos del municipio según el DANE (Ej: <code>11001</code> = Bogotá D.C.). <em>Requerido en el XML FE.</em></li>
+                        <li><strong>Departamento:</strong> Departamento</li>
+                        <li><strong>Código País:</strong> ISO 3166-1 alpha-2 (default: <code>CO</code>)</li>
+                        <li><strong>Régimen Tributario:</strong> SIMPLE, ORDINARIO, NO_RESP, GRAN_CONTRIB</li>
+                        <li><strong>Responsable de IVA:</strong> Sí/No</li>
+                        <li><strong>Obliado a Llevar Contabilidad:</strong> Sí/No</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    Haga clic en <strong>"Guardar"</strong>
+                </div>
 
-                <h3>Cliente Genérico</h3>
-                <p>El sistema crea automáticamente un cliente "CLIENTE GENERICO" para ventas rápidas sin datos específicos.</p>
+                <h3>Cliente Genérico (Consumidor Final)</h3>
+                <p>Para ventas rápidas sin identificación del comprador, el sistema permite usar automáticamente el <strong>Consumidor Final</strong>. No se requiere crear un tercero para este caso.</p>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Para Facturación Electrónica:</strong> Cuando la FE está activa, las ventas a consumidor final se emiten como <em>Factura de Venta (FV)</em> sin receptor específico. Para emitir una FE con datos del comprador, debe seleccionar el <strong>Receptor Fiscal</strong> en el POS.
+                </div>
+
+                <h3>Consultar y Editar Terceros</h3>
+                <ul>
+                    <li>Use el buscador para filtrar por nombre o número de documento</li>
+                    <li>Haga clic en el ícono de edición para modificar datos</li>
+                    <li>Puede desactivar un tercero sin eliminarlo</li>
+                </ul>
+            </section>
+
+            <!-- CARGA MASIVA -->
+            <section id="carga-masiva" class="section">
+                <h2>📥 Carga Masiva por Excel</h2>
+
+                <p>El módulo de carga masiva permite importar grandes cantidades de <strong>Productos</strong> o <strong>Terceros</strong> desde un archivo Excel (XLSX), ideal para el arranque inicial del sistema o migraciones.</p>
 
                 <div class="alert alert-info">
-                    <strong>💡 Historial:</strong> Puede consultar todas las compras de un cliente desde su perfil.
+                    <strong>👤 Rol requerido:</strong> <span class="badge badge-danger">Administrador</span>
+                </div>
+
+                <h3>Acceder al Módulo</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Vaya a <strong>Administración → Carga Masiva</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Seleccione el <strong>Tipo de Importación</strong>: Productos/variantes o Terceros
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Haga clic en <strong>"Descargar Plantilla"</strong> para obtener el XLSX correcto
+                </div>
+
+                <h3>Plantilla de Productos (<code>import-product-variants.xlsx</code>)</h3>
+                <p>Rellene la hoja <strong>productos</strong> con una fila por producto:</p>
+                <table>
+                    <thead>
+                        <tr><th>Columna</th><th>Requerida</th><th>Descripción</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>product_name</code></td><td>✅ Sí</td><td>Nombre del producto. Si ya existe se actualiza.</td></tr>
+                        <tr><td><code>unit_price</code></td><td>✅ Sí</td><td>Precio de venta de la variante.</td></tr>
+                        <tr><td><code>category_name</code></td><td>No</td><td>Se crea automáticamente si no existe.</td></tr>
+                        <tr><td><code>unit_code</code></td><td>No</td><td>Código DIAN de unidad de medida (ver hoja <em>unidades_dian</em>).</td></tr>
+                        <tr><td><code>unit_cost</code></td><td>No</td><td>Costo unitario.</td></tr>
+                        <tr><td><code>tax_code</code></td><td>No</td><td>IVA19, IVA5 o IVA0.</td></tr>
+                        <tr><td><code>price_includes_tax</code></td><td>No</td><td>TRUE si el precio ya incluye IVA.</td></tr>
+                        <tr><td><code>inventory_type</code></td><td>No</td><td>REVENTA / SERVICIO / MANUFACTURA / BUNDLE (default REVENTA).</td></tr>
+                        <tr><td><code>initial_stock</code></td><td>No</td><td>Cantidad inicial en la ubicación indicada.</td></tr>
+                        <tr><td><code>location_code</code></td><td>No</td><td>Código de la bodega para el stock inicial.</td></tr>
+                        <tr><td><code>control_expiration</code></td><td>No</td><td>TRUE para activar gestión de lotes y vencimientos.</td></tr>
+                        <tr><td><code>is_component</code></td><td>No</td><td>TRUE si es insumo/materia prima.</td></tr>
+                        <tr><td><code>is_active</code></td><td>No</td><td>TRUE/FALSE (default TRUE).</td></tr>
+                        <tr><td><code>standard_code</code></td><td>No</td><td>🧾 Código estándar del producto para el XML FE (Ej: código UNSPSC del ítem).</td></tr>
+                        <tr><td><code>standard_code_type</code></td><td>No</td><td>🧾 Tipo de código: <strong>UNSPSC</strong> (default), EAN, GTIN o PARTNUM. Usa el desplegable.</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Plantilla de Terceros (<code>import-third-parties.xlsx</code>)</h3>
+                <p>Rellene la hoja <strong>terceros</strong> con una fila por tercero:</p>
+                <table>
+                    <thead>
+                        <tr><th>Columna</th><th>Requerida</th><th>Descripción</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>legal_name</code></td><td>✅ Sí</td><td>Razón social o nombre completo.</td></tr>
+                        <tr><td><code>document_type</code></td><td>No</td><td>NIT, CC, CE, TI, PPN. Usa el desplegable.</td></tr>
+                        <tr><td><code>document_number</code></td><td>No</td><td>Número sin DV para NIT. Si ya existe se actualiza.</td></tr>
+                        <tr><td><code>dv</code></td><td>No</td><td>Dígito de verificación (solo NIT).</td></tr>
+                        <tr><td><code>type</code></td><td>No</td><td>customer / supplier / both / employee.</td></tr>
+                        <tr><td><code>trade_name</code></td><td>No</td><td>Nombre comercial.</td></tr>
+                        <tr><td><code>email</code> / <code>phone</code></td><td>No</td><td>Datos de contacto.</td></tr>
+                        <tr><td><code>fiscal_email</code></td><td>No</td><td>Correo para envío de FE.</td></tr>
+                        <tr><td><code>address</code></td><td>No</td><td>Dirección completa.</td></tr>
+                        <tr><td><code>city</code></td><td>No</td><td>Ciudad.</td></tr>
+                        <tr><td><code>city_code</code></td><td>No</td><td>🧾 Código DANE del municipio (5 dígitos, Ej: <strong>11001</strong> = Bogotá D.C.). Requerido en XML FE.</td></tr>
+                        <tr><td><code>department</code></td><td>No</td><td>Departamento.</td></tr>
+                        <tr><td><code>country_code</code></td><td>No</td><td>Código país ISO (default CO).</td></tr>
+                        <tr><td><code>tax_regime</code></td><td>No</td><td>SIMPLE / ORDINARIO / NO_RESP / GRAN_CONTRIB.</td></tr>
+                        <tr><td><code>is_responsible_for_iva</code></td><td>No</td><td>TRUE/FALSE.</td></tr>
+                        <tr><td><code>default_currency</code></td><td>No</td><td>COP, USD, EUR (default COP).</td></tr>
+                        <tr><td><code>is_active</code></td><td>No</td><td>TRUE/FALSE (default TRUE).</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Proceso de Importación</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Descargue la plantilla, complete los datos y guarde el archivo.
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    En el módulo de Carga Masiva, haga clic en <strong>"Elegir archivo XLSX"</strong>.
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Haga clic en <strong>"Subir y Procesar"</strong>. El sistema procesa fila por fila.
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    Al finalizar, vea el resumen: filas procesadas y errores. Si hay errores, haga clic en el ícono de alerta para ver el detalle por fila.
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Notas importantes:</strong>
+                    <ul>
+                        <li>No modifique los nombres de las columnas (fila 1).</li>
+                        <li>Los booleanos deben ser <code>TRUE</code> o <code>FALSE</code> en mayúsculas.</li>
+                        <li>Si un producto (por nombre) o tercero (por número de documento) ya existe, se <strong>actualiza</strong>; no se duplica.</li>
+                        <li>El historial de importaciones queda guardado con fecha, estado y conteo de errores.</li>
+                    </ul>
                 </div>
             </section>
 
@@ -1634,6 +1831,21 @@
                 <div class="step">
                     <span class="step-number">5</span>
                     Haga clic en <strong>"Procesar Pago"</strong>
+                </div>
+
+                <h3>Receptor Fiscal (Facturación Electrónica)</h3>
+                <p>Cuando la <strong>Facturación Electrónica DIAN</strong> está habilitada, aparece un campo adicional en el POS:</p>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Busque y seleccione el <strong>Receptor Fiscal</strong> (autocomplete de Terceros)
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Si deja el campo vacío, la venta se procesa como <em>Consumidor Final</em> (sin FE específica)
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>💡 Consejo:</strong> Solo los terceros con datos fiscales completos (tipo de documento, número, régimen, código DANE) generarán un XML FE válido.
                 </div>
 
                 <h3>Procesar Pago</h3>
@@ -2078,6 +2290,142 @@
                 </div>
             </section>
 
+            <!-- FACTURACIÓN ELECTRÓNICA -->
+            <section id="facturacion-electronica" class="section">
+                <h2>🧾 Facturación Electrónica DIAN</h2>
+
+                <p>POS Lite incluye soporte nativo para la <strong>Facturación Electrónica (FE)</strong> según la normativa DIAN de Colombia. El sistema opera en modo <em>dual</em>: las ventas se crean normalmente en el POS y, si la FE está habilitada, el XML se genera y envía al proveedor tecnológico autorizado (PT).</p>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Prerrequisito:</strong> Debe ejecutar las migraciones <code>ADD_ELECTRONIC_INVOICING.sql</code> y <code>ADD_FE_COMPLEMENTARY.sql</code> en su base de datos antes de activar este módulo.
+                </div>
+
+                <h3>Paso 1 — Configurar el Emisor</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Vaya a <strong>Configuración → Tenant → Facturación Electrónica</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Active el interruptor <strong>"Facturación Electrónica Habilitada"</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Complete los datos del emisor (empresa facturadora):
+                    <ul>
+                        <li><strong>NIT / DV:</strong> Número de identificación tributaria y dígito de verificación</li>
+                        <li><strong>Razón Social:</strong> Nombre legal registrado ante la DIAN</li>
+                        <li><strong>Régimen tributario:</strong> SIMPLE / ORDINARIO / GRAN_CONTRIB</li>
+                        <li><strong>Responsable de IVA:</strong> Sí/No</li>
+                        <li><strong>Obligado a llevar contabilidad:</strong> Sí/No</li>
+                        <li><strong>Dirección:</strong> Dirección física del emisor</li>
+                        <li><strong>Ciudad:</strong> Ciudad del emisor</li>
+                        <li><strong>Código DANE:</strong> 5 dígitos del municipio (Ej: <strong>11001</strong> = Bogotá D.C.) — <em>requerido en el XML</em></li>
+                        <li><strong>Departamento:</strong> Ej: Cundinamarca</li>
+                        <li><strong>Código postal:</strong> Ej: 110111</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    Configure el <strong>Proveedor Tecnológico (PT):</strong> URL del endpoint, API key, ambiente (TEST/PROD) y prefijo de factura
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    Configure la <strong>Resolución DIAN:</strong> número de resolución, rango y vigencia
+                </div>
+
+                <h3>Paso 2 — Configurar los Métodos de Pago</h3>
+                <p>Cada método de pago tiene un <strong>código DIAN</strong> que se incluye en el XML. El sistema asigna automáticamente los códigos más comunes:</p>
+                <table>
+                    <thead>
+                        <tr><th>Método</th><th>Código DIAN</th><th>Descripción DIAN</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Efectivo / Cash</td><td><strong>10</strong></td><td>Efectivo</td></tr>
+                        <tr><td>Tarjeta Crédito</td><td><strong>48</strong></td><td>Tarjeta de crédito</td></tr>
+                        <tr><td>Tarjeta Débito</td><td><strong>49</strong></td><td>Tarjeta de débito</td></tr>
+                        <tr><td>Transferencia</td><td><strong>22</strong></td><td>Cheque / transferencia</td></tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-info">
+                    <strong>💡 Nota:</strong> Si su PT requiere un código diferente, actualice el campo <code>dian_payment_code</code> del método de pago directamente en la base de datos.
+                </div>
+
+                <h3>Paso 3 — Preparar los Productos</h3>
+                <p>Para cada variante que se factura electrónicamente, configure en la sección <strong>"Facturación Electrónica (DIAN)"</strong> del formulario de variante:</p>
+                <ul>
+                    <li><strong>Unidad DIAN:</strong> Ej: UND (Unidad)</li>
+                    <li><strong>Código Estándar:</strong> Código UNSPSC del bien/servicio</li>
+                    <li><strong>Tipo de Código:</strong> UNSPSC (recomendado por la DIAN)</li>
+                </ul>
+
+                <h3>Paso 4 — Preparar los Terceros</h3>
+                <p>Para que un tercero aparezca como receptor en la FE, debe tener completados:</p>
+                <ul>
+                    <li>Tipo de documento y número</li>
+                    <li>Régimen tributario</li>
+                    <li>Dirección y <strong>Código DANE del municipio</strong></li>
+                </ul>
+
+                <h3>Uso en el Punto de Venta</h3>
+                <p>Cuando la FE está habilitada, aparece el campo <strong>"Receptor Fiscal (FE)"</strong> en el POS (ver sección <a href="#pos">Punto de Venta</a>). Si se deja vacío, la venta se registra como <em>Consumidor Final</em>.</p>
+
+                <h3>Seguimiento de Facturas en Ventas</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Vaya a <strong>Operaciones → Ventas</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    En cada venta verá un chip de estado FE:
+                    <ul>
+                        <li>🔵 <strong>Sin enviar</strong> — Venta sin FE iniciada</li>
+                        <li>🟡 <strong>Pendiente</strong> — XML generado, esperando respuesta del PT</li>
+                        <li>🟢 <strong>Enviado / Aprobado</strong> — CUFE asignado, FE válida</li>
+                        <li>🔴 <strong>Error / Rechazado</strong> — El PT devolvió error; puede reintentar</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Haga clic en una venta para ver el detalle. En el panel lateral encontrará:
+                    <ul>
+                        <li>CUFE (Código Único de Factura Electrónica)</li>
+                        <li>Número de factura asignado</li>
+                        <li>Receptor fiscal</li>
+                        <li>Botón <strong>"Reintentar envío"</strong> (visible cuando el estado es Pendiente, Error o Rechazado)</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-success">
+                    <strong>✅ Modo dual:</strong> Aunque la FE falle o sea rechazada, la venta queda registrada y el inventario se descuenta normalmente. La FE es un proceso separado que puede reintentarse.
+                </div>
+
+                <h3>Preguntas Frecuentes FE</h3>
+                <table>
+                    <thead>
+                        <tr><th>Pregunta</th><th>Respuesta</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>¿Qué pasa si el PT no responde?</td>
+                            <td>La venta queda en estado <em>Pendiente</em>. Puede reintentar desde la vista de Ventas.</td>
+                        </tr>
+                        <tr>
+                            <td>¿Puedo usar sólo algunos productos con FE?</td>
+                            <td>Sí. Los que no tengan <code>standard_code</code> se incluirán en el XML sin ese campo (el PT puede aceptarlo dependiendo de su configuración).</td>
+                        </tr>
+                        <tr>
+                            <td>¿El sistema envía el correo al receptor?</td>
+                            <td>Actualmente el envío de correo queda registrado como pendiente (<code>email_sent_at</code>). La integración de envío automático se implementa según la configuración del PT.</td>
+                        </tr>
+                        <tr>
+                            <td>¿Qué es el CUFE?</td>
+                            <td>Código Único de Factura Electrónica. Lo asigna la DIAN a través de su PT y es el identificador oficial de la factura.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
             <!-- PIE DE PÁGINA -->
             <section class="section" style="background: #f9f9f9; margin-top: 50px;">
                 <h2>📞 Soporte y Ayuda</h2>
@@ -2102,7 +2450,7 @@
                 <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #ddd; text-align: center; color: #757575;">
                     <p><strong>POS Lite</strong> - Sistema de Punto de Venta</p>
                     <p>Versión 1.0 - © 2026 Todos los derechos reservados</p>
-                    <p>Última actualización de este manual: Febrero 19, 2026</p>
+                    <p>Última actualización de este manual: Febrero 25, 2026</p>
                 </div>
             </section>
         </main>

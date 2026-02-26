@@ -190,6 +190,32 @@
                 <v-list-item v-bind="props" :subtitle="item.raw.document || item.raw.phone || ''"></v-list-item>
               </template>
             </v-autocomplete>
+
+            <!-- Receptor Fiscal: solo visible cuando FE está habilitada -->
+            <v-autocomplete
+              v-if="electronicInvoicingEnabled"
+              v-model="selectedThirdParty"
+              :items="thirdPartyResults"
+              item-title="legal_name"
+              item-value="third_party_id"
+              return-object
+              label="Receptor Fiscal (FE)"
+              prepend-inner-icon="mdi-domain"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              class="mt-2"
+              :loading="searchingThirdParty"
+              @update:search="searchThirdParty"
+            >
+              <template #item="{ props, item }">
+                <v-list-item
+                  v-bind="props"
+                  :subtitle="(item.raw.document_type || '') + ' ' + (item.raw.document_number || '') + (item.raw.dv ? '-' + item.raw.dv : '')"
+                ></v-list-item>
+              </template>
+            </v-autocomplete>
           </v-card-text>
 
           <v-divider></v-divider>
@@ -389,15 +415,17 @@ import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import productsService from '@/services/products.service'
 import customersService from '@/services/customers.service'
+import thirdPartiesService from '@/services/thirdParties.service'
 import salesService from '@/services/sales.service'
 import cashService from '@/services/cash.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import taxesService from '@/services/taxes.service'
+import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
-const { maxDiscountWithoutAuth, applyRounding, loadSettings } = useTenantSettings()
+const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, loadSettings } = useTenantSettings()
 
 const searchTerm = ref('')
 const searchResults = ref([])
@@ -405,6 +433,10 @@ const cart = ref([])
 const selectedCustomer = ref(null)
 const customerResults = ref([])
 const searchingCustomer = ref(false)
+// Receptor fiscal FE (third_parties)
+const selectedThirdParty = ref(null)
+const thirdPartyResults  = ref([])
+const searchingThirdParty = ref(false)
 const payments = ref([{ method: '', amount: 0 }])
 const paymentMethods = ref([])
 const currentSession = ref(null)
@@ -760,6 +792,17 @@ const searchCustomer = async (search) => {
   searchingCustomer.value = false
 }
 
+// Receptor Fiscal (FE) - busca en third_parties (clientes / ambos)
+const searchThirdParty = async (search) => {
+  if (!search || search.length < 2) return
+  searchingThirdParty.value = true
+  try {
+    const data = await thirdPartiesService.list({ search, type: 'customer', limit: 15 })
+    thirdPartyResults.value = data
+  } catch { thirdPartyResults.value = [] }
+  searchingThirdParty.value = false
+}
+
 // Pagos
 const isPaymentCash = (methodCode) => {
   // Verifica si el método de pago es efectivo
@@ -828,7 +871,8 @@ const processSale = async () => {
     const r = await salesService.createSale(tenantId.value, {
       location_id: currentSession.value?.cash_register?.location_id || null,
       cash_session_id: currentSession.value?.cash_session_id || null,
-      customer_id: selectedCustomer.value?.customer_id || null,
+      customer_id:     selectedCustomer.value?.customer_id     || null,
+      third_party_id:  selectedThirdParty.value?.third_party_id || null,
       sold_by: userProfile.value.user_id,
       lines,
       payments: paymentsList,
@@ -837,6 +881,24 @@ const processSale = async () => {
 
     if (r.success) {
       showMsg('¡Venta registrada exitosamente!')
+      // ── Facturación Electrónica (dual mode: fire-and-forget) ────────
+      if (r.data?.sale_id) {
+        const saleId = r.data.sale_id
+        const feEnabled = electronicInvoicingEnabled.value
+        // No bloquear el flujo POS; lanzar en background
+        electronicInvoicingService.submitInvoice(saleId, tenantId.value, feEnabled)
+          .then(feResult => {
+            if (!feResult.success) {
+              console.warn('Aviso FE:', feResult.error)
+              // Mostrar aviso suave al cajero sin bloquear
+              showMsg('Venta registrada. Aviso FE: ' + feResult.error, 'warning')
+            } else if (feResult.mode === 'fe' && feResult.cufe) {
+              showMsg('\u00a1Factura electrónica enviada al proveedor!', 'success')
+            }
+          })
+          .catch(err => console.error('Error FE:', err))
+      }
+      // ─────────────────────────────────────────────────────────────
       clearSale()
     } else {
       showMsg(r.error || 'Error al procesar venta', 'error')
@@ -851,6 +913,7 @@ const processSale = async () => {
 const clearSale = () => {
   cart.value = []
   selectedCustomer.value = null
+  selectedThirdParty.value = null
   payments.value = [{ method: paymentMethods.value[0]?.code || '', amount: 0 }]
   saleNote.value = ''
   searchTerm.value = ''

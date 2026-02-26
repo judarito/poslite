@@ -115,7 +115,9 @@ async function handleProductRow(row, tenantId) {
     is_active: !(row.is_active === false || row.is_active === 'FALSE' || row.is_active === 'false' || row.is_active === 0),
     control_expiration: toBool(row.control_expiration),
     is_component: toBool(row.is_component),
-    location_code: row.location_code
+    location_code: row.location_code,
+    standard_code: row.standard_code?.toString().trim() || null,
+    standard_code_type: row.standard_code_type?.toString().trim() || 'UNSPSC'
   }
 
   const category = await categoriesService.findOrCreateByName(tenantId, payload.category_name)
@@ -158,6 +160,7 @@ async function handleThirdPartyRow(row, tenantId) {
     fiscal_email: row.fiscal_email?.toString().trim() || null,
     address: row.address?.toString().trim() || null,
     city: row.city?.toString().trim() || null,
+    city_code: row.city_code?.toString().trim() || null,
     department: row.department?.toString().trim() || null,
     country_code: row.country_code?.toString().trim() || 'CO',
     tax_regime: row.tax_regime || null,

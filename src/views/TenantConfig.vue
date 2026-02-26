@@ -334,60 +334,235 @@
             <!-- FACTURACIÓN -->
             <v-window-item value="invoicing">
               <div class="text-h6 mb-4">Configuración de Facturación</div>
+
+              <!-- Siempre visible: impresión y consecutivo POS -->
               <v-row>
-                <v-col cols="12" sm="6">
-                  <v-text-field 
-                    v-model="settings.invoice_prefix" 
-                    label="Prefijo de factura *" 
-                    variant="outlined"
-                    hint="Ej: FAC, INV, FC"
-                    persistent-hint
-                  ></v-text-field>
+                <v-col cols="12" sm="4">
+                  <v-text-field v-model="settings.invoice_prefix" label="Prefijo de factura *" variant="outlined"
+                    hint="Ej: FAC, INV, FC" persistent-hint></v-text-field>
                 </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field 
-                    v-model.number="settings.next_invoice_number" 
-                    type="number" 
-                    label="Siguiente número de factura *" 
-                    variant="outlined"
-                    min="1"
-                    hint="Consecutivo actual de facturación"
-                    persistent-hint
-                  ></v-text-field>
+                <v-col cols="12" sm="4">
+                  <v-text-field v-model.number="settings.next_invoice_number" type="number" label="Siguiente # de factura *"
+                    variant="outlined" min="1" hint="Consecutivo POS" persistent-hint></v-text-field>
                 </v-col>
-                <v-col cols="12" sm="6">
-                  <v-select 
-                    v-model="settings.print_format" 
-                    :items="printFormatOptions" 
-                    label="Formato de impresión *" 
-                    variant="outlined"
-                    hint="Tipo de impresora a usar"
-                    persistent-hint
-                  ></v-select>
+                <v-col cols="12" sm="4">
+                  <v-select v-model="settings.print_format" :items="printFormatOptions" label="Formato de impresión *"
+                    variant="outlined" hint="Tipo de impresora" persistent-hint></v-select>
                 </v-col>
-                <v-col cols="12" sm="6">
-                  <v-select 
-                    v-model="settings.thermal_paper_width" 
-                    :items="[{label: '58mm', value: 58}, {label: '80mm', value: 80}]"
-                    item-title="label"
-                    item-value="value" 
-                    label="Ancho papel térmico *" 
-                    variant="outlined"
-                    :disabled="settings.print_format !== 'thermal'"
-                    hint="Ancho del rollo de papel"
-                    persistent-hint
-                  ></v-select>
+                <v-col cols="12" sm="4">
+                  <v-select v-model="settings.thermal_paper_width"
+                    :items="[{label:'58mm',value:58},{label:'80mm',value:80}]"
+                    item-title="label" item-value="value" label="Ancho papel térmico"
+                    variant="outlined" :disabled="settings.print_format !== 'thermal'"
+                    hint="Ancho del rollo" persistent-hint></v-select>
                 </v-col>
-                <v-col cols="12" sm="6">
-                  <v-switch 
-                    v-model="settings.electronic_invoicing_enabled" 
-                    label="Facturación electrónica habilitada" 
-                    color="indigo"
-                    hint="Integración con DIAN u organismo fiscal"
-                    persistent-hint
-                  ></v-switch>
+                <v-col cols="12" sm="8" class="d-flex align-center">
+                  <v-switch v-model="settings.electronic_invoicing_enabled"
+                    label="Activar Facturación Electrónica DIAN"
+                    color="indigo" hint="Habilita el módulo FE completo con proveedor tecnológico"
+                    persistent-hint></v-switch>
                 </v-col>
               </v-row>
+
+              <!-- ======= SECCIÓN FE (solo si está habilitada) ======= -->
+              <template v-if="settings.electronic_invoicing_enabled">
+
+                <!-- DATOS FISCALES DEL EMISOR -->
+                <v-divider class="my-5"></v-divider>
+                <div class="d-flex align-center mb-3">
+                  <v-icon start color="blue">mdi-office-building-cog</v-icon>
+                  <span class="text-subtitle-1 font-weight-bold">Datos Fiscales del Emisor (DIAN)</span>
+                </div>
+                <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+                  Estos datos se incluyen en el XML de cada factura electrónica emitida.
+                </v-alert>
+                <v-row>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model="tenant.dv" label="DV (dígito verificación)" variant="outlined"
+                      hint="Dígito de verificación del NIT" persistent-hint maxlength="1"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="5">
+                    <v-text-field v-model="tenant.trade_name" label="Nombre comercial" variant="outlined"
+                      hint="Nombre comercial del emisor (puede diferir de la razón social)" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-select v-model="tenant.tax_regime" :items="taxRegimeOptions" item-title="title" item-value="value"
+                      label="Régimen tributario" variant="outlined" hint="Régimen ante la DIAN" persistent-hint></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="tenant.ciiu_code" label="Código CIIU" variant="outlined"
+                      hint="Actividad económica principal" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="tenant.fiscal_email" label="Email fiscal" variant="outlined" type="email"
+                      prepend-inner-icon="mdi-email" hint="Email en encabezado del XML" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="tenant.fiscal_phone" label="Teléfono fiscal" variant="outlined"
+                      prepend-inner-icon="mdi-phone" hint="Teléfono en encabezado del XML" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-switch v-model="tenant.is_responsible_for_iva" label="Responsable de IVA"
+                      color="primary" hide-details inset></v-switch>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-switch v-model="tenant.obligated_accounting" label="Obligado a llevar contabilidad"
+                      color="primary" hide-details inset></v-switch>
+                  </v-col>
+                </v-row>
+
+                <!-- DIRECCIÓN FISCAL DEL EMISOR -->
+                <v-row class="mt-0">
+                  <v-col cols="12">
+                    <div class="text-caption text-medium-emphasis font-weight-bold mb-n1">
+                      <v-icon size="small" color="orange">mdi-map-marker</v-icon>
+                      Dirección Fiscal del Emisor (requerida en XML FE)
+                    </div>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-text-field v-model="tenant.address" label="Dirección" variant="outlined"
+                      prepend-inner-icon="mdi-map-marker"
+                      hint="Ej: Calle 68 # 95-30 Piso 2" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="tenant.city" label="Ciudad / Municipio" variant="outlined"
+                      prepend-inner-icon="mdi-city" hint="Nombre del municipio" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model="tenant.city_code" label="Código DANE" variant="outlined"
+                      prepend-inner-icon="mdi-numeric"
+                      hint="5 dígitos (ej: 11001)" persistent-hint maxlength="5"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model="tenant.department" label="Departamento" variant="outlined"
+                      prepend-inner-icon="mdi-map" hint="Nombre del departamento" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="2">
+                    <v-text-field v-model="tenant.postal_code" label="Cód. Postal" variant="outlined"
+                      hint="Código postal" persistent-hint></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <!-- PROVEEDOR TECNOLÓGICO -->
+                <v-divider class="my-5"></v-divider>
+                <div class="d-flex align-center mb-3">
+                  <v-icon start color="purple">mdi-cloud-sync</v-icon>
+                  <span class="text-subtitle-1 font-weight-bold">Proveedor Tecnológico</span>
+                </div>
+                <v-alert type="warning" variant="tonal" density="compact" class="mb-4">
+                  Ingresa las credenciales del proveedor tecnológico habilitado por la DIAN.
+                  El sistema enviará cada factura electrónica a esta URL.
+                </v-alert>
+                <v-row>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="feProvider.provider_name" label="Nombre del proveedor" variant="outlined"
+                      hint="Ej: Gosocket, SIIGO, Bizlink, propio" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="8">
+                    <v-text-field v-model="feProvider.base_url" label="URL base de la API *" variant="outlined"
+                      prepend-inner-icon="mdi-web"
+                      hint="Sin barra final, ej: https://api.proveedor.co/v1" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-select v-model="feProvider.auth_type"
+                      :items="[{title:'API Key (header)',value:'apikey'},{title:'Bearer Token',value:'bearer'},{title:'Basic Auth',value:'basic'}]"
+                      item-title="title" item-value="value"
+                      label="Tipo de autenticación" variant="outlined"></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="4" v-if="feProvider.auth_type === 'apikey'">
+                    <v-text-field v-model="feProvider.auth_header" label="Nombre del header" variant="outlined"
+                      hint="Ej: X-API-Key, x-auth-token" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="feProvider.api_key"
+                      :label="feProvider.auth_type === 'basic' ? 'Usuario:Contraseña' : 'API Key / Token'"
+                      variant="outlined" type="password"
+                      prepend-inner-icon="mdi-key"
+                      hint="Se almacena tal como se ingresa" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="feProvider.software_id" label="Software ID (DIAN)" variant="outlined"
+                      hint="ID del software registrado ante DIAN" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="feProvider.software_pin" label="Software PIN (DIAN)" variant="outlined"
+                      type="password" prepend-inner-icon="mdi-shield-key"
+                      hint="PIN del software ante DIAN" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-select v-model="feProvider.environment" :items="feEnvironmentOptions"
+                      item-title="title" item-value="value"
+                      label="Ambiente" variant="outlined"
+                      hint="Habilitación = pruebas ante DIAN" persistent-hint></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="4" v-if="feProvider.environment === 'habilitacion'">
+                    <v-text-field v-model="feProvider.test_set_id" label="Test Set ID" variant="outlined"
+                      hint="ID del set de pruebas asignado por DIAN" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="2">
+                    <v-text-field v-model.number="feProvider.timeout_seconds" type="number" label="Timeout (seg)"
+                      variant="outlined" min="5" max="120" hint="Segundos máx por petición" persistent-hint></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <!-- RESOLUCIÓN DIAN -->
+                <v-divider class="my-5"></v-divider>
+                <div class="d-flex align-center mb-3">
+                  <v-icon start color="green">mdi-file-document-check</v-icon>
+                  <span class="text-subtitle-1 font-weight-bold">Resolución DIAN Activa</span>
+                </div>
+                <v-alert type="success" variant="tonal" density="compact" class="mb-4">
+                  Ingresa los datos de la resolución de facturación electrónica autorizada por la DIAN.
+                </v-alert>
+                <v-row>
+                  <v-col cols="12" sm="3">
+                    <v-select v-model="activeResolution.document_type" :items="feDocTypeOptions"
+                      item-title="title" item-value="value"
+                      label="Tipo de documento" variant="outlined"></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model="activeResolution.prefix" label="Prefijo autorizado" variant="outlined"
+                      hint="Ej: SETP, FE, LETF (según resolución)" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model.number="activeResolution.from_number" type="number" label="Desde #"
+                      variant="outlined" min="1"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="3">
+                    <v-text-field v-model.number="activeResolution.to_number" type="number" label="Hasta #"
+                      variant="outlined" min="1"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="activeResolution.resolution_number" label="Número de resolución DIAN"
+                      variant="outlined" hint="Número oficial de la resolución" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model="activeResolution.resolution_date" type="date" label="Fecha de resolución"
+                      variant="outlined"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="4">
+                    <v-text-field v-model.number="activeResolution.current_number" type="number"
+                      label="Último consecutivo usado" variant="outlined" min="0"
+                      hint="Se incrementa automáticamente al emitir" persistent-hint></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field v-model="activeResolution.valid_from" type="date" label="Vigencia desde"
+                      variant="outlined"></v-text-field>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field v-model="activeResolution.valid_to" type="date" label="Vigencia hasta"
+                      variant="outlined"></v-text-field>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-textarea v-model="activeResolution.technical_key" label="Clave técnica (para cálculo del CUFE)"
+                      variant="outlined" rows="2" auto-grow
+                      hint="Clave técnica de 64 caracteres entregada por la DIAN" persistent-hint
+                      :rules="[v => !v || v.length === 64 || 'La clave técnica debe tener exactamente 64 caracteres']"
+                    ></v-textarea>
+                  </v-col>
+                </v-row>
+
+              </template>
             </v-window-item>
 
             <!-- NOTIFICACIONES -->
@@ -459,6 +634,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAICache } from '@/composables/useAICache'
 import { useTheme } from '@/composables/useTheme'
 import tenantSettingsService from '@/services/tenantSettings.service'
+import electronicInvoicingService from '@/services/electronicInvoicing.service'
 
 const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()
@@ -515,7 +691,49 @@ const printFormatOptions = [
   { title: 'Ticket (Media Carta)', value: 'ticket' }
 ]
 
-const tenant = ref({ name: '', tax_id: '', currency_code: 'COP' })
+const tenant = ref({
+  name: '', tax_id: '', currency_code: 'COP',
+  // Datos fiscales emisor (Facturación Electrónica)
+  dv: '', trade_name: '', tax_regime: '',
+  is_responsible_for_iva: false, obligated_accounting: false,
+  ciiu_code: '', fiscal_email: '', fiscal_phone: '',
+  // Dirección fiscal del emisor (requerida en XML FE)
+  address: '', city: '', department: '', country_code: 'CO', postal_code: '', city_code: ''
+})
+
+// Configuración proveedor tecnológico FE
+const feProvider = ref({
+  provider_name: '', base_url: '', auth_type: 'apikey', auth_header: 'X-API-Key',
+  api_key: '', software_id: '', software_pin: '', environment: 'habilitacion',
+  test_set_id: '', timeout_seconds: 30, is_active: true
+})
+
+// Resolución DIAN activa
+const activeResolution = ref({
+  resolution_id: null, document_type: 'FE', prefix: '',
+  from_number: 1, to_number: 1000, current_number: 0,
+  resolution_number: '', resolution_date: '', valid_from: '', valid_to: '',
+  technical_key: '', is_active: true
+})
+
+const taxRegimeOptions = [
+  { title: 'Responsable de IVA (Régimen Ordinario)', value: '48' },
+  { title: 'No Responsable de IVA', value: '49' },
+  { title: 'Gran Contribuyente', value: 'O-13' },
+  { title: 'Régimen Simple de Tributación (SIMPLE)', value: 'ZZ' }
+]
+
+const feEnvironmentOptions = [
+  { title: 'Habilitación (Pruebas)', value: 'habilitacion' },
+  { title: 'Producción', value: 'produccion' }
+]
+
+const feDocTypeOptions = [
+  { title: 'Factura Electrónica (FE)', value: 'FE' },
+  { title: 'Tiquete POS (FV)', value: 'FV' },
+  { title: 'Nota Crédito (NC)', value: 'NC' },
+  { title: 'Nota Débito (ND)', value: 'ND' }
+]
 
 const settings = ref({
   // General
@@ -573,10 +791,40 @@ const loadData = async () => {
   ])
 
   if (tRes.success) {
+    const td = tRes.data
     tenant.value = {
-      name: tRes.data.name || '',
-      tax_id: tRes.data.tax_id || '',
-      currency_code: tRes.data.currency_code || 'COP'
+      name:                  td.name                  || '',
+      tax_id:                td.tax_id                || '',
+      currency_code:         td.currency_code         || 'COP',
+      dv:                    td.dv                    || '',
+      trade_name:            td.trade_name            || '',
+      tax_regime:            td.tax_regime            || '',
+      is_responsible_for_iva: td.is_responsible_for_iva || false,
+      obligated_accounting:  td.obligated_accounting  || false,
+      ciiu_code:             td.ciiu_code             || '',
+      fiscal_email:          td.fiscal_email          || '',
+      fiscal_phone:          td.fiscal_phone          || '',
+      // Dirección fiscal del emisor
+      address:               td.address               || '',
+      city:                  td.city                  || '',
+      department:            td.department            || '',
+      country_code:          td.country_code          || 'CO',
+      postal_code:           td.postal_code           || '',
+      city_code:             td.city_code             || ''
+    }
+  }
+
+  // Cargar configuración del proveedor FE y resolución activa (si FE está habilitada)
+  if (settings.value?.electronic_invoicing_enabled || true) {
+    const [providerRes, resolutionRes] = await Promise.all([
+      electronicInvoicingService.getProviderConfig(tenantId.value),
+      electronicInvoicingService.getActiveResolution(tenantId.value, 'FE')
+    ])
+    if (providerRes.success && providerRes.data) {
+      Object.assign(feProvider.value, providerRes.data)
+    }
+    if (resolutionRes.success && resolutionRes.data) {
+      Object.assign(activeResolution.value, resolutionRes.data)
     }
   }
 
@@ -635,10 +883,27 @@ const saveAll = async () => {
 
   saving.value = true
   try {
-    const [tRes, sRes] = await Promise.all([
+    // Guardar tenant + settings + proveedor FE + resolución (en paralelo)
+    const saveTasks = [
       tenantSettingsService.updateTenant(tenantId.value, tenant.value),
       tenantSettingsService.saveSettings(tenantId.value, settings.value)
-    ])
+    ]
+
+    if (settings.value.electronic_invoicing_enabled) {
+      saveTasks.push(
+        electronicInvoicingService.saveProviderConfig(tenantId.value, feProvider.value)
+      )
+      if (feProvider.value.base_url) {
+        // Solo guardar resolución si hay datos mínimos
+        if (activeResolution.value.resolution_number || activeResolution.value.prefix) {
+          saveTasks.push(
+            electronicInvoicingService.upsertResolution(tenantId.value, activeResolution.value)
+          )
+        }
+      }
+    }
+
+    const [tRes, sRes] = await Promise.all(saveTasks)
 
     if (tRes.success && sRes.success) {
       showMsg('Configuración guardada exitosamente')

@@ -9,6 +9,12 @@
           <v-btn value="supplier" prepend-icon="mdi-truck">Proveedor</v-btn>
           <v-btn value="both" prepend-icon="mdi-account-switch">Ambos</v-btn>
         </v-btn-toggle>
+        <div class="text-caption text-medium-emphasis mt-1">
+          <v-icon size="12" class="mr-1">mdi-information-outline</v-icon>
+          <span v-if="form.type === 'customer'">Aparece en el buscador de clientes del POS y en reportes de ventas.</span>
+          <span v-else-if="form.type === 'supplier'">Aparece en órdenes de compra y reportes de proveedores. No se muestra en POS.</span>
+          <span v-else>La misma empresa actúa como cliente <em>y</em> proveedor (p.ej. compras y ventas cruzadas). Para FE se usa la misma identificación fiscal en ambos roles.</span>
+        </div>
       </v-col>
 
       <!-- Identificación -->
@@ -64,6 +70,9 @@
       <v-col cols="12" sm="6">
         <v-select v-model="form.city" :items="cities" item-title="name" item-value="city_id" label="Ciudad / Municipio" prepend-inner-icon="mdi-city" variant="outlined" density="comfortable"></v-select>
       </v-col>
+      <v-col cols="12" sm="6">
+        <v-text-field v-model="form.city_code" label="Código DANE municipio" prepend-inner-icon="mdi-numeric" variant="outlined" density="comfortable" maxlength="5" hint="5 dígitos. Ej: 11001 = Bogotá D.C." persistent-hint></v-text-field>
+      </v-col>
       <v-col cols="12">
         <v-textarea v-model="form.address_text" label="Dirección" prepend-inner-icon="mdi-map-marker" rows="2" auto-grow variant="outlined" density="comfortable"></v-textarea>
       </v-col>
@@ -72,7 +81,7 @@
       <v-col cols="12">
         <div class="text-caption text-medium-emphasis font-weight-bold mt-2 mb-n1">Condiciones comerciales</div>
       </v-col>
-      <v-col cols="12" sm="5">
+      <v-col cols="12" sm="3">
         <v-text-field v-model.number="form.max_credit_amount" label="Cupo de crédito (COP)" prepend-inner-icon="mdi-cash" type="number" min="0" variant="outlined" density="comfortable"></v-text-field>
       </v-col>
       <v-col cols="12" sm="4">
@@ -80,6 +89,60 @@
       </v-col>
       <v-col cols="12" sm="3">
         <v-text-field v-model="form.default_currency" label="Moneda" prepend-inner-icon="mdi-currency-usd" variant="outlined" density="comfortable"></v-text-field>
+      </v-col>
+
+      <!-- Información Fiscal -->
+      <v-col cols="12">
+        <div class="text-caption text-medium-emphasis font-weight-bold mt-2 mb-n1">Información Fiscal (Facturación Electrónica)</div>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-select
+          v-model="form.tax_regime"
+          :items="taxRegimeOptions"
+          item-title="title"
+          item-value="value"
+          label="Régimen tributario"
+          prepend-inner-icon="mdi-bank"
+          variant="outlined"
+          density="comfortable"
+          clearable
+        ></v-select>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-text-field v-model="form.ciiu_code" label="Código CIIU" prepend-inner-icon="mdi-briefcase" variant="outlined" density="comfortable" hint="Actividad económica" persistent-hint></v-text-field>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-sheet rounded="lg" border class="pa-3">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-body-2 font-weight-medium">Responsable de IVA</div>
+              <div class="text-caption text-medium-emphasis mt-1">Activa cuando el tercero pertenece al régimen ordinario y cobra/descuenta IVA en sus facturas. Los no responsables de IVA (antes régimen simplificado) NO marcan esta opción.</div>
+            </div>
+            <v-switch v-model="form.is_responsible_for_iva" color="primary" hide-details inset density="compact" class="ml-2 flex-shrink-0"></v-switch>
+          </div>
+        </v-sheet>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-sheet rounded="lg" border class="pa-3">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-body-2 font-weight-medium">Obligado a llevar contabilidad</div>
+              <div class="text-caption text-medium-emphasis mt-1">Empresas y personas naturales con ingresos superiores al tope legal deben llevar contabilidad formal. Este dato va en el XML de la factura electrónica.</div>
+            </div>
+            <v-switch v-model="form.obligated_accounting" color="primary" hide-details inset density="compact" class="ml-2 flex-shrink-0"></v-switch>
+          </div>
+        </v-sheet>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-sheet rounded="lg" border class="pa-3">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-body-2 font-weight-medium">Acepta Factura Electrónica</div>
+              <div class="text-caption text-medium-emphasis mt-1">Indica que este cliente está habilitado para recibir FE por correo. Si está desactivado, se emite tiquete POS (FV) aunque la FE global esté activa.</div>
+            </div>
+            <v-switch v-model="form.electronic_invoicing_enabled" color="indigo" hide-details inset density="compact" class="ml-2 flex-shrink-0"></v-switch>
+          </div>
+        </v-sheet>
       </v-col>
 
       <v-col cols="12">
@@ -113,12 +176,15 @@ const form = reactive({
   department: '',
   country_code: 'CO',
   postal_code: '',
+  city_code: '',
   phone: '',
   email: '',
   fiscal_email: '',
   tax_regime: '',
   tax_responsibilities: [],
   is_responsible_for_iva: false,
+  obligated_accounting: false,
+  ciiu_code: '',
   electronic_invoicing_enabled: false,
   default_payment_terms: null,
   default_currency: 'COP',
@@ -127,6 +193,13 @@ const form = reactive({
 })
 
 const rules = { required: v => !!v || 'Campo requerido' }
+
+const taxRegimeOptions = [
+  { title: 'Responsable de IVA (Régimen Ordinario) - 48', value: '48' },
+  { title: 'No Responsable de IVA - 49', value: '49' },
+  { title: 'Gran Contribuyente - O-13', value: 'O-13' },
+  { title: 'Régimen Simple de Tributación - ZZ', value: 'ZZ' }
+]
 
 // Inicializar con modelo si viene
 if (props.model && Object.keys(props.model).length > 0) {

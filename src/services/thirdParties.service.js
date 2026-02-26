@@ -1,6 +1,6 @@
 import { supabase } from '@/plugins/supabase'
 
-const cols = `third_party_id, tenant_id, type, document_type, document_number, dv, legal_name, trade_name, phone, email, fiscal_email, address, city, department, max_credit_amount, default_payment_terms, default_currency, is_active, created_at`
+const cols = `third_party_id, tenant_id, type, document_type, document_number, dv, legal_name, trade_name, phone, email, fiscal_email, address, city, city_code, department, postal_code, country_code, tax_regime, is_responsible_for_iva, obligated_accounting, ciiu_code, electronic_invoicing_enabled, max_credit_amount, default_payment_terms, default_currency, is_active, created_at`
 
 const thirdPartiesService = {
   // List with optional search; RLS en DB limita por tenant cuando corresponde

@@ -50,6 +50,7 @@ COLUMNS = [
     ("fiscal_email",                "fiscal_email",               "O"),
     ("address",                     "address",                    "O"),
     ("city",                        "city",                       "O"),
+    ("city_code",                   "city_code",                  "O"),
     ("department",                  "department",                 "O"),
     ("country_code",                "country_code",               "O"),
     ("tax_regime",                  "tax_regime",                 "O"),
@@ -73,6 +74,7 @@ EXAMPLE = {
     "fiscal_email":             "",
     "address":                  "Calle 10 # 5-20",
     "city":                     "Bogota",
+    "city_code":                "11001",
     "department":               "Cundinamarca",
     "country_code":             "CO",
     "tax_regime":               "ORDINARIO",
@@ -101,6 +103,7 @@ INST = [
     ("  * fiscal_email          -> Correo para envio de facturas electronicas.", None),
     ("  * address               -> Direccion (texto libre).", None),
     ("  * city                  -> Ciudad.", None),
+    ("  * city_code             -> Codigo DANE del municipio (5 digitos, ej. 11001 = Bogota).", None),
     ("  * department            -> Departamento.", None),
     ("  * country_code          -> Codigo pais (default CO).", None),
     ("  * tax_regime            -> Regimen tributario. Ver desplegable.", None),
@@ -187,7 +190,7 @@ def build():
         c.fill = ef; c.border = tb()
         c.alignment = Alignment(horizontal="left", vertical="center")
 
-    widths = [26,14,18,6,12,18,14,26,26,28,16,18,12,14,18,18,18,18,16,12]
+    widths = [26,14,18,6,12,18,14,26,26,28,16,14,18,12,14,18,18,18,18,16,12]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.freeze_panes = "A2"
@@ -197,12 +200,12 @@ def build():
     add_dv(ws, "B", "listas_ref", "D", len(DOC_TYPES)+1)
     # Col E = type (col 1 in listas_ref -> A)
     add_dv(ws, "E", "listas_ref", "A", len(TYPES)+1)
-    # Col N = tax_regime (col 7 -> G)
-    add_dv(ws, "N", "listas_ref", "G", len(TAX_REGIMES)+1)
-    # Col S = default_currency
-    add_dv(ws, "S", "listas_ref", "L", len(CURRENCIES)+1)
-    # Booleans: O(is_responsible_for_iva), P(obligated_accounting), T(is_active) -> col 10 (J)
-    for bc in ["O", "P", "T"]:
+    # Col O = tax_regime (col 7 -> G)  [shifted by city_code in col 12]
+    add_dv(ws, "O", "listas_ref", "G", len(TAX_REGIMES)+1)
+    # Col T = default_currency
+    add_dv(ws, "T", "listas_ref", "L", len(CURRENCIES)+1)
+    # Booleans: P(is_responsible_for_iva), Q(obligated_accounting), U(is_active) -> col 10 (J)
+    for bc in ["P", "Q", "U"]:
         add_dv(ws, bc, "listas_ref", "J", 3)
 
     # ---- Instrucciones sheet -----------------------------------------------

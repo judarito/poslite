@@ -459,7 +459,9 @@ class ProductsService {
       price_includes_tax: Boolean(payload.price_includes_tax),
       is_active: isActive,
       requires_expiration: controlExpiration,
-      unit_id: unitId
+      unit_id: unitId,
+      standard_code: payload.standard_code || null,
+      standard_code_type: payload.standard_code_type || null
     }
 
     let variantId

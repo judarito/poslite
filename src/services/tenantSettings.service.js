@@ -97,13 +97,29 @@ class TenantSettingsService {
     }
   }
 
-  // Actualizar datos generales del tenant
+  // Actualizar datos generales del tenant (incluye campos fiscales para FE)
   async updateTenant(tenantId, updates) {
     try {
       const { data, error } = await supabaseService.update(this.tenantsTable, {
-        name: updates.name,
-        tax_id: updates.tax_id || null,
-        currency_code: updates.currency_code || 'COP'
+        name:                  updates.name,
+        tax_id:                updates.tax_id                || null,
+        currency_code:         updates.currency_code         || 'COP',
+        // Campos fiscales para Facturación Electrónica DIAN
+        dv:                    updates.dv                    || null,
+        trade_name:            updates.trade_name            || null,
+        tax_regime:            updates.tax_regime            || null,
+        is_responsible_for_iva: updates.is_responsible_for_iva || false,
+        obligated_accounting:  updates.obligated_accounting  || false,
+        ciiu_code:             updates.ciiu_code             || null,
+        fiscal_email:          updates.fiscal_email          || null,
+        fiscal_phone:          updates.fiscal_phone          || null,
+        // Dirección fiscal del emisor (requerida en XML FE)
+        address:               updates.address               || null,
+        city:                  updates.city                  || null,
+        department:            updates.department            || null,
+        country_code:          updates.country_code          || 'CO',
+        postal_code:           updates.postal_code           || null,
+        city_code:             updates.city_code             || null
       }, { tenant_id: tenantId })
       if (error) throw error
       return { success: true, data: data[0] }

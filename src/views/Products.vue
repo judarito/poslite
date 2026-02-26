@@ -600,6 +600,50 @@
               </div>
             </div>
             <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
+
+            <v-divider class="my-4"></v-divider>
+            <div class="text-subtitle-2 mb-3">
+              <v-icon start color="orange" size="small">mdi-receipt-text</v-icon>
+              Facturación Electrónica (DIAN)
+            </div>
+            <v-row>
+              <v-col cols="12">
+                <v-autocomplete
+                  v-model="variantData.unit_id"
+                  :items="unitOptions"
+                  item-title="display_name"
+                  item-value="unit_id"
+                  label="Unidad de medida DIAN"
+                  prepend-inner-icon="mdi-ruler"
+                  variant="outlined"
+                  clearable
+                  hint="Unidad requerida en el XML FE (ej: 94=Unidad, KGM=Kilogramo)"
+                  persistent-hint
+                ></v-autocomplete>
+              </v-col>
+              <v-col cols="12" sm="8">
+                <v-text-field
+                  v-model="variantData.standard_code"
+                  label="Código estándar (UNSPSC / EAN / GTIN)"
+                  prepend-inner-icon="mdi-barcode"
+                  variant="outlined"
+                  hint="Código UNSPSC del producto para el XML FE"
+                  persistent-hint
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model="variantData.standard_code_type"
+                  :items="[{title:'UNSPSC', value:'UNSPSC'},{title:'EAN', value:'EAN'},{title:'GTIN', value:'GTIN'},{title:'Fabricante', value:'PARTNUM'}]"
+                  item-title="title"
+                  item-value="value"
+                  label="Tipo código"
+                  variant="outlined"
+                  hint="Tipo de código estándar"
+                  persistent-hint
+                ></v-select>
+              </v-col>
+            </v-row>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -704,7 +748,11 @@ const variantData = ref({
   min_stock: 0, 
   allow_backorder: false, 
   requires_expiration: null, 
-  is_active: true 
+  is_active: true,
+  // Facturación Electrónica DIAN
+  standard_code: '',
+  standard_code_type: 'UNSPSC',
+  unit_id: null   // Unidad de medida DIAN por defecto para esta variante
 })
 
 const inventoryBehaviorOptions = [
@@ -982,7 +1030,10 @@ const addVariant = () => {
     min_stock: 0, 
     allow_backorder: false, 
     is_active: true,
-    requires_expiration: null  // null = hereda del producto
+    requires_expiration: null,  // null = hereda del producto
+    standard_code: '',
+    standard_code_type: 'UNSPSC',
+    unit_id: null
   }
   variantDialog.value = true 
 }
@@ -993,7 +1044,10 @@ const editVariant = (v) => {
     min_stock: v.min_stock || 0, 
     allow_backorder: v.allow_backorder || false, 
     price_includes_tax: v.price_includes_tax || false,
-    requires_expiration: v.requires_expiration !== undefined ? v.requires_expiration : null
+    requires_expiration: v.requires_expiration !== undefined ? v.requires_expiration : null,
+    standard_code: v.standard_code || '',
+    standard_code_type: v.standard_code_type || 'UNSPSC',
+    unit_id: v.unit_id || null
   }
   variantDialog.value = true 
 }
