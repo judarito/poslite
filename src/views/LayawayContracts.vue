@@ -315,6 +315,7 @@ import locationsService from '@/services/locations.service'
 import cashService from '@/services/cash.service'
 import taxesService from '@/services/taxes.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
+import { formatMoney, formatDate } from '@/utils/formatters'
 
 const router = useRouter()
 const { tenantId } = useTenant()
@@ -394,9 +395,6 @@ const rules = {
   required: v => !!v || 'Campo requerido',
   positive: v => v > 0 || 'Debe ser mayor a 0'
 }
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : ''
 
 const getStatusColor = (status) => ({
   ACTIVE: 'success',

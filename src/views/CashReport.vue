@@ -301,6 +301,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
+import { formatMoney, formatDate, formatDateTime } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 
@@ -325,10 +326,6 @@ const totalSalesCount = computed(() => sessions.value.reduce((s, x) => s + (x.sa
 const totalSalesAmount = computed(() => sessions.value.reduce((s, x) => s + (x.sales_total || 0), 0))
 const sessionsWithDiff = computed(() => sessions.value.filter(s => s.has_difference).length)
 const sessionsWithDifferences = computed(() => sessions.value.filter(s => s.has_difference))
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDateTime = (d) => d ? new Date(d).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '-'
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : '-'
 
 const loadSessions = async () => {
   if (!tenantId.value) return

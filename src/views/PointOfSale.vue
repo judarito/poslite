@@ -447,6 +447,8 @@ import taxesService from '@/services/taxes.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import creditService from '@/services/credit.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
+import { formatMoney } from '@/utils/formatters'
+import { applyLineTaxes } from '@/utils/taxCalculator'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -570,8 +572,6 @@ const paidTotal = computed(() => payments.value.reduce((s, p) => s + (parseFloat
 const change = computed(() => Math.max(0, paidTotal.value - totals.value.total))
 const remaining = computed(() => Math.max(0, totals.value.total - paidTotal.value))
 
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-
 // Autocompletado con debounce
 const debouncedSearch = (val) => {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -670,12 +670,9 @@ const addToCart = async (variant) => {
 
 const recalculateTaxes = async (line) => {
   if (!tenantId.value || !line.variant_id) return
-  
-  // Obtener información completa del impuesto
+
   const taxResult = await taxesService.getTaxInfoForVariant(tenantId.value, line.variant_id)
-  console.log('Tax info:', taxResult, 'for variant:', line.variant_id)
-  
-  // Calcular descuentos por separado
+
   const subtotal = line.quantity * line.unit_price
   const discountLineAmount = calculateDiscount(
     subtotal,
@@ -683,64 +680,14 @@ const recalculateTaxes = async (line) => {
     line.discount_line_type || 'AMOUNT'
   )
   const discountGlobalAmount = line.discount_global || 0
-  
-  // Descuento total = línea + global
   const discountAmount = discountLineAmount + discountGlobalAmount
-  
+
   // Actualizar campo discount para compatibilidad con backend
   line.discount = discountAmount
   line.discount_type = 'AMOUNT' // Siempre enviar como AMOUNT porque ya está calculado
-  
-  // Calcular precio después de descuentos
+
   const priceAfterDiscount = subtotal - discountAmount
-  
-  if (taxResult.success && taxResult.rate) {
-    line.tax_rate = taxResult.rate
-    line.tax_code = taxResult.code
-    line.tax_name = taxResult.name
-    
-    // 🆕 NUEVA LÓGICA: Calcular según si el precio incluye o no IVA
-    if (line.price_includes_tax) {
-      // IVA INCLUIDO: El precio ya incluye el impuesto, debemos descomponerlo
-      // Total = precio después de descuento
-      // Base = total / (1 + tasa)
-      // Impuesto = total - base
-      const total = priceAfterDiscount
-      const base = total / (1 + line.tax_rate)
-      const tax = total - base
-      
-      line.base_amount = Math.round(base)
-      line.tax_amount = Math.round(tax)
-      line.line_total = Math.round(total)
-      
-      console.log('Tax INCLUDED - subtotal:', subtotal, 'discount:', discountAmount, 
-                  'total:', total, 'base:', line.base_amount, 'tax:', line.tax_amount)
-    } else {
-      // IVA ADICIONAL: El impuesto se suma al precio
-      // Base = precio después de descuento
-      // Impuesto = base * tasa
-      // Total = base + impuesto
-      const base = priceAfterDiscount
-      const tax = base * line.tax_rate
-      const total = base + tax
-      
-      line.base_amount = Math.round(base)
-      line.tax_amount = Math.round(tax)
-      line.line_total = Math.round(total)
-      
-      console.log('Tax ADDITIONAL - subtotal:', subtotal, 'discount:', discountAmount, 
-                  'base:', line.base_amount, 'tax:', line.tax_amount, 'total:', line.line_total)
-    }
-  } else {
-    console.warn('No tax rate found or error:', taxResult)
-    // Sin impuesto
-    line.base_amount = Math.round(priceAfterDiscount)
-    line.tax_amount = 0
-    line.tax_rate = 0
-    line.tax_code = null
-    line.tax_name = null
-    line.line_total = Math.round(priceAfterDiscount)
-  }
+  applyLineTaxes(line, taxResult, priceAfterDiscount)
 }
 
 const removeFromCart = (i) => { cart.value.splice(i, 1); recalcPayments() }

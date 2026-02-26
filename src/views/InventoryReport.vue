@@ -443,6 +443,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import inventoryService from '@/services/inventory.service'
+import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 
@@ -485,8 +486,6 @@ const stockAlertsCount = computed(() => stockAlerts.value.length)
 const totalLocValue = computed(() => inventoryByLocation.value.reduce((s, l) => s + l.value, 0))
 const totalFrozenValue = computed(() => noMovementProducts.value.reduce((s, p) => s + p.frozen_value, 0))
 const totalAtRisk = computed(() => expiringProducts.value.reduce((s, p) => s + p.at_risk_value, 0))
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
 
 const alertColor = (level) => ({ OUT_OF_STOCK: 'error', LOW_STOCK: 'warning', NO_AVAILABLE: 'error', LOW_AVAILABLE: 'orange' }[level] || 'grey')
 const alertLabel = (level) => ({ OUT_OF_STOCK: 'Sin stock', LOW_STOCK: 'Stock bajo', NO_AVAILABLE: 'Sin disponible', LOW_AVAILABLE: 'Disponible bajo' }[level] || level)

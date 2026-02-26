@@ -107,6 +107,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import customersService from '@/services/customers.service'
+import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
@@ -128,8 +129,6 @@ const snackbarColor = ref('success')
 
 const formData = ref({ customer_id: null, full_name: '', document: '', phone: '', email: '', address: '', is_active: true })
 const rules = { required: v => !!v || 'Campo requerido' }
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
 
 const loadCustomers = async ({ page, pageSize, search, tenantId: tid }) => {
   if (!tid) return

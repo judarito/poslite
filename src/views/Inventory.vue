@@ -430,6 +430,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
+import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()
@@ -495,9 +496,6 @@ const moveTypes = [
   { label: 'Traslado Salida', value: 'TRANSFER_OUT' },
   { label: 'Traslado Entrada', value: 'TRANSFER_IN' }
 ]
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO') : ''
 
 const moveTypeLabel = (t) => moveTypes.find(m => m.value === t)?.label || t
 const moveTypeColor = (t) => ({

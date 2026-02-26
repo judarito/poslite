@@ -450,6 +450,7 @@ import salesService from '@/services/sales.service'
 import locationsService from '@/services/locations.service'
 import supabaseService from '@/services/supabase.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
+import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -501,8 +502,6 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 const rules = { required: v => !!v || 'Campo requerido' }
 
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO') : ''
 const statusColor = (s) => ({ COMPLETED: 'success', VOIDED: 'error', RETURNED: 'warning', PARTIAL_RETURN: 'orange' }[s] || 'grey')
 const statusLabel = (s) => ({ COMPLETED: 'Completada', VOIDED: 'Anulada', RETURNED: 'Devuelta', PARTIAL_RETURN: 'Dev. Parcial' }[s] || s)
 

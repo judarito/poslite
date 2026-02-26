@@ -877,6 +877,7 @@ import purchasesService from '@/services/purchases.service'
 import batchesService from '@/services/batches.service'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ListView from '@/components/ListView.vue'
+import { formatMoney, formatDateTime as formatDate } from '@/utils/formatters'
 
 const { isMobile } = useDisplay()
 const { tenantId } = useTenant()
@@ -1389,27 +1390,6 @@ const savePurchase = async () => {
   } finally {
     saving.value = false
   }
-}
-
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('es-CO', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const formatMoney = (value) => {
-  if (!value && value !== 0) return '$0'
-  return new Intl.NumberFormat('es-CO', { 
-    style: 'currency', 
-    currency: 'COP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value)
 }
 
 const showMsg = (msg, color = 'success') => {

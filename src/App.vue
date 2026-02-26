@@ -544,11 +544,11 @@
                     <v-row dense class="text-caption">
                       <v-col cols="6">
                         <div class="text-grey">Total:</div>
-                        <div class="font-weight-bold">${{ formatMoney(alert.data.total) }}</div>
+                        <div class="font-weight-bold">{{ formatMoney(alert.data.total) }}</div>
                       </v-col>
                       <v-col cols="6">
                         <div class="text-grey">Saldo:</div>
-                        <div class="font-weight-bold text-error">${{ formatMoney(alert.data.balance) }}</div>
+                        <div class="font-weight-bold text-error">{{ formatMoney(alert.data.balance) }}</div>
                       </v-col>
                     </v-row>
                   </v-card-text>
@@ -589,9 +589,9 @@
                       </td>
                       <td>{{ alert.data.location_name }}</td>
                       <td>{{ formatDate(alert.data.due_date) }}</td>
-                      <td class="text-right">${{ formatMoney(alert.data.total) }}</td>
-                      <td class="text-right">${{ formatMoney(alert.data.paid_total) }}</td>
-                      <td class="text-right text-error font-weight-bold">${{ formatMoney(alert.data.balance) }}</td>
+                      <td class="text-right">{{ formatMoney(alert.data.total) }}</td>
+                      <td class="text-right">{{ formatMoney(alert.data.paid_total) }}</td>
+                      <td class="text-right text-error font-weight-bold">{{ formatMoney(alert.data.balance) }}</td>
                       <td>
                         <v-btn
                           size="small"
@@ -644,9 +644,9 @@ import { useNotification } from '@/composables/useNotification'
 import { useTheme } from '@/composables/useTheme'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useDisplay } from 'vuetify'
-import alertsService from '@/services/alerts.service'
-import locationsService from '@/services/locations.service'
 import rolesService from '@/services/roles.service'
+import { useAppAlerts } from '@/composables/useAppAlerts'
+import { formatMoney, formatDate } from '@/utils/formatters'
 
 const router = useRouter()
 const route = useRoute()
@@ -697,122 +697,20 @@ async function loadDynamicMenus(authUserId) {
 const alertsDialog = ref(false)
 const alertsTab = ref('stock')
 
-// System Alerts (realtime)
-const allAlerts = ref([])
-const loadingAlerts = ref(false)
-let alertsChannel = null
-
-// Stock Alerts
-const stockFilters = ref({
-  alert_level: null,
-  location_id: null,
-  search: ''
-})
-const locations = ref([])
-
-const stockAlertLevels = [
-  { title: 'Sin stock', value: 'OUT_OF_STOCK' },
-  { title: 'Stock bajo', value: 'LOW_STOCK' },
-  { title: 'Sin disponible', value: 'NO_AVAILABLE' },
-  { title: 'Disponible bajo', value: 'LOW_AVAILABLE' }
-]
-
-// Expiration Alerts
-const expirationFilters = ref({
-  alert_level: null,
-  location_id: null,
-  search: ''
-})
-
-const expirationAlertLevels = [
-  { title: 'Vencido', value: 'EXPIRED' },
-  { title: 'Crítico', value: 'CRITICAL' },
-  { title: 'Advertencia', value: 'WARNING' }
-]
-
-// Layaway Alerts
-const layawayFilters = ref({
-  alert_level: null,
-  search: ''
-})
-
-const layawayAlertLevels = [
-  { title: 'Vencido', value: 'EXPIRED' },
-  { title: 'Próximo a vencer', value: 'DUE_SOON' }
-]
-
-// Computed alerts from system_alerts table
-const stockAlerts = computed(() => {
-  let alerts = allAlerts.value.filter(a => a.alert_type === 'STOCK')
-  
-  if (stockFilters.value.alert_level) {
-    alerts = alerts.filter(a => a.alert_level === stockFilters.value.alert_level)
-  }
-  
-  if (stockFilters.value.location_id) {
-    alerts = alerts.filter(a => a.data.location_id === stockFilters.value.location_id)
-  }
-  
-  if (stockFilters.value.search) {
-    const search = stockFilters.value.search.toLowerCase()
-    alerts = alerts.filter(a => 
-      a.data.product_name?.toLowerCase().includes(search) ||
-      a.data.sku?.toLowerCase().includes(search)
-    )
-  }
-  
-  return alerts
-})
-
-const layawayAlerts = computed(() => {
-  let alerts = allAlerts.value.filter(a => a.alert_type === 'LAYAWAY')
-  
-  if (layawayFilters.value.alert_level) {
-    alerts = alerts.filter(a => a.alert_level === layawayFilters.value.alert_level)
-  }
-  
-  if (layawayFilters.value.search) {
-    const search = layawayFilters.value.search.toLowerCase()
-    alerts = alerts.filter(a => 
-      a.data.customer_name?.toLowerCase().includes(search) ||
-      a.data.customer_document?.toLowerCase().includes(search) ||
-      a.data.customer_phone?.toLowerCase().includes(search)
-    )
-  }
-  
-  return alerts
-})
-
-const expirationAlerts = computed(() => {
-  let alerts = allAlerts.value.filter(a => a.alert_type === 'EXPIRATION')
-  
-  if (expirationFilters.value.alert_level) {
-    alerts = alerts.filter(a => a.alert_level === expirationFilters.value.alert_level)
-  }
-  
-  if (expirationFilters.value.location_id) {
-    alerts = alerts.filter(a => a.data.location_id === expirationFilters.value.location_id)
-  }
-  
-  if (expirationFilters.value.search) {
-    const search = expirationFilters.value.search.toLowerCase()
-    alerts = alerts.filter(a => 
-      a.data.product_name?.toLowerCase().includes(search) ||
-      a.data.sku?.toLowerCase().includes(search) ||
-      a.data.batch_number?.toLowerCase().includes(search)
-    )
-  }
-  
-  return alerts
-})
-
-const stockAlertsCount = computed(() => stockAlerts.value.length)
-const expirationAlertsCount = computed(() => expirationAlerts.value.length)
-const layawayAlertsCount = computed(() => layawayAlerts.value.length)
-const totalAlertsCount = computed(() => stockAlertsCount.value + expirationAlertsCount.value + layawayAlertsCount.value)
-
-// Filtered layaway alerts (deprecated, usando computed ahora)
-const filteredLayawayAlerts = computed(() => layawayAlerts.value)
+// Composable: alertas del sistema + ubicaciones
+const {
+  allAlerts, loadingAlerts, locations,
+  stockFilters, expirationFilters, layawayFilters,
+  stockAlertLevels, expirationAlertLevels, layawayAlertLevels,
+  stockAlerts, expirationAlerts, layawayAlerts,
+  stockAlertsCount, expirationAlertsCount, layawayAlertsCount, totalAlertsCount,
+  filteredLayawayAlerts,
+  loadAlerts, loadLocations, subscribeToAlerts, unsubscribeFromAlerts,
+  loadStockAlerts, loadExpirationAlerts, loadLayawayAlerts,
+  getStockAlertColor, getStockAlertIcon, getStockAlertLabel,
+  getExpirationAlertColor, getExpirationAlertIcon, getExpirationAlertLabel,
+  getLayawayAlertColor, getLayawayAlertIcon, getLayawayAlertLabel
+} = useAppAlerts()
 
 // Verificar si estamos en una ruta de autenticación
 const isAuthRoute = computed(() => route.path === '/login')
@@ -919,213 +817,14 @@ const handleLogout = async () => {
   }
 }
 
-// Alerts Functions
-const loadAlerts = async () => {
-  if (!tenantId.value) return
-  
-  loadingAlerts.value = true
-  try {
-    const result = await alertsService.getAlerts(tenantId.value)
-    if (result.success) {
-      allAlerts.value = result.data || []
-    }
-  } catch (error) {
-    console.error('Error loading alerts:', error)
-  } finally {
-    loadingAlerts.value = false
-  }
-}
-
-const loadLocations = async () => {
-  if (!tenantId.value) return
-  
-  try {
-    const result = await locationsService.getLocations(tenantId.value)
-    if (result.success) {
-      locations.value = result.data || []
-    }
-  } catch (error) {
-    console.error('Error loading locations:', error)
-  }
-}
-
-const handleAlertChange = (payload) => {
-  console.log('📡 Alert change received:', payload)
-  
-  const { eventType, new: newRecord, old: oldRecord } = payload
-  
-  if (eventType === 'INSERT') {
-    // Nueva alerta: agregar al inicio
-    console.log('➕ Nueva alerta:', newRecord)
-    const exists = allAlerts.value.find(a => a.alert_id === newRecord.alert_id)
-    if (!exists) {
-      allAlerts.value.unshift(newRecord)
-    }
-  } else if (eventType === 'UPDATE') {
-    // Actualizar alerta existente
-    console.log('🔄 Actualizando alerta:', newRecord)
-    const index = allAlerts.value.findIndex(a => a.alert_id === newRecord.alert_id)
-    if (index !== -1) {
-      allAlerts.value[index] = newRecord
-    } else {
-      // Si no existe, agregarla (puede ser el caso de filtros activos)
-      allAlerts.value.unshift(newRecord)
-    }
-  } else if (eventType === 'DELETE') {
-    // Eliminar alerta resuelta
-    console.log('❌ Eliminando alerta:', oldRecord)
-    allAlerts.value = allAlerts.value.filter(a => a.alert_id !== oldRecord.alert_id)
-  }
-}
-
-const subscribeToAlerts = () => {
-  if (!tenantId.value) return
-  
-  // Desuscribirse si ya existe
-  if (alertsChannel) {
-    console.log('🔌 Desconectando canal anterior de alertas')
-    alertsService.unsubscribe(alertsChannel)
-  }
-  
-  // Suscribirse a cambios en tiempo real
-  console.log('📡 Suscribiendo a alertas en tiempo real para tenant:', tenantId.value)
-  alertsChannel = alertsService.subscribeToAlerts(tenantId.value, (payload) => {
-    handleAlertChange(payload)
-  })
-  
-  // Verificar estado de suscripción
-  if (alertsChannel) {
-    console.log('✅ Suscripción a alertas activa')
-  } else {
-    console.error('❌ Error al suscribirse a alertas')
-  }
-}
-
-const unsubscribeFromAlerts = () => {
-  if (alertsChannel) {
-    alertsService.unsubscribe(alertsChannel)
-    alertsChannel = null
-  }
-}
-
-// Stock Alert Helpers
-const getStockAlertColor = (level) => {
-  const colors = {
-    OUT_OF_STOCK: 'error',
-    LOW_STOCK: 'warning',
-    NO_AVAILABLE: 'deep-orange',
-    LOW_AVAILABLE: 'orange'
-  }
-  return colors[level] || 'grey'
-}
-
-const getStockAlertIcon = (level) => {
-  const icons = {
-    OUT_OF_STOCK: 'mdi-alert-circle',
-    LOW_STOCK: 'mdi-alert',
-    NO_AVAILABLE: 'mdi-cancel',
-    LOW_AVAILABLE: 'mdi-alert-outline'
-  }
-  return icons[level] || 'mdi-information'
-}
-
-const getStockAlertLabel = (level) => {
-  const labels = {
-    OUT_OF_STOCK: 'Sin stock',
-    LOW_STOCK: 'Stock bajo',
-    NO_AVAILABLE: 'Sin disponible',
-    LOW_AVAILABLE: 'Disponible bajo'
-  }
-  return labels[level] || level
-}
-
-const loadStockAlerts = async () => {
-  // Trigger manual refresh of stock alerts
-  await alertsService.refreshStockAlerts()
-}
-
 const goToInventory = () => {
   alertsDialog.value = false
   router.push('/inventory')
 }
 
-// Expiration Alert Helpers
-const loadExpirationAlerts = async () => {
-  // Trigger manual refresh of expiration alerts
-  await alertsService.refreshExpirationAlerts()
-}
-
-const getExpirationAlertColor = (level) => {
-  const colors = {
-    EXPIRED: 'error',
-    CRITICAL: 'deep-orange',
-    WARNING: 'warning'
-  }
-  return colors[level] || 'grey'
-}
-
-const getExpirationAlertIcon = (level) => {
-  const icons = {
-    EXPIRED: 'mdi-alert-circle',
-    CRITICAL: 'mdi-alert-octagon',
-    WARNING: 'mdi-alert'
-  }
-  return icons[level] || 'mdi-information'
-}
-
-const getExpirationAlertLabel = (level) => {
-  const labels = {
-    EXPIRED: 'Vencido',
-    CRITICAL: 'Crítico',
-    WARNING: 'Advertencia'
-  }
-  return labels[level] || level
-}
-
 const goToBatches = () => {
   alertsDialog.value = false
   router.push('/batches')
-}
-
-// Layaway Alert Helpers
-const loadLayawayAlerts = async () => {
-  // Trigger manual refresh of layaway alerts
-  await alertsService.refreshLayawayAlerts()
-}
-
-const getLayawayAlertColor = (level) => {
-  const colors = {
-    EXPIRED: 'error',
-    DUE_SOON: 'warning'
-  }
-  return colors[level] || 'grey'
-}
-
-const getLayawayAlertIcon = (level) => {
-  const icons = {
-    EXPIRED: 'mdi-alert-circle',
-    DUE_SOON: 'mdi-clock-alert'
-  }
-  return icons[level] || 'mdi-information'
-}
-
-const getLayawayAlertLabel = (level) => {
-  const labels = {
-    EXPIRED: 'Vencido',
-    DUE_SOON: 'Próximo a vencer'
-  }
-  return labels[level] || level
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-const formatMoney = (amount) => {
-  if (amount == null) return '0'
-  return new Intl.NumberFormat('es-CO').format(amount)
 }
 
 const goToLayaway = () => {

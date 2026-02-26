@@ -215,6 +215,7 @@ import { getAllUsers } from '@/services/users.service'
 import cashService from '@/services/cash.service'
 import locationsService from '@/services/locations.service'
 import { useNotification } from '@/composables/useNotification'
+import { formatDateTime as formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()
@@ -231,23 +232,13 @@ const assignDialog = ref(false)
 const saving = ref(false)
 const newAssignment = ref({ userId: null, cashRegisterId: null, note: null })
 
-const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO', { 
-  year: 'numeric', 
-  month: '2-digit', 
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit'
-}) : ''
-
 const loadAssignments = async (page = 1, pageSize = null) => {
   if (!tenantId.value) return
   const ps = pageSize ?? defaultPageSize.value
   try {
     const r = await cashAssignmentService.getAllAssignments(tenantId.value, page, ps, filters.value)
-    console.log('loadAssignments result:', r)
     if (r.success) {
       assignments.value = r.data
-      console.log('Assignments loaded:', assignments.value.length)
     } else {
       console.error('Error loading assignments:', r.error)
       showError(r.error || 'Error al cargar asignaciones')

@@ -357,6 +357,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import creditService from '@/services/credit.service'
 import customersService from '@/services/customers.service'
+import { formatMoney, formatMoneyShort, formatDateTime as formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -434,21 +435,6 @@ const usagePercent = (acc) => {
 }
 
 // ─── Format helpers ───────────────────────────────────────────────────────
-const formatMoney = (val) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseFloat(val) || 0)
-
-const formatMoneyShort = (val) => {
-  const n = parseFloat(val) || 0
-  if (n >= 1_000_000) return `$${(n/1_000_000).toFixed(0)}M`
-  if (n >= 1_000)     return `$${(n/1_000).toFixed(0)}k`
-  return `$${n}`
-}
-
-const formatDate = (iso) => {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
 // ─── Load ─────────────────────────────────────────────────────────────────
 async function load() {
   if (!tenantId.value) return

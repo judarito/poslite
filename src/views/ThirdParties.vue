@@ -81,6 +81,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ThirdPartyForm from '@/components/ThirdPartyForm.vue'
+import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()
@@ -98,8 +99,6 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 const thirdPartyFormRef = ref(null)
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
 
 async function load({ page = 1, pageSize = null, search = '' } = {}) {
   if (!tenantId.value) return

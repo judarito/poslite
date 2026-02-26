@@ -167,36 +167,11 @@ export function validateDiscount(subtotal, discountValue, discountType = Discoun
   return { valid: true, error: null };
 }
 
-/**
- * Ejemplo de uso en una línea de venta
- */
-export function exampleUsage() {
-  const line = {
-    qty: 2,
-    unit_price: 50000,
-    discount_value: 10,
-    discount_type: DiscountType.PERCENT,
-    tax_rate: 0.19
-  };
-
-  const totals = calculateLineTotal(line);
-  
-  console.log('Ejemplo de cálculo:');
-  console.log('Subtotal:', totals.subtotal); // 100,000
-  console.log('Descuento 10%:', totals.discount); // 10,000
-  console.log('Base imponible:', totals.taxable_base); // 90,000
-  console.log('IVA 19%:', totals.tax); // 17,100
-  console.log('Total:', totals.total); // 107,100
-  
-  return totals;
-}
-
 export default {
   DiscountType,
   calculateDiscount,
   calculateLineTotal,
   formatDiscount,
   convertDiscountType,
-  validateDiscount,
-  exampleUsage
+  validateDiscount
 };

@@ -20,13 +20,6 @@
       </template>
     </v-alert>
 
-    <!-- Sesión de caja (solo si no hay sesión abierta) -->
-    <v-row v-if="!hasOpenSession">
-      <v-col cols="12">
-        <CashSessionCard />
-      </v-col>
-    </v-row>
-
     <!-- KPI Cards de ventas -->
     <v-row class="mb-1">
       <!-- Ventas Hoy -->
@@ -222,15 +215,15 @@ import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
 import { useTenantSettings } from '@/composables/useTenantSettings'
-import CashSessionCard from '@/components/CashSessionCard.vue'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
 import cashService from '@/services/cash.service'
+import { formatMoney } from '@/utils/formatters'
 
 const apexchart = VueApexCharts
 
 const router = useRouter()
-const { hasOpenSession, loadPOSContext } = useCashSession()
+const { loadPOSContext } = useCashSession()
 const { userProfile } = useAuth()
 const { tenantId } = useTenant()
 const { isDark } = useTheme()
@@ -243,9 +236,6 @@ const dailySeries    = ref([])
 const topProducts    = ref([])
 const paymentMethods = ref([])
 const expiredSessions = ref([])
-
-const formatMoney = (val) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseFloat(val) || 0)
 
 // Trend chart
 const trendSeries = computed(() => [{

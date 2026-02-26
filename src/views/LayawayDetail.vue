@@ -342,6 +342,7 @@ import layawayService from '@/services/layaway.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
+import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -382,9 +383,6 @@ const rules = {
   required: v => !!v || 'Campo requerido',
   positive: v => v > 0 || 'Debe ser mayor a 0'
 }
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO') : ''
 
 const getStatusColor = (status) => ({
   ACTIVE: 'success',

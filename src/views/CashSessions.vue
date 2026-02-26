@@ -328,6 +328,7 @@ import { useAuth } from '@/composables/useAuth'
 import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
+import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, cashSessionMaxHours, loadSettings } = useTenantSettings()
@@ -373,9 +374,6 @@ const rules = {
   positive: v => v >= 0 || 'Debe ser >= 0',
   minAmount: v => v > 0 || 'Debe ser mayor a 0'
 }
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleString('es-CO') : ''
 
 // Computed para diferencia en el arqueo
 const difference = computed(() => {

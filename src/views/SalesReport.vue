@@ -453,6 +453,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import inventoryService from '@/services/inventory.service'
+import { formatMoney, formatDate, formatDateTime } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 
@@ -506,10 +507,6 @@ const filteredMovements = computed(() => {
   if (movementTypeFilter.value === 'ALL') return cashMovements.value
   return cashMovements.value.filter(m => m.type === movementTypeFilter.value)
 })
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDateTime = (d) => d ? new Date(d).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : ''
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : ''
 
 const alertColor = (level) => ({ OUT_OF_STOCK: 'error', LOW_STOCK: 'warning', NO_AVAILABLE: 'error', LOW_AVAILABLE: 'orange' }[level] || 'grey')
 const alertIcon = (level) => ({ OUT_OF_STOCK: 'mdi-alert-circle', LOW_STOCK: 'mdi-alert', NO_AVAILABLE: 'mdi-alert-circle-outline', LOW_AVAILABLE: 'mdi-alert-outline' }[level] || 'mdi-information')

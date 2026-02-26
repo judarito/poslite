@@ -243,6 +243,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
+import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 
@@ -267,8 +268,6 @@ const totalFlowIncome = computed(() => cashFlow.value.reduce((s, d) => s + d.ing
 const totalFlowExpenses = computed(() => cashFlow.value.reduce((s, d) => s + d.gastos, 0))
 const totalOtherIncome = computed(() => cashFlow.value.reduce((s, d) => s + d.otros_ingresos, 0))
 const totalNetFlow = computed(() => cashFlow.value.reduce((s, d) => s + d.neto, 0))
-
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
 
 const loadFinancials = async () => {
   if (!tenantId.value) return

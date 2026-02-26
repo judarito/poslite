@@ -225,6 +225,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
+import { formatMoney, formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 
@@ -261,8 +262,6 @@ const avgYield = computed(() => {
   return completed.reduce((s, o) => s + (parseFloat(o.yield_percentage) || 0), 0) / completed.length
 })
 
-const formatMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0)
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : '-'
 const statusLabel = (s) => ({ COMPLETED: 'Completada', IN_PROGRESS: 'En Proceso', PLANNED: 'Planeada', CANCELLED: 'Cancelada' }[s] || s)
 
 const loadOrders = async () => {
