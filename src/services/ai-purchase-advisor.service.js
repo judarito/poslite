@@ -6,24 +6,18 @@
  */
 
 import AICacheManager from '../utils/aiCache.js';
+import { supabase } from '@/plugins/supabase';
 
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 const CACHE_TTL_HOURS = 12; // Caché de 12 horas para sugerencias de compra
+const AI_EDGE_FUNCTION = 'deepseek-proxy';
 
 class AIPurchaseAdvisorService {
-  constructor() {
-    this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
-    if (!this.apiKey) {
-      console.warn('⚠️ VITE_DEEPSEEK_API_KEY no está configurada. El análisis IA no estará disponible.');
-    }
-  }
-
   /**
    * Verifica si el servicio de IA está disponible
    */
   isAvailable() {
-    return !!this.apiKey;
+    return true;
   }
 
   /**
@@ -34,10 +28,6 @@ class AIPurchaseAdvisorService {
    * @param {Object} options - Opciones adicionales (forceRefresh: boolean)
    */
   async generatePurchaseRecommendations(tenantId, rotationData, suggestions, options = {}) {
-    if (!this.isAvailable()) {
-      throw new Error('Servicio de IA no disponible. Configure VITE_DEEPSEEK_API_KEY.');
-    }
-
     try {
       // Generar clave de caché
       const cacheParams = {
@@ -60,41 +50,27 @@ class AIPurchaseAdvisorService {
         }
       }
 
-      console.log('🚀 Consultando API de DeepSeek...');
+      console.log('🚀 Consultando IA vía Edge Function...');
 
       const prompt = this._buildPrompt(rotationData, suggestions, options);
       
-      const response = await fetch(DEEPSEEK_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
+      const aiResponse = await this._invokeDeepSeek(
+        [
+          {
+            role: 'system',
+            content: this._getSystemPrompt()
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        {
           model: DEEPSEEK_MODEL,
-          messages: [
-            {
-              role: 'system',
-              content: this._getSystemPrompt()
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.3, // Más determinístico para análisis de negocio
-          max_tokens: 4000,
-          stream: false
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`DeepSeek API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      const aiResponse = data.choices[0]?.message?.content;
+          temperature: 0.3,
+          max_tokens: 4000
+        }
+      );
 
       if (!aiResponse) {
         throw new Error('Respuesta vacía de DeepSeek');
@@ -371,6 +347,25 @@ Responde ÚNICAMENTE con JSON válido en este formato:
       hash = hash & hash;
     }
     return Math.abs(hash).toString(36).substring(0, 8);
+  }
+
+  async _invokeDeepSeek(messages, config) {
+    const { data, error } = await supabase.functions.invoke(AI_EDGE_FUNCTION, {
+      body: {
+        messages,
+        ...config
+      }
+    });
+
+    if (error) {
+      throw new Error(`Error invocando Edge Function "${AI_EDGE_FUNCTION}": ${error.message}`);
+    }
+
+    if (!data?.content) {
+      throw new Error('Respuesta vacía desde Edge Function de IA');
+    }
+
+    return data.content;
   }
 }
 

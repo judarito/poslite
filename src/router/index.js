@@ -41,6 +41,36 @@ import BOMs from '@/views/BOMs.vue'
 import Cartera from '@/views/Cartera.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
+async function canAccessTenantConfig() {
+  try {
+    if (await canManageTenants()) return true
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return false
+
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (profileError || !profile?.user_id) return false
+
+    const { data: userRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role:role_id(name)')
+      .eq('user_id', profile.user_id)
+
+    if (rolesError) return false
+
+    const roleNames = (userRoles || []).map(r => r.role?.name).filter(Boolean)
+    return roleNames.includes('ADMINISTRADOR') || roleNames.includes('GERENTE')
+  } catch (error) {
+    console.error('Error checking tenant-config access:', error)
+    return false
+  }
+}
+
 const routes = [
   {
     path: '/login',
@@ -250,7 +280,7 @@ const routes = [
     path: '/tenant-config',
     name: 'TenantConfig',
     component: TenantConfig,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresTenantConfigAccess: true }
   },
   {
     path: '/tenant-management',
@@ -323,6 +353,15 @@ router.beforeEach(async (to, from, next) => {
       if (!isSuperAdmin) {
         console.warn('🔐 Acceso denegado: Solo Super Admins pueden gestionar tenants')
         next('/') // Redirigir a home
+        return
+      }
+    }
+
+    if (to.meta.requiresTenantConfigAccess && isAuthenticated) {
+      const allowedTenantConfig = await canAccessTenantConfig()
+      if (!allowedTenantConfig) {
+        console.warn('Acceso denegado: configuración de tenant requiere rol autorizado')
+        next('/')
         return
       }
     }

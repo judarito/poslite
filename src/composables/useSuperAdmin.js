@@ -6,6 +6,11 @@ import { ref, computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useTenant } from './useTenant'
 
+const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean)
+
 export const useSuperAdmin = () => {
   const { userProfile, user } = useAuth()
   const { tenantId } = useTenant()
@@ -34,9 +39,11 @@ export const useSuperAdmin = () => {
   ]
 
   const isSuperAdminByEmail = computed(() => {
-    if (allowedSuperAdminEmails.length === 0) return true // Sin restricción
+    // Fail-closed: requiere whitelist explícita
+    const allowed = SUPER_ADMIN_EMAILS.length > 0 ? SUPER_ADMIN_EMAILS : allowedSuperAdminEmails
+    if (allowed.length === 0) return false
     if (!user.value?.email) return false // Guarda: si no hay email, no es super admin
-    return allowedSuperAdminEmails.includes(user.value.email)
+    return allowed.includes(user.value.email.toLowerCase())
   })
 
   const canManageTenants = computed(() => {

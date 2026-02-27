@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.3",
+    "supabase": "^2.76.15",
     "vite": "^5.0.12",
     "vite-plugin-vuetify": "^2.0.1"
   }

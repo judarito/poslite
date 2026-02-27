@@ -490,6 +490,7 @@ const rules = {
 
 const moveTypes = [
   { label: 'Compra', value: 'PURCHASE_IN' },
+  { label: 'Devolucion Proveedor', value: 'PURCHASE_RETURN_OUT' },
   { label: 'Venta', value: 'SALE_OUT' },
   { label: 'Devolución', value: 'RETURN_IN' },
   { label: 'Ajuste', value: 'ADJUSTMENT' },
@@ -500,6 +501,7 @@ const moveTypes = [
 const moveTypeLabel = (t) => moveTypes.find(m => m.value === t)?.label || t
 const moveTypeColor = (t) => ({
   PURCHASE_IN: 'green', RETURN_IN: 'orange', TRANSFER_IN: 'blue',
+  PURCHASE_RETURN_OUT: 'deep-orange',
   SALE_OUT: 'red', TRANSFER_OUT: 'purple', ADJUSTMENT: 'amber'
 }[t] || 'grey')
 const isIncoming = (t) => ['PURCHASE_IN', 'RETURN_IN', 'TRANSFER_IN', 'ADJUSTMENT'].includes(t)
@@ -695,3 +697,4 @@ onMounted(async () => {
   }
 })
 </script>
+

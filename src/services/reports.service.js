@@ -39,19 +39,20 @@ class ReportsService {
       }
 
       ;(data || []).forEach(s => {
-        summary.gross_subtotal += parseFloat(s.subtotal) || 0
-        summary.gross_discount += parseFloat(s.discount_total) || 0
-        summary.gross_tax += parseFloat(s.tax_total) || 0
-        summary.gross_total += parseFloat(s.total) || 0
-      })
+        const subtotal = parseFloat(s.subtotal) || 0
+        const discount = parseFloat(s.discount_total) || 0
+        const tax = parseFloat(s.tax_total) || 0
+        const total = parseFloat(s.total) || 0
 
-      // Obtener total de devoluciones en el mismo período
-      // Nota: Las devoluciones ya están incluidas en el estado PARTIAL_RETURN y RETURNED
-      // Aquí calculamos el total real de devoluciones
-      const returns = data.filter(s => s.status === 'RETURNED' || s.status === 'PARTIAL_RETURN')
-      returns.forEach(r => {
-        // Las devoluciones parciales y totales ya están en negativo en el total
-        summary.returns_total += Math.abs(parseFloat(r.total) || 0)
+        if (s.status === 'RETURNED' || s.status === 'PARTIAL_RETURN') {
+          summary.returns_total += Math.abs(total)
+          return
+        }
+
+        summary.gross_subtotal += subtotal
+        summary.gross_discount += discount
+        summary.gross_tax += tax
+        summary.gross_total += total
       })
 
       summary.net_total = summary.gross_total - summary.returns_total
@@ -84,12 +85,14 @@ class ReportsService {
         const day = s.sold_at.substring(0, 10)
         if (!byDay[day]) byDay[day] = { date: day, count: 0, gross_total: 0, returns_total: 0, net_total: 0 }
         byDay[day].count++
-        byDay[day].gross_total += parseFloat(s.total) || 0
+        const total = parseFloat(s.total) || 0
         
-        // Si es devolución, sumar al total de devoluciones
         if (s.status === 'RETURNED' || s.status === 'PARTIAL_RETURN') {
-          byDay[day].returns_total += Math.abs(parseFloat(s.total) || 0)
+          byDay[day].returns_total += Math.abs(total)
+          return
         }
+
+        byDay[day].gross_total += total
       })
 
       // Calcular neto

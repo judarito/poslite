@@ -3,6 +3,11 @@
  */
 import supabaseService from './supabase.service'
 
+const isDev = import.meta.env.DEV
+const debugLog = (...args) => {
+  if (isDev) console.log(...args)
+}
+
 const tenantsService = {
   /**
    * Obtiene template JSON de configuración de un tenant
@@ -48,7 +53,7 @@ const tenantsService = {
         throw new Error(`Email inválido: "${adminEmail}"`)
       }
 
-      console.log('📧 Email sanitizado:', adminEmail)
+      debugLog('📧 Email sanitizado para creación de tenant')
 
       // 2. Crear usuario en Supabase Auth
       let authUserId = adminData.user_id
@@ -57,7 +62,7 @@ const tenantsService = {
         // Generar contraseña temporal si no viene
         const tempPassword = adminData.password || `Temp${crypto.randomUUID().substring(0, 12)}!`
         
-        console.log('🔐 Creando usuario en Supabase Auth...')
+        debugLog('🔐 Creando usuario en Supabase Auth...')
         
         // Usar signUp (requiere deshabilitar email confirmation en Dashboard)
         const { data: authData, error: authError } = await supabaseService.client.auth.signUp({
@@ -81,9 +86,7 @@ const tenantsService = {
         }
 
         authUserId = authData.user.id
-        console.log('✅ Usuario Auth creado:', authUserId)
-        console.log('📧 Contraseña temporal:', tempPassword)
-        console.log('⚠️  IMPORTANTE: Deshabilita "Enable email confirmations" en Supabase Dashboard')
+        debugLog('✅ Usuario Auth creado para tenant')
       }
 
       // 3. Llamar al SP para crear tenant completo (con defaults)

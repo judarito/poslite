@@ -4,6 +4,11 @@
  */
 import { supabase } from '@/plugins/supabase'
 
+const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean)
+
 /**
  * Verifica si el usuario actual es Super Admin
  * Super Admin = Usuario autenticado pero sin registro en tabla users
@@ -16,11 +21,11 @@ export const isSuperAdmin = async () => {
       return false
     }
 
-    // 2. Verificar si tiene perfil en tabla users
+    // 2. Verificar si tiene perfil en tabla users enlazado por auth_user_id
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('user_id')
-      .eq('user_id', user.id)
+      .eq('auth_user_id', user.id)
       .single()
 
     // Si no encuentra perfil = Super Admin
@@ -50,13 +55,15 @@ const ALLOWED_SUPER_ADMIN_EMAILS = [
  * Verifica si el email del usuario está en la lista de super admins
  */
 export const isSuperAdminByEmail = async () => {
-  if (ALLOWED_SUPER_ADMIN_EMAILS.length === 0) return true // Sin restricción
+  // Fail-closed: si no hay lista configurada, nadie pasa por email whitelist
+  const allowed = SUPER_ADMIN_EMAILS.length > 0 ? SUPER_ADMIN_EMAILS : ALLOWED_SUPER_ADMIN_EMAILS
+  if (allowed.length === 0) return false
 
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) return false
 
-    return ALLOWED_SUPER_ADMIN_EMAILS.includes(user.email)
+    return allowed.includes((user.email || '').toLowerCase())
   } catch (error) {
     console.error('Error checking super admin email:', error)
     return false

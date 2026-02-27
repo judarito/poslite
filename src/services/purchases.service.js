@@ -72,7 +72,7 @@ class PurchasesService {
       if (!aiPurchaseAdvisor.isAvailable()) {
         return {
           success: false,
-          error: 'Servicio de IA no disponible. Configure VITE_DEEPSEEK_API_KEY.'
+          error: 'Servicio de IA no disponible. Verifique la Edge Function deepseek-proxy y su secreto DEEPSEEK_API_KEY.'
         }
       }
 
@@ -252,6 +252,32 @@ class PurchasesService {
 
       if (error) throw error
 
+      const { data: returnSummary } = await supabaseService.client
+        .from('purchase_return_lines')
+        .select('source_inventory_move_id, qty')
+        .eq('tenant_id', tenantId)
+        .eq('purchase_id', purchaseId)
+
+      const returnedBySourceLine = (returnSummary || []).reduce((acc, row) => {
+        const key = row.source_inventory_move_id
+        const current = Number(acc[key] || 0)
+        acc[key] = current + Number(row.qty || 0)
+        return acc
+      }, {})
+
+      const { data: returnsList } = await supabaseService.client
+        .from('purchase_returns')
+        .select(`
+          purchase_return_id,
+          note,
+          total,
+          created_at,
+          created_by_user:created_by(full_name)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('purchase_id', purchaseId)
+        .order('created_at', { ascending: false })
+
       if (!data || data.length === 0) {
         return {
           success: false,
@@ -260,8 +286,7 @@ class PurchasesService {
       }
 
       const firstLine = data[0]
-      
-      // Transformar líneas
+
       const lines = data.map(item => ({
         line_id: item.inventory_move_id,
         variant_id: item.variant_id,
@@ -269,6 +294,8 @@ class PurchasesService {
         variant_name: item.variant?.variant_name || '',
         product_name: item.variant?.product?.name || '',
         quantity: item.quantity,
+        returned_qty: Number(returnedBySourceLine[item.inventory_move_id] || 0),
+        returnable_qty: Math.max(Number(item.quantity || 0) - Number(returnedBySourceLine[item.inventory_move_id] || 0), 0),
         unit_cost: item.unit_cost,
         line_total: item.quantity * item.unit_cost
       }))
@@ -285,7 +312,8 @@ class PurchasesService {
           created_by_name: header?.created_by_user?.full_name || firstLine.created_by_user?.full_name || '',
           note: header?.note || firstLine.note || '',
           supplier: header?.supplier || null,
-          lines: lines,
+          lines,
+          returns: returnsList || [],
           total: header?.total || total,
           items_count: lines.length
         }
@@ -298,6 +326,213 @@ class PurchasesService {
       }
     }
   }
+
+  /**
+   * Crear orden de compra en estado DRAFT (sin afectar inventario).
+   * @param {Object} payload
+   * @param {string} payload.tenantId
+   * @param {string} payload.locationId
+   * @param {string|null} payload.supplierId
+   * @param {string} payload.createdBy
+   * @param {Array} payload.lines
+   * @param {string|null} payload.note
+   */
+  async createPurchaseOrder({ tenantId, locationId, supplierId = null, createdBy, lines, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_create_purchase_order', {
+        p_tenant: tenantId,
+        p_location: locationId,
+        p_supplier_id: supplierId,
+        p_created_by: createdBy,
+        p_lines: lines,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error creating purchase order:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Obtener ordenes de compra pendientes por recibir (status DRAFT).
+   * @param {string} tenantId
+   */
+  async getOpenPurchaseOrders(tenantId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('purchase_orders')
+        .select(`
+          purchase_order_id,
+          tenant_id,
+          location_id,
+          supplier_id,
+          status,
+          note,
+          total,
+          created_at,
+          location:location_id(name),
+          supplier:supplier_id(third_party_id, legal_name, trade_name, document_number),
+          lines:purchase_order_lines(
+            purchase_order_line_id,
+            variant_id,
+            qty_ordered,
+            qty_received,
+            unit_cost,
+            batch_number,
+            expiration_date,
+            physical_location,
+            variant:variant_id(
+              sku,
+              variant_name,
+              product:product_id(name)
+            )
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .in('status', ['DRAFT', 'PARTIAL'])
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (error) throw error
+
+      const mapped = (data || []).map(order => ({
+        ...order,
+        lines_count: order.lines?.length || 0,
+        pending_lines_count: order.lines?.filter(line => Number(line.qty_received || 0) < Number(line.qty_ordered || 0)).length || 0,
+        computed_total: order.lines?.reduce((sum, line) => {
+          return sum + (Number(line.qty_ordered || 0) * Number(line.unit_cost || 0))
+        }, 0) || 0,
+        lines: (order.lines || []).map(line => ({
+          ...line,
+          qty_received: Number(line.qty_received || 0),
+          qty_remaining: Math.max(Number(line.qty_ordered || 0) - Number(line.qty_received || 0), 0)
+        }))
+      }))
+
+      return {
+        success: true,
+        data: mapped
+      }
+    } catch (error) {
+      console.error('Error getting open purchase orders:', error)
+      return {
+        success: false,
+        error: error.message,
+        data: []
+      }
+    }
+  }
+
+  /**
+   * Recibir una orden de compra DRAFT y convertirla en compra de inventario.
+   * @param {Object} payload
+   * @param {string} payload.tenantId
+   * @param {string} payload.purchaseOrderId
+   * @param {string} payload.createdBy
+   * @param {string|null} payload.note
+   */
+  async receivePurchaseOrder({ tenantId, purchaseOrderId, createdBy, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_receive_purchase_order', {
+        p_tenant: tenantId,
+        p_purchase_order_id: purchaseOrderId,
+        p_created_by: createdBy,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error receiving purchase order:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Recibir parcialmente una orden de compra.
+   * @param {Object} payload
+   * @param {string} payload.tenantId
+   * @param {string} payload.purchaseOrderId
+   * @param {string} payload.createdBy
+   * @param {Array} payload.lines
+   * @param {string|null} payload.note
+   */
+  async receivePurchaseOrderPartial({ tenantId, purchaseOrderId, createdBy, lines, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_receive_purchase_order_partial', {
+        p_tenant: tenantId,
+        p_purchase_order_id: purchaseOrderId,
+        p_created_by: createdBy,
+        p_lines: lines,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error receiving purchase order partially:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Crear devolucion a proveedor para una compra.
+   * @param {Object} payload
+   * @param {string} payload.tenantId
+   * @param {string} payload.purchaseId
+   * @param {string} payload.createdBy
+   * @param {Array} payload.lines
+   * @param {string|null} payload.note
+   */
+  async createPurchaseReturn({ tenantId, purchaseId, createdBy, lines, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_create_purchase_return', {
+        p_tenant: tenantId,
+        p_purchase_id: purchaseId,
+        p_created_by: createdBy,
+        p_lines: lines,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error creating purchase return:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
 }
 
 export default new PurchasesService()
+

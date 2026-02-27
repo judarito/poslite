@@ -12,6 +12,17 @@
       </v-tab>
     </v-tabs>
 
+    <div class="d-flex justify-end mb-3">
+      <v-btn
+        color="success"
+        prepend-icon="mdi-microsoft-excel"
+        :loading="exportingCatalog"
+        @click="downloadCatalogExcel"
+      >
+        Descargar Catalogo Excel
+      </v-btn>
+    </div>
+
     <v-window v-model="currentTab">
       <!-- Tab: Productos para Venta -->
       <v-window-item value="products">
@@ -685,6 +696,7 @@ import categoriesService from '@/services/categories.service'
 import manufacturingService from '@/services/manufacturing.service'
 import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
+import { utils, writeFileXLSX } from 'xlsx'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
@@ -717,6 +729,7 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 const bomEditor = ref(null)
+const exportingCatalog = ref(false)
 
 const formData = ref({ 
   product_id: null, 
@@ -1173,6 +1186,81 @@ const onBOMSaved = async (bomData) => {
 }
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+const sanitizeForExcel = (value) => {
+  if (value === null || value === undefined) return ''
+  const str = String(value)
+  return /^[=+\-@]/.test(str) ? `'${str}` : str
+}
+
+const downloadCatalogExcel = async () => {
+  if (!tenantId.value) return
+  exportingCatalog.value = true
+  try {
+    const exportingComponents = currentTab.value === 'components'
+    const r = await productsService.getProductsCatalog(tenantId.value, {
+      is_component: exportingComponents
+    })
+
+    if (!r.success) {
+      showMsg(r.error || 'Error al descargar catalogo', 'error')
+      return
+    }
+
+    const rows = []
+    for (const product of (r.data || [])) {
+      const variants = product.product_variants && product.product_variants.length > 0
+        ? product.product_variants
+        : [null]
+
+      for (const variant of variants) {
+        rows.push({
+          Producto: sanitizeForExcel(product.name),
+          Descripcion: sanitizeForExcel(product.description || ''),
+          Categoria: sanitizeForExcel(product.category?.name || 'Sin categoria'),
+          Tipo: product.is_component ? 'Componente' : 'Producto',
+          Estado: product.is_active ? 'Activo' : 'Inactivo',
+          Inventario: product.track_inventory ? 'Si' : 'No',
+          Vencimiento: product.requires_expiration ? 'Si' : 'No',
+          Comportamiento: sanitizeForExcel(product.inventory_behavior || ''),
+          SKU: sanitizeForExcel(variant?.sku || ''),
+          Variante: sanitizeForExcel(variant?.variant_name || 'Predeterminado'),
+          Costo: Number(variant?.cost || 0),
+          Precio: Number(variant?.price || 0),
+          MinStock: Number(variant?.min_stock || 0),
+          Backorder: variant?.allow_backorder ? 'Si' : 'No',
+          VarianteActiva: variant ? (variant.is_active ? 'Si' : 'No') : '',
+          UnidadCodigo: sanitizeForExcel(product.unit?.code || ''),
+          UnidadNombre: sanitizeForExcel(product.unit?.name || ''),
+          DianCode: sanitizeForExcel(product.unit?.dian_code || '')
+        })
+      }
+    }
+
+    if (rows.length === 0) {
+      showMsg('No hay datos para exportar', 'info')
+      return
+    }
+
+    const ws = utils.json_to_sheet(rows)
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, ws, 'Catalogo')
+
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    const tabSuffix = exportingComponents ? 'componentes' : 'productos'
+    writeFileXLSX(wb, `catalogo_${tabSuffix}_${y}${m}${d}.xlsx`)
+
+    showMsg('Catalogo descargado correctamente')
+  } catch (error) {
+    console.error('Error exportando catalogo:', error)
+    showMsg('Error exportando catalogo', 'error')
+  } finally {
+    exportingCatalog.value = false
+  }
+}
 
 // Lifecycle
 onMounted(async () => {

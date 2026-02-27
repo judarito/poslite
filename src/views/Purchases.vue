@@ -13,6 +13,19 @@
         </v-btn>
       </v-col>
       <v-col cols="12" sm="auto">
+        <v-btn
+          color="indigo"
+          prepend-icon="mdi-clipboard-list"
+          variant="tonal"
+          @click="openPurchaseOrdersDialog"
+          :loading="loadingPurchaseOrders"
+          :block="isMobile"
+        >
+          OC Pendientes
+          <v-badge v-if="pendingPurchaseOrdersCount > 0" color="warning" :content="pendingPurchaseOrdersCount" inline></v-badge>
+        </v-btn>
+      </v-col>
+      <v-col cols="12" sm="auto">
         <v-btn 
           color="purple" 
           prepend-icon="mdi-lightbulb-on" 
@@ -734,7 +747,173 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn @click="dialog = false">Cancelar</v-btn>
+          <v-btn color="indigo" variant="tonal" :loading="savingDraft" @click="savePurchaseOrder" :disabled="purchaseData.lines.length === 0">Guardar como OC</v-btn>
           <v-btn color="primary" :loading="saving" @click="savePurchase" :disabled="purchaseData.lines.length === 0">Guardar Compra</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog OC Pendientes -->
+    <v-dialog v-model="purchaseOrdersDialog" max-width="1100" scrollable>
+      <v-card>
+        <v-card-title class="bg-indigo">
+          <v-icon start color="white">mdi-clipboard-list</v-icon>
+          <span class="text-white">Ordenes de Compra Pendientes</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-alert v-if="loadingPurchaseOrders" type="info" variant="tonal">
+            <v-progress-linear indeterminate></v-progress-linear>
+            <div class="mt-2">Cargando ordenes pendientes...</div>
+          </v-alert>
+
+          <v-alert v-else-if="pendingPurchaseOrders.length === 0" type="info" variant="tonal">
+            No hay ordenes de compra en borrador.
+          </v-alert>
+
+          <v-card
+            v-for="order in pendingPurchaseOrders"
+            :key="order.purchase_order_id"
+            variant="outlined"
+            class="mb-3"
+          >
+            <v-card-text>
+              <v-row align="center" class="mb-2">
+                <v-col cols="12" md="8">
+                  <div class="text-subtitle-1 font-weight-bold">
+                    OC {{ order.purchase_order_id.slice(0, 8) }}
+                  </div>
+                  <div class="text-caption text-grey">
+                    {{ formatDate(order.created_at) }} • {{ order.location?.name || 'Sin sede' }} •
+                    {{ order.supplier?.legal_name || 'Sin proveedor' }}
+                  </div>
+                  <div v-if="order.note" class="text-caption mt-1">
+                    Nota: {{ order.note }}
+                  </div>
+                </v-col>
+                <v-col cols="12" md="4" class="text-md-right">
+                  <v-chip size="small" color="info" variant="tonal" class="mr-1">
+                    {{ order.lines_count }} lineas
+                  </v-chip>
+                  <v-chip size="small" color="warning" variant="tonal" class="mr-1">
+                    Pendientes: {{ order.pending_lines_count }}
+                  </v-chip>
+                  <v-chip size="small" color="success" variant="tonal">
+                    {{ formatMoney(order.total || order.computed_total) }}
+                  </v-chip>
+                  <div class="mt-2">
+                    <v-btn
+                      color="primary"
+                      size="small"
+                      prepend-icon="mdi-check-circle"
+                      :loading="receivingPurchaseOrderId === order.purchase_order_id"
+                      @click="openReceiveConfirm(order)"
+                    >
+                      Recibir y pasar a inventario
+                    </v-btn>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <v-divider class="mb-2"></v-divider>
+
+              <v-row
+                v-for="line in order.lines"
+                :key="line.purchase_order_line_id"
+                dense
+                class="py-1"
+              >
+                <v-col cols="12" md="6">
+                  <div class="text-body-2">
+                    {{ line.variant?.product?.name || 'Producto' }}{{ line.variant?.variant_name ? ' - ' + line.variant.variant_name : '' }}
+                  </div>
+                  <div class="text-caption text-grey">SKU: {{ line.variant?.sku || '-' }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Cantidad</div>
+                  <div class="text-body-2">{{ line.qty_ordered }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Costo</div>
+                  <div class="text-body-2">{{ formatMoney(line.unit_cost) }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-right">
+                  <div class="text-caption text-grey">Subtotal</div>
+                  <div class="text-body-2">{{ formatMoney(Number(line.qty_ordered) * Number(line.unit_cost)) }}</div>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="tonal" color="indigo" prepend-icon="mdi-refresh" :loading="loadingPurchaseOrders" @click="loadPendingPurchaseOrders">
+            Actualizar
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn @click="purchaseOrdersDialog = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="receiveConfirmDialog" max-width="460">
+      <v-card>
+        <v-card-title>
+          <v-icon start color="warning">mdi-alert</v-icon>
+          Confirmar recepcion
+        </v-card-title>
+        <v-card-text>
+          <div class="text-body-2">Define cantidades a recibir por linea.</div>
+          <div class="text-body-2 mt-1">
+            <strong>OC:</strong> {{ selectedPurchaseOrderToReceive?.purchase_order_id?.slice(0, 8) || '-' }}
+          </div>
+          <v-alert type="info" variant="tonal" density="compact" class="mt-3">
+            Puedes recibir parcial. Solo se registran lineas con cantidad mayor a 0.
+          </v-alert>
+
+          <v-card v-for="line in receiveDraftLines" :key="line.purchase_order_line_id" variant="outlined" class="mt-2">
+            <v-card-text class="py-2">
+              <v-row dense align="center">
+                <v-col cols="12" md="6">
+                  <div class="text-body-2">
+                    {{ line.product_name }}{{ line.variant_name ? ' - ' + line.variant_name : '' }}
+                  </div>
+                  <div class="text-caption text-grey">SKU: {{ line.sku || '-' }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Ordenado</div>
+                  <div class="text-body-2">{{ line.qty_ordered }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Pendiente</div>
+                  <div class="text-body-2">{{ line.qty_remaining }}</div>
+                </v-col>
+                <v-col cols="4" md="2">
+                  <v-text-field
+                    v-model.number="line.qty_to_receive"
+                    type="number"
+                    min="0"
+                    :max="line.qty_remaining"
+                    step="0.001"
+                    label="Recibir"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="closeReceiveConfirm">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-check-circle"
+            :loading="receivingPurchaseOrderId === selectedPurchaseOrderToReceive?.purchase_order_id"
+            @click="confirmReceivePurchaseOrder"
+          >
+            Confirmar
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -757,6 +936,11 @@
           </v-alert>
 
           <div v-if="purchaseDetail && !loadingDetail">
+            <div class="d-flex justify-end mb-3">
+              <v-btn color="warning" prepend-icon="mdi-undo" variant="tonal" @click="openReturnDialog">
+                Devolver a proveedor
+              </v-btn>
+            </div>
             <!-- Información general -->
             <v-card variant="outlined" class="mb-4">
               <v-card-text>
@@ -827,6 +1011,7 @@
                   <v-col cols="4" md="2" class="text-center">
                     <div class="text-caption text-grey">Cantidad</div>
                     <div class="text-h6">{{ line.quantity }}</div>
+                    <div class="text-caption text-warning">Dev: {{ line.returned_qty || 0 }}</div>
                   </v-col>
                   <v-col cols="4" md="2" class="text-center">
                     <div class="text-caption text-grey">Costo Unit.</div>
@@ -853,11 +1038,93 @@
                 </v-row>
               </v-card-text>
             </v-card>
+
+            <v-card v-if="purchaseDetail.returns && purchaseDetail.returns.length > 0" variant="outlined" class="mt-4">
+              <v-card-title class="text-subtitle-1">Devoluciones Registradas</v-card-title>
+              <v-card-text>
+                <v-row v-for="ret in purchaseDetail.returns" :key="ret.purchase_return_id" dense class="py-1">
+                  <v-col cols="12" md="5">
+                    <div class="text-body-2">DEV {{ ret.purchase_return_id.slice(0, 8) }}</div>
+                    <div class="text-caption text-grey">{{ formatDate(ret.created_at) }}</div>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <div class="text-caption text-grey">Usuario</div>
+                    <div class="text-body-2">{{ ret.created_by_user?.full_name || '' }}</div>
+                  </v-col>
+                  <v-col cols="12" md="3" class="text-md-right">
+                    <div class="text-caption text-grey">Total</div>
+                    <div class="text-body-2 font-weight-bold">{{ formatMoney(ret.total) }}</div>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
           </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn @click="detailDialog = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="returnDialog" max-width="760" scrollable>
+      <v-card>
+        <v-card-title class="bg-warning">
+          <v-icon start color="white">mdi-undo</v-icon>
+          <span class="text-white">Devolucion a proveedor</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+            Solo puedes devolver cantidades pendientes por linea.
+          </v-alert>
+
+          <v-card v-for="line in returnDraftLines" :key="line.source_line_id" variant="outlined" class="mb-2">
+            <v-card-text class="py-2">
+              <v-row dense align="center">
+                <v-col cols="12" md="6">
+                  <div class="text-body-2">{{ line.product_name }}{{ line.variant_name ? ' - ' + line.variant_name : '' }}</div>
+                  <div class="text-caption text-grey">SKU: {{ line.sku || '-' }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Comprado</div>
+                  <div class="text-body-2">{{ line.quantity }}</div>
+                </v-col>
+                <v-col cols="4" md="2" class="text-md-center">
+                  <div class="text-caption text-grey">Pendiente</div>
+                  <div class="text-body-2">{{ line.returnable_qty }}</div>
+                </v-col>
+                <v-col cols="4" md="2">
+                  <v-text-field
+                    v-model.number="line.qty_to_return"
+                    type="number"
+                    min="0"
+                    :max="line.returnable_qty"
+                    step="0.001"
+                    label="Devolver"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+
+          <v-text-field
+            v-model="returnNote"
+            label="Nota de devolucion (opcional)"
+            prepend-inner-icon="mdi-note-text"
+            variant="outlined"
+            density="compact"
+            class="mt-2"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="closeReturnDialog">Cancelar</v-btn>
+          <v-btn color="warning" :loading="returningPurchase" prepend-icon="mdi-check" @click="confirmPurchaseReturn">
+            Registrar devolucion
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -887,6 +1154,7 @@ const { userProfile } = useAuth()
 const loading = ref(false)
 const dialog = ref(false)
 const saving = ref(false)
+const savingDraft = ref(false)
 const form = ref(null)
 
 // Variables para detalle de compra
@@ -894,6 +1162,10 @@ const detailDialog = ref(false)
 const purchaseDetail = ref(null)
 const loadingDetail = ref(false)
 const detailError = ref(null)
+const returnDialog = ref(false)
+const returningPurchase = ref(false)
+const returnDraftLines = ref([])
+const returnNote = ref('')
 
 const snackbar = ref(false)
 const snackbarMessage = ref('')
@@ -901,6 +1173,13 @@ const snackbarColor = ref('success')
 
 const purchases = ref([])
 const totalPurchases = ref(0)
+const purchaseOrdersDialog = ref(false)
+const pendingPurchaseOrders = ref([])
+const loadingPurchaseOrders = ref(false)
+const receivingPurchaseOrderId = ref(null)
+const receiveConfirmDialog = ref(false)
+const selectedPurchaseOrderToReceive = ref(null)
+const receiveDraftLines = ref([])
 const locations = ref([])
 const variants = ref([])
 const searchingVariants = ref(false)
@@ -942,12 +1221,13 @@ const loadingAIAnalysis = ref(false)
 const aiAnalysisError = ref(null)
 const aiSuggestionsTab = ref('all')
 const aiAvailable = ref(false)
+const pendingPurchaseOrdersCount = computed(() => pendingPurchaseOrders.value.length)
 
 // Verificar disponibilidad de IA
 onMounted(() => {
   aiAvailable.value = purchasesService.isAIAvailable()
   if (!aiAvailable.value) {
-    console.warn('Servicio de IA no disponible. Configure VITE_DEEPSEEK_API_KEY.')
+    console.warn('Servicio de IA no disponible. Verifique la Edge Function deepseek-proxy.')
   }
 })
 
@@ -1025,7 +1305,7 @@ const openAIAnalysisDialog = async () => {
 const loadAIAnalysis = async (forceRefresh = false) => {
   if (!tenantId.value) return
   if (!aiAvailable.value) {
-    aiAnalysisError.value = 'Servicio de IA no disponible. Configure VITE_DEEPSEEK_API_KEY en las variables de entorno.'
+    aiAnalysisError.value = 'Servicio de IA no disponible. Verifique la Edge Function deepseek-proxy y su secreto DEEPSEEK_API_KEY.'
     return
   }
 
@@ -1102,9 +1382,32 @@ onMounted(async () => {
   await loadSettings()
   await loadLocations()
   await loadPurchases()
+  await loadPendingPurchaseOrders()
   // Cargar sugerencias en background para mostrar badge
   loadSuggestions()
 })
+
+const loadPendingPurchaseOrders = async () => {
+  if (!tenantId.value) return
+  loadingPurchaseOrders.value = true
+  try {
+    const result = await purchasesService.getOpenPurchaseOrders(tenantId.value)
+    if (result.success) {
+      pendingPurchaseOrders.value = result.data || []
+    } else {
+      throw new Error(result.error)
+    }
+  } catch (error) {
+    showMsg('Error al cargar OC pendientes: ' + error.message, 'error')
+  } finally {
+    loadingPurchaseOrders.value = false
+  }
+}
+
+const openPurchaseOrdersDialog = async () => {
+  purchaseOrdersDialog.value = true
+  await loadPendingPurchaseOrders()
+}
 
 const loadLocations = async () => {
   if (!tenantId.value) return
@@ -1187,6 +1490,106 @@ const viewPurchaseDetail = async (item) => {
     detailError.value = 'Error al cargar detalle: ' + error.message
   } finally {
     loadingDetail.value = false
+  }
+}
+
+const openReturnDialog = () => {
+  if (!purchaseDetail.value?.lines?.length) {
+    showMsg('No hay lineas para devolver', 'warning')
+    return
+  }
+
+  returnDraftLines.value = purchaseDetail.value.lines
+    .map(line => ({
+      source_line_id: line.line_id,
+      variant_id: line.variant_id,
+      quantity: Number(line.quantity || 0),
+      returned_qty: Number(line.returned_qty || 0),
+      returnable_qty: Math.max(Number(line.returnable_qty || 0), 0),
+      qty_to_return: 0,
+      unit_cost: Number(line.unit_cost || 0),
+      product_name: line.product_name || '',
+      variant_name: line.variant_name || '',
+      sku: line.sku || ''
+    }))
+    .filter(line => line.returnable_qty > 0)
+
+  if (returnDraftLines.value.length === 0) {
+    showMsg('Toda la compra ya fue devuelta', 'info')
+    return
+  }
+
+  returnNote.value = ''
+  returnDialog.value = true
+}
+
+const closeReturnDialog = () => {
+  returnDialog.value = false
+  returnDraftLines.value = []
+  returnNote.value = ''
+}
+
+const confirmPurchaseReturn = async () => {
+  if (!tenantId.value || !purchaseDetail.value?.purchase_id) return
+
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+
+  const selectedLines = returnDraftLines.value
+    .filter(line => Number(line.qty_to_return || 0) > 0)
+    .map(line => ({
+      source_line_id: line.source_line_id,
+      variant_id: line.variant_id,
+      qty: Number(line.qty_to_return),
+      unit_cost: Number(line.unit_cost)
+    }))
+
+  if (selectedLines.length === 0) {
+    showMsg('Ingresa al menos una linea con cantidad a devolver', 'warning')
+    return
+  }
+
+  for (const line of returnDraftLines.value) {
+    const qty = Number(line.qty_to_return || 0)
+    if (qty < 0) {
+      showMsg('No se permiten cantidades negativas', 'error')
+      return
+    }
+    if (qty > Number(line.returnable_qty || 0)) {
+      showMsg('Una cantidad excede lo pendiente por devolver', 'error')
+      return
+    }
+  }
+
+  returningPurchase.value = true
+  try {
+    const result = await purchasesService.createPurchaseReturn({
+      tenantId: tenantId.value,
+      purchaseId: purchaseDetail.value.purchase_id,
+      createdBy: userProfile.value.user_id,
+      lines: selectedLines,
+      note: returnNote.value || null
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    showMsg('Devolucion registrada correctamente')
+    closeReturnDialog()
+
+    const refreshed = await purchasesService.getPurchaseDetail(tenantId.value, purchaseDetail.value.purchase_id)
+    if (refreshed.success) {
+      purchaseDetail.value = refreshed.data
+    }
+
+    await loadPurchases()
+  } catch (error) {
+    showMsg('Error al registrar devolucion: ' + error.message, 'error')
+  } finally {
+    returningPurchase.value = false
   }
 }
 
@@ -1324,19 +1727,19 @@ const onVariantSelected = (lineIndex, variantId) => {
   }
 }
 
-// Generar número de lote automático
+// Generar numero de lote automatico
 const generateBatchNumber = async (lineIndex) => {
   const line = purchaseData.value.lines[lineIndex]
   if (!line.variant_id || !tenantId.value) {
     showMsg('Selecciona primero un producto', 'warning')
     return
   }
-  
+
   try {
     const result = await batchesService.generateBatchNumber(tenantId.value, line.variant_id)
     if (result.success) {
       purchaseData.value.lines[lineIndex].batch_number = result.batchNumber
-      showMsg('Número de lote generado', 'success')
+      showMsg('Numero de lote generado', 'success')
     } else {
       showMsg('Error al generar lote: ' + result.error, 'error')
     }
@@ -1345,10 +1748,21 @@ const generateBatchNumber = async (lineIndex) => {
   }
 }
 
+const buildFormattedLines = () => {
+  return purchaseData.value.lines.map(line => ({
+    variant_id: line.variant_id,
+    qty: Number(line.qty),
+    unit_cost: Number(line.unit_cost),
+    batch_number: line.batch_number || null,
+    expiration_date: line.expiration_date || null,
+    physical_location: line.physical_location || null
+  }))
+}
+
 const savePurchase = async () => {
   const { valid } = await form.value.validate()
   if (!valid || !tenantId.value) return
-  
+
   if (purchaseData.value.lines.length === 0) {
     showMsg('Agrega al menos un producto', 'warning')
     return
@@ -1361,17 +1775,9 @@ const savePurchase = async () => {
 
   saving.value = true
   try {
-    // Formatear líneas para asegurar tipos correctos
-    const formattedLines = purchaseData.value.lines.map(line => ({
-      variant_id: line.variant_id,
-      qty: Number(line.qty),
-      unit_cost: Number(line.unit_cost),
-      batch_number: line.batch_number || null,
-      expiration_date: line.expiration_date || null, // Ya está en formato YYYY-MM-DD desde type="date"
-      physical_location: line.physical_location || null
-    }))
+    const formattedLines = buildFormattedLines()
 
-    const { data, error } = await supabaseService.client.rpc('sp_create_purchase', {
+    const { error } = await supabaseService.client.rpc('sp_create_purchase', {
       p_tenant: tenantId.value,
       p_location: purchaseData.value.location_id,
       p_supplier_id: purchaseData.value.supplier_id || null,
@@ -1381,7 +1787,7 @@ const savePurchase = async () => {
     })
 
     if (error) throw error
-    
+
     showMsg('Compra registrada exitosamente')
     dialog.value = false
     await loadPurchases()
@@ -1392,9 +1798,149 @@ const savePurchase = async () => {
   }
 }
 
+const savePurchaseOrder = async () => {
+  const { valid } = await form.value.validate()
+  if (!valid || !tenantId.value) return
+
+  if (purchaseData.value.lines.length === 0) {
+    showMsg('Agrega al menos un producto', 'warning')
+    return
+  }
+
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+
+  savingDraft.value = true
+  try {
+    const formattedLines = buildFormattedLines()
+
+    const result = await purchasesService.createPurchaseOrder({
+      tenantId: tenantId.value,
+      locationId: purchaseData.value.location_id,
+      supplierId: purchaseData.value.supplier_id || null,
+      createdBy: userProfile.value.user_id,
+      lines: formattedLines,
+      note: purchaseData.value.note || null
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    showMsg('Orden de compra guardada en borrador')
+    dialog.value = false
+    await loadPendingPurchaseOrders()
+  } catch (error) {
+    showMsg('Error al guardar OC: ' + error.message, 'error')
+  } finally {
+    savingDraft.value = false
+  }
+}
+
+const openReceiveConfirm = (order) => {
+  if (!order?.purchase_order_id) return
+  selectedPurchaseOrderToReceive.value = order
+  receiveDraftLines.value = (order.lines || [])
+    .map(line => ({
+      purchase_order_line_id: line.purchase_order_line_id,
+      variant_id: line.variant_id,
+      unit_cost: line.unit_cost,
+      batch_number: line.batch_number || null,
+      expiration_date: line.expiration_date || null,
+      physical_location: line.physical_location || null,
+      qty_ordered: Number(line.qty_ordered || 0),
+      qty_received: Number(line.qty_received || 0),
+      qty_remaining: Math.max(Number(line.qty_remaining || 0), 0),
+      qty_to_receive: Math.max(Number(line.qty_remaining || 0), 0),
+      product_name: line.variant?.product?.name || 'Producto',
+      variant_name: line.variant?.variant_name || '',
+      sku: line.variant?.sku || ''
+    }))
+    .filter(line => line.qty_remaining > 0)
+
+  if (receiveDraftLines.value.length === 0) {
+    showMsg('Esta OC no tiene lineas pendientes por recibir', 'warning')
+    return
+  }
+  receiveConfirmDialog.value = true
+}
+
+const closeReceiveConfirm = () => {
+  receiveConfirmDialog.value = false
+  selectedPurchaseOrderToReceive.value = null
+  receiveDraftLines.value = []
+}
+
+const confirmReceivePurchaseOrder = async () => {
+  const order = selectedPurchaseOrderToReceive.value
+  if (!tenantId.value || !order?.purchase_order_id) return
+
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+
+  const selectedLines = receiveDraftLines.value
+    .filter(line => Number(line.qty_to_receive || 0) > 0)
+    .map(line => ({
+      purchase_order_line_id: line.purchase_order_line_id,
+      variant_id: line.variant_id,
+      qty_to_receive: Number(line.qty_to_receive),
+      unit_cost: Number(line.unit_cost),
+      batch_number: line.batch_number || null,
+      expiration_date: line.expiration_date || null,
+      physical_location: line.physical_location || null
+    }))
+
+  if (selectedLines.length === 0) {
+    showMsg('Ingresa al menos una linea con cantidad a recibir', 'warning')
+    return
+  }
+
+  for (const line of receiveDraftLines.value) {
+    const qty = Number(line.qty_to_receive || 0)
+    if (qty < 0) {
+      showMsg('No se permiten cantidades negativas', 'error')
+      return
+    }
+    if (qty > Number(line.qty_remaining || 0)) {
+      showMsg('Una cantidad excede lo pendiente por recibir', 'error')
+      return
+    }
+  }
+
+  receivingPurchaseOrderId.value = order.purchase_order_id
+  try {
+    const result = await purchasesService.receivePurchaseOrderPartial({
+      tenantId: tenantId.value,
+      purchaseOrderId: order.purchase_order_id,
+      createdBy: userProfile.value.user_id,
+      lines: selectedLines,
+      note: order.note || null
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    showMsg('OC recibida y registrada en inventario')
+    closeReceiveConfirm()
+    await Promise.all([loadPurchases(), loadPendingPurchaseOrders()])
+  } catch (error) {
+    showMsg('Error al recibir OC: ' + error.message, 'error')
+  } finally {
+    receivingPurchaseOrderId.value = null
+  }
+}
+
 const showMsg = (msg, color = 'success') => {
   snackbarMessage.value = msg
   snackbarColor.value = color
   snackbar.value = true
 }
 </script>
+
+
+

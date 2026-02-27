@@ -47,6 +47,61 @@ class ProductsService {
     }
   }
 
+  async getProductsCatalog(tenantId, filters = {}) {
+    try {
+      const pageSize = 500
+      let from = 0
+      let hasMore = true
+      const allRows = []
+
+      while (hasMore) {
+        let query = supabaseService.client
+          .from(this.table)
+          .select(`
+            product_id,
+            name,
+            description,
+            is_active,
+            track_inventory,
+            requires_expiration,
+            inventory_behavior,
+            is_component,
+            category:category_id(category_id, name),
+            unit:unit_id(unit_id, code, name, dian_code),
+            product_variants(
+              variant_id, sku, variant_name, cost, price, min_stock, allow_backorder, is_active
+            )
+          `)
+          .eq('tenant_id', tenantId)
+          .order('name', { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (filters.is_component !== undefined) {
+          query = query.eq('is_component', filters.is_component)
+        }
+        if (filters.is_active !== undefined) {
+          query = query.eq('is_active', filters.is_active)
+        }
+        if (filters.inventory_behavior) {
+          query = query.eq('inventory_behavior', filters.inventory_behavior)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        const chunk = data || []
+        allRows.push(...chunk)
+
+        hasMore = chunk.length === pageSize
+        from += pageSize
+      }
+
+      return { success: true, data: allRows }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
   async getProductById(tenantId, productId) {
     try {
       const { data, error } = await supabaseService.client
