@@ -210,3 +210,16 @@ Este documento resume los cambios de core implementados en web para que la app m
 - Frontend:
   - `Sales.vue`: dialogo de devolucion ahora captura metodos de reembolso (multiple), referencia y validacion de cuadre.
   - `sales.service`: soporte `createReturnV2` y enrutamiento automatico cuando llegan `refunds`.
+
+## 16) IA Comercial: Compras + Precios
+- Compras (ya existente):
+  - Servicio: `src/services/ai-purchase-advisor.service.js`.
+  - Integracion: `src/services/purchases.service.js` + `src/views/Purchases.vue`.
+  - Valor: prioriza reabastecimiento con base en rotacion, tendencia y stock; permite pasar de sugerencia a flujo de compra.
+- Precios (nuevo):
+  - Servicio: `src/services/ai-pricing-advisor.service.js`.
+  - Integracion UI: `src/views/PricingRules.vue` (dialogo `Sugerencias IA de Precio`).
+  - Enfoque:
+    - Motor hibrido (reglas + IA opcional por DeepSeek).
+    - Sugerencias por variante con accion (`INCREASE`/`DECREASE`), delta porcentual, razon e impacto.
+    - Resumen ejecutivo (`subir`, `bajar`, `delta promedio`) e insights para decision comercial.

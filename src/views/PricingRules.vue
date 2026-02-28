@@ -1,6 +1,19 @@
 <template>
   <div>
-    <!-- Filtros -->
+    <v-card flat class="mb-3">
+      <v-card-text class="pa-2 d-flex justify-end" style="gap: 8px; flex-wrap: wrap;">
+        <v-btn
+          color="deep-purple"
+          prepend-icon="mdi-brain"
+          variant="tonal"
+          :loading="loadingPricingAI"
+          @click="openPricingAIDialog"
+        >
+          Sugerencias IA de Precio
+        </v-btn>
+      </v-card-text>
+    </v-card>
+
     <v-card flat class="mb-3">
       <v-card-text class="pa-2">
         <v-row dense>
@@ -8,18 +21,20 @@
             <v-select
               v-model="scopeFilter"
               :items="scopeOptions"
+              item-title="title"
+              item-value="value"
               label="Alcance"
               density="compact"
               variant="outlined"
               clearable
               hide-details
               @update:model-value="applyFilters"
-            ></v-select>
+            />
           </v-col>
           <v-col cols="12" md="3">
             <v-select
               v-model="statusFilter"
-              :items="[{label: 'Todos', value: null}, {label: 'Activos', value: true}, {label: 'Inactivos', value: false}]"
+              :items="statusOptions"
               item-title="label"
               item-value="value"
               label="Estado"
@@ -27,14 +42,14 @@
               variant="outlined"
               hide-details
               @update:model-value="applyFilters"
-            ></v-select>
+            />
           </v-col>
         </v-row>
       </v-card-text>
     </v-card>
 
     <ListView
-      title="Políticas de Precio"
+      title="Politicas de Precio"
       icon="mdi-tag-multiple"
       :items="rules"
       :total-items="totalItems"
@@ -44,8 +59,8 @@
       title-field="scope"
       avatar-icon="mdi-cash-multiple"
       avatar-color="green"
-      empty-message="No hay políticas de precio configuradas"
-      create-button-text="Nueva Política"
+      empty-message="No hay politicas de precio configuradas"
+      create-button-text="Nueva Politica"
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="confirmDelete"
@@ -53,14 +68,14 @@
       @search="loadRules"
     >
       <template #title="{ item }">
-        {{ getScopeLabel(item.scope) }} — {{ item.pricing_method === 'MARKUP' ? `Markup ${item.markup_percentage}%` : 'Precio Fijo' }}
+        {{ getScopeLabel(item.scope) }} - {{ item.pricing_method === 'MARKUP' ? `Markup ${item.markup_percentage}%` : 'Precio Fijo' }}
       </template>
       <template #subtitle="{ item }">
         <span v-if="item.scope === 'TENANT'">Aplica a todo el negocio</span>
         <span v-else-if="item.scope === 'LOCATION'">Sede: {{ item.location?.name }}</span>
-        <span v-else-if="item.scope === 'CATEGORY'">Categoría: {{ item.category?.name }}</span>
+        <span v-else-if="item.scope === 'CATEGORY'">Categoria: {{ item.category?.name }}</span>
         <span v-else-if="item.scope === 'PRODUCT'">Producto: {{ item.product?.name }}</span>
-        <span v-else-if="item.scope === 'VARIANT'">Variante: {{ item.variant?.sku }} — {{ item.variant?.variant_name }}</span>
+        <span v-else-if="item.scope === 'VARIANT'">Variante: {{ item.variant?.sku }} - {{ item.variant?.variant_name }}</span>
       </template>
       <template #content="{ item }">
         <div class="mt-2 d-flex flex-wrap ga-2">
@@ -77,31 +92,30 @@
       </template>
     </ListView>
 
-    <!-- Dialog: Crear/Editar -->
     <v-dialog v-model="dialog" max-width="600" persistent>
       <v-card>
         <v-card-title>
           <v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-          {{ isEditing ? 'Editar Política' : 'Nueva Política de Precio' }}
+          {{ isEditing ? 'Editar Politica' : 'Nueva Politica de Precio' }}
         </v-card-title>
         <v-card-text>
           <v-form ref="form">
             <v-row>
-              <!-- Alcance -->
               <v-col cols="12" md="6">
                 <v-select
                   v-model="formData.scope"
                   :items="scopeOptions"
+                  item-title="title"
+                  item-value="value"
                   label="Alcance *"
                   prepend-inner-icon="mdi-target"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
+                  :rules="[rulesValidation.required]"
                   :disabled="isEditing"
                   @update:model-value="onScopeChange"
-                ></v-select>
+                />
               </v-col>
 
-              <!-- Prioridad -->
               <v-col cols="12" md="6">
                 <v-text-field
                   v-model.number="formData.priority"
@@ -109,12 +123,11 @@
                   prepend-inner-icon="mdi-sort-numeric-ascending"
                   variant="outlined"
                   type="number"
-                  hint="Mayor número = mayor prioridad"
+                  hint="Mayor numero = mayor prioridad"
                   persistent-hint
-                ></v-text-field>
+                />
               </v-col>
 
-              <!-- Sede (si aplica) -->
               <v-col v-if="formData.scope === 'LOCATION'" cols="12">
                 <v-select
                   v-model="formData.location_id"
@@ -124,28 +137,26 @@
                   label="Sede *"
                   prepend-inner-icon="mdi-store"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
+                  :rules="[rulesValidation.required]"
                   :disabled="isEditing"
-                ></v-select>
+                />
               </v-col>
 
-              <!-- Categoría (si aplica) -->
               <v-col v-if="formData.scope === 'CATEGORY'" cols="12">
                 <v-autocomplete
                   v-model="formData.category_id"
                   :items="categories"
                   item-title="name"
                   item-value="category_id"
-                  label="Categoría *"
+                  label="Categoria *"
                   prepend-inner-icon="mdi-shape"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
+                  :rules="[rulesValidation.required]"
                   :loading="loadingCategories"
                   :disabled="isEditing"
-                ></v-autocomplete>
+                />
               </v-col>
 
-              <!-- Producto (si aplica) -->
               <v-col v-if="formData.scope === 'PRODUCT'" cols="12">
                 <v-autocomplete
                   v-model="formData.product_id"
@@ -155,14 +166,13 @@
                   label="Producto *"
                   prepend-inner-icon="mdi-package-variant"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
+                  :rules="[rulesValidation.required]"
                   :loading="loadingProducts"
                   :disabled="isEditing"
                   @update:search="searchProducts"
-                ></v-autocomplete>
+                />
               </v-col>
 
-              <!-- Variante (si aplica) -->
               <v-col v-if="formData.scope === 'VARIANT'" cols="12">
                 <v-autocomplete
                   v-model="formData.variant_id"
@@ -171,13 +181,17 @@
                   label="Variante *"
                   prepend-inner-icon="mdi-tag"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
+                  :rules="[rulesValidation.required]"
                   :loading="loadingVariants"
                   :disabled="isEditing"
                   @update:search="searchVariants"
                 >
                   <template #item="{ props, item }">
-                    <v-list-item v-bind="props" :title="`${item.raw.sku} - ${item.raw.variant_name || 'Default'}`" :subtitle="item.raw.product?.name"></v-list-item>
+                    <v-list-item
+                      v-bind="props"
+                      :title="`${item.raw.sku} - ${item.raw.variant_name || 'Default'}`"
+                      :subtitle="item.raw.product?.name"
+                    />
                   </template>
                   <template #selection="{ item }">
                     {{ item.raw.sku }} - {{ item.raw.variant_name || 'Default' }}
@@ -185,29 +199,26 @@
                 </v-autocomplete>
               </v-col>
 
-              <!-- Configuración de Precio -->
               <v-col cols="12">
-                <v-divider class="my-2"></v-divider>
-                <div class="text-subtitle-2 mb-3">Configuración de Precio</div>
+                <v-divider class="my-2" />
+                <div class="text-subtitle-2 mb-3">Configuracion de Precio</div>
               </v-col>
 
-              <!-- Método de Precio -->
               <v-col cols="12">
                 <v-select
                   v-model="formData.pricing_method"
                   :items="pricingMethods"
                   item-title="label"
                   item-value="value"
-                  label="Método de Precio *"
+                  label="Metodo de Precio *"
                   prepend-inner-icon="mdi-calculator"
                   variant="outlined"
-                  :rules="[rules_validation.required]"
-                  hint="MARKUP: automático con margen. FIXED: manual"
+                  :rules="[rulesValidation.required]"
+                  hint="MARKUP: automatico con margen. FIXED: manual"
                   persistent-hint
-                ></v-select>
+                />
               </v-col>
 
-              <!-- Markup % (solo si método es MARKUP) -->
               <v-col v-if="formData.pricing_method === 'MARKUP'" cols="12" md="6">
                 <v-text-field
                   v-model.number="formData.markup_percentage"
@@ -217,13 +228,12 @@
                   type="number"
                   min="0"
                   suffix="%"
-                  :rules="[rules_validation.required, rules_validation.positive]"
+                  :rules="[rulesValidation.required, rulesValidation.positive]"
                   hint="Porcentaje de ganancia sobre costo"
                   persistent-hint
-                ></v-text-field>
+                />
               </v-col>
 
-              <!-- Redondeo (solo si método es MARKUP) -->
               <v-col v-if="formData.pricing_method === 'MARKUP'" cols="12" md="6">
                 <v-select
                   v-model="formData.price_rounding"
@@ -233,60 +243,158 @@
                   label="Redondeo"
                   prepend-inner-icon="mdi-circle-outline"
                   variant="outlined"
-                  hint="Tipo de redondeo del precio"
-                  persistent-hint
-                ></v-select>
+                />
               </v-col>
 
-              <!-- Redondear a múltiplo (solo si no es NONE) -->
               <v-col v-if="formData.pricing_method === 'MARKUP' && formData.price_rounding !== 'NONE'" cols="12">
                 <v-text-field
                   v-model.number="formData.rounding_to"
-                  label="Redondear a múltiplo de"
+                  label="Redondear a multiplo de"
                   prepend-inner-icon="mdi-numeric"
                   variant="outlined"
                   type="number"
                   min="1"
-                  :rules="[rules_validation.required, rules_validation.positive]"
-                  hint="Ej: 1 (unidades), 10 (decenas), 100 (centenas)"
-                  persistent-hint
-                ></v-text-field>
+                  :rules="[rulesValidation.required, rulesValidation.positive]"
+                />
               </v-col>
 
-              <!-- Estado -->
               <v-col cols="12">
-                <v-switch
-                  v-model="formData.is_active"
-                  label="Activo"
-                  color="success"
-                  hide-details
-                ></v-switch>
+                <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details />
               </v-col>
             </v-row>
           </v-form>
         </v-card-text>
         <v-card-actions>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn @click="dialog = false" :disabled="saving">Cancelar</v-btn>
           <v-btn color="primary" @click="save" :loading="saving">Guardar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- Dialog: Confirmar Eliminación -->
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
-        <v-card-title>Confirmar Eliminación</v-card-title>
-        <v-card-text>¿Está seguro de eliminar esta política de precio?</v-card-text>
+        <v-card-title>Confirmar Eliminacion</v-card-title>
+        <v-card-text>�Esta seguro de eliminar esta politica de precio?</v-card-text>
         <v-card-actions>
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn @click="deleteDialog = false" :disabled="deleting">Cancelar</v-btn>
           <v-btn color="error" @click="doDelete" :loading="deleting">Eliminar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- Snackbar -->
+    <v-dialog v-model="pricingAIDialog" max-width="1100" scrollable>
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between">
+          <div>
+            <v-icon start color="deep-purple">mdi-brain</v-icon>
+            Sugerencias IA de Precio
+          </div>
+          <v-btn
+            variant="text"
+            color="deep-purple"
+            prepend-icon="mdi-refresh"
+            :loading="loadingPricingAI"
+            @click="loadPricingAI(true)"
+          >
+            Actualizar
+          </v-btn>
+        </v-card-title>
+        <v-card-text>
+          <v-row dense class="mb-2">
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model.number="pricingAIConfig.targetMargin"
+                label="Margen objetivo (%)"
+                type="number"
+                density="compact"
+                variant="outlined"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model.number="pricingAIConfig.minMargin"
+                label="Margen minimo (%)"
+                type="number"
+                density="compact"
+                variant="outlined"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model.number="pricingAIConfig.maxItems"
+                label="Maximo productos"
+                type="number"
+                density="compact"
+                variant="outlined"
+              />
+            </v-col>
+          </v-row>
+
+          <v-alert v-if="loadingPricingAI" type="info" variant="tonal" class="mb-3">
+            Analizando margenes, rotacion y stock...
+          </v-alert>
+
+          <template v-if="pricingAIResult && !loadingPricingAI">
+            <v-row dense class="mb-3">
+              <v-col cols="12" md="3">
+                <v-chip color="deep-purple" variant="tonal">Sugerencias: {{ pricingAIResult.summary?.total_suggestions || 0 }}</v-chip>
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-chip color="success" variant="tonal">Subir: {{ pricingAIResult.summary?.increase_count || 0 }}</v-chip>
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-chip color="warning" variant="tonal">Bajar: {{ pricingAIResult.summary?.decrease_count || 0 }}</v-chip>
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-chip color="info" variant="tonal">Delta prom: {{ pricingAIResult.summary?.avg_delta_pct || 0 }}%</v-chip>
+              </v-col>
+            </v-row>
+
+            <v-row dense class="mb-3" v-if="pricingAIResult.insights?.length">
+              <v-col cols="12" md="6" v-for="(insight, idx) in pricingAIResult.insights" :key="`ins-${idx}`">
+                <v-alert :type="insight.level === 'high' ? 'warning' : 'info'" variant="tonal">
+                  <div class="font-weight-bold">{{ insight.title }}</div>
+                  <div class="text-body-2">{{ insight.detail }}</div>
+                </v-alert>
+              </v-col>
+            </v-row>
+
+            <v-list lines="two" class="rounded border">
+              <v-list-item v-for="item in pricingAIResult.suggestions" :key="item.variant_id">
+                <template #title>
+                  <div class="d-flex align-center justify-space-between" style="gap: 8px; flex-wrap: wrap;">
+                    <span>{{ item.product_name }}{{ item.variant_name ? ` - ${item.variant_name}` : '' }}</span>
+                    <v-chip :color="item.action === 'INCREASE' ? 'success' : 'warning'" size="small" variant="flat">
+                      {{ item.action === 'INCREASE' ? 'Subir' : 'Bajar' }}
+                    </v-chip>
+                  </div>
+                </template>
+                <template #subtitle>
+                  <div class="d-flex flex-wrap ga-2 mt-1">
+                    <v-chip size="x-small" variant="tonal">SKU: {{ item.sku }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="primary">Costo: {{ item.current_cost }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="info">Actual: {{ item.current_price }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="deep-purple">Sugerido: {{ item.suggested_price }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="orange">Delta: {{ item.delta_pct }}%</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="teal">Vendidos 30d: {{ item.sold_last_30d }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="indigo">Dias stock: {{ item.days_of_stock_remaining ?? 'N/A' }}</v-chip>
+                  </div>
+                  <div class="text-caption mt-1">{{ item.reason }}</div>
+                </template>
+              </v-list-item>
+            </v-list>
+          </template>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="pricingAIDialog = false">Cerrar</v-btn>
+          <v-btn color="deep-purple" @click="loadPricingAI(true)" :loading="loadingPricingAI">Recalcular</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000">
       {{ snackbarMessage }}
     </v-snackbar>
@@ -301,6 +409,7 @@ import ListView from '@/components/ListView.vue'
 import pricingRulesService from '@/services/pricingRules.service'
 import categoriesService from '@/services/categories.service'
 import productsService from '@/services/products.service'
+import aiPricingAdvisorService from '@/services/ai-pricing-advisor.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
@@ -319,11 +428,9 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
-// Filtros
 const scopeFilter = ref(null)
 const statusFilter = ref(null)
 
-// Catálogos
 const locations = ref([])
 const categories = ref([])
 const products = ref([])
@@ -331,6 +438,21 @@ const variants = ref([])
 const loadingCategories = ref(false)
 const loadingProducts = ref(false)
 const loadingVariants = ref(false)
+
+const pricingAIDialog = ref(false)
+const loadingPricingAI = ref(false)
+const pricingAIResult = ref(null)
+const pricingAIConfig = ref({
+  targetMargin: 35,
+  minMargin: 15,
+  maxItems: 80
+})
+
+const statusOptions = [
+  { label: 'Todos', value: null },
+  { label: 'Activos', value: true },
+  { label: 'Inactivos', value: false }
+]
 
 const formData = ref({
   pricing_rule_id: null,
@@ -350,13 +472,13 @@ const formData = ref({
 const scopeOptions = [
   { title: 'Global (Tenant)', value: 'TENANT' },
   { title: 'Por Sede', value: 'LOCATION' },
-  { title: 'Por Categoría', value: 'CATEGORY' },
+  { title: 'Por Categoria', value: 'CATEGORY' },
   { title: 'Por Producto', value: 'PRODUCT' },
   { title: 'Por Variante', value: 'VARIANT' }
 ]
 
 const pricingMethods = [
-  { label: 'MARKUP - Precio automático con margen', value: 'MARKUP' },
+  { label: 'MARKUP - Precio automatico con margen', value: 'MARKUP' },
   { label: 'FIXED - Precio manual', value: 'FIXED' }
 ]
 
@@ -364,25 +486,25 @@ const roundingOptions = [
   { label: 'Sin redondeo', value: 'NONE' },
   { label: 'Redondear hacia arriba', value: 'UP' },
   { label: 'Redondear hacia abajo', value: 'DOWN' },
-  { label: 'Redondear al más cercano', value: 'NEAREST' }
+  { label: 'Redondear al mas cercano', value: 'NEAREST' }
 ]
 
-const rules_validation = {
-  required: v => (v !== null && v !== undefined && v !== '') || 'Campo requerido',
-  positive: v => v >= 0 || 'Debe ser >= 0'
+const rulesValidation = {
+  required: (v) => (v !== null && v !== undefined && v !== '') || 'Campo requerido',
+  positive: (v) => Number(v) >= 0 || 'Debe ser >= 0'
 }
 
 const getScopeLabel = (scope) => {
-  const opt = scopeOptions.find(o => o.value === scope)
+  const opt = scopeOptions.find((o) => o.value === scope)
   return opt ? opt.title : scope
 }
 
 const getRoundingLabel = (rounding) => {
-  const opt = roundingOptions.find(o => o.value === rounding)
+  const opt = roundingOptions.find((o) => o.value === rounding)
   return opt ? opt.label : rounding
 }
 
-const loadRules = async ({ page, pageSize, search, tenantId: tid }) => {
+const loadRules = async ({ page, pageSize, tenantId: tid }) => {
   if (!tid) return
   loading.value = true
   try {
@@ -391,14 +513,16 @@ const loadRules = async ({ page, pageSize, search, tenantId: tid }) => {
     if (r.success) {
       rules.value = r.data
       totalItems.value = r.total
-    } else showMsg('Error al cargar políticas', 'error')
+    } else {
+      showMsg('Error al cargar politicas', 'error')
+    }
   } finally {
     loading.value = false
   }
 }
 
 const applyFilters = () => {
-  loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+  loadRules({ page: 1, pageSize: defaultPageSize.value, tenantId: tenantId.value })
 }
 
 const loadLocations = async () => {
@@ -478,10 +602,12 @@ const save = async () => {
       : await pricingRulesService.createPricingRule(tenantId.value, formData.value)
 
     if (r.success) {
-      showMsg('Política guardada')
+      showMsg('Politica guardada')
       dialog.value = false
-      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
-    } else showMsg(r.error || 'Error al guardar', 'error')
+      loadRules({ page: 1, pageSize: defaultPageSize.value, tenantId: tenantId.value })
+    } else {
+      showMsg(r.error || 'Error al guardar', 'error')
+    }
   } finally {
     saving.value = false
   }
@@ -498,12 +624,38 @@ const doDelete = async () => {
   try {
     const r = await pricingRulesService.deletePricingRule(tenantId.value, itemToDelete.value.pricing_rule_id)
     if (r.success) {
-      showMsg('Política eliminada')
+      showMsg('Politica eliminada')
       deleteDialog.value = false
-      loadRules({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
-    } else showMsg(r.error, 'error')
+      loadRules({ page: 1, pageSize: defaultPageSize.value, tenantId: tenantId.value })
+    } else {
+      showMsg(r.error, 'error')
+    }
   } finally {
     deleting.value = false
+  }
+}
+
+const openPricingAIDialog = async () => {
+  pricingAIDialog.value = true
+  await loadPricingAI(false)
+}
+
+const loadPricingAI = async (forceRefresh = false) => {
+  if (!tenantId.value || !aiPricingAdvisorService.isAvailable()) return
+
+  loadingPricingAI.value = true
+  try {
+    const result = await aiPricingAdvisorService.getPricingSuggestions(tenantId.value, {
+      targetMargin: pricingAIConfig.value.targetMargin,
+      minMargin: pricingAIConfig.value.minMargin,
+      maxItems: pricingAIConfig.value.maxItems,
+      forceRefresh
+    })
+    pricingAIResult.value = result
+  } catch (error) {
+    showMsg(`Error generando sugerencias IA: ${error.message}`, 'error')
+  } finally {
+    loadingPricingAI.value = false
   }
 }
 
@@ -515,5 +667,6 @@ const showMsg = (msg, color = 'success') => {
 
 onMounted(async () => {
   await loadSettings()
+  await loadLocations()
 })
 </script>
