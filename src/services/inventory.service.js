@@ -126,54 +126,84 @@ class InventoryService {
     }
   }
 
-  // Crear traslado entre sedes
+  // Crear traslado entre sedes (flujo en transito)
   async createTransfer(tenantId, transfer) {
     try {
-      // Movimiento OUT de origen
-      await supabaseService.insert(this.movesTable, {
-        tenant_id: tenantId,
-        move_type: 'TRANSFER_OUT',
-        location_id: transfer.from_location_id,
-        to_location_id: transfer.to_location_id,
-        variant_id: transfer.variant_id,
-        quantity: transfer.quantity,
-        unit_cost: transfer.unit_cost || 0,
-        source: 'TRANSFER',
-        note: transfer.note || null,
-        created_by: transfer.created_by
-      })
-
-      // Movimiento IN en destino
-      await supabaseService.insert(this.movesTable, {
-        tenant_id: tenantId,
-        move_type: 'TRANSFER_IN',
-        location_id: transfer.to_location_id,
-        variant_id: transfer.variant_id,
-        quantity: transfer.quantity,
-        unit_cost: transfer.unit_cost || 0,
-        source: 'TRANSFER',
-        note: transfer.note || null,
-        created_by: transfer.created_by
-      })
-
-      // Actualizar stock en ambas sedes
-      await supabaseService.client.rpc('fn_apply_stock_delta', {
+      const { data, error } = await supabaseService.client.rpc('sp_create_transfer_request', {
         p_tenant: tenantId,
-        p_location: transfer.from_location_id,
+        p_from_location: transfer.from_location_id,
+        p_to_location: transfer.to_location_id,
         p_variant: transfer.variant_id,
-        p_delta: -transfer.quantity
+        p_quantity: transfer.quantity,
+        p_unit_cost: transfer.unit_cost || 0,
+        p_created_by: transfer.created_by,
+        p_note: transfer.note || null
       })
-      await supabaseService.client.rpc('fn_apply_stock_delta', {
-        p_tenant: tenantId,
-        p_location: transfer.to_location_id,
-        p_variant: transfer.variant_id,
-        p_delta: transfer.quantity
-      })
+      if (error) throw error
 
-      // Refrescar alertas después de traslado
+      // Refrescar alertas despues de salida en origen
       await this.refreshStockAlerts()
 
-      return { success: true }
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Obtener traslados en transito pendientes de recepcion
+  async getPendingTransfers(tenantId, toLocationId = null) {
+    try {
+      let query = supabaseService.client
+        .from('transfer_requests')
+        .select(`
+          transfer_id,
+          tenant_id,
+          from_location_id,
+          to_location_id,
+          variant_id,
+          quantity,
+          unit_cost,
+          status,
+          note,
+          created_at,
+          from_location:from_location_id(name),
+          to_location:to_location_id(name),
+          variant:variant_id(
+            sku,
+            variant_name,
+            product:product_id(name)
+          ),
+          created_by_user:created_by(full_name)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'IN_TRANSIT')
+        .order('created_at', { ascending: false })
+        .limit(200)
+
+      if (toLocationId) query = query.eq('to_location_id', toLocationId)
+
+      const { data, error } = await query
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  // Recibir traslado en destino
+  async receiveTransfer(tenantId, transferId, receivedBy, note = null) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_receive_transfer_request', {
+        p_tenant: tenantId,
+        p_transfer_id: transferId,
+        p_received_by: receivedBy,
+        p_note: note
+      })
+      if (error) throw error
+
+      await this.refreshStockAlerts()
+
+      return { success: true, data }
     } catch (error) {
       return { success: false, error: error.message }
     }
@@ -341,3 +371,4 @@ class InventoryService {
 }
 
 export default new InventoryService()
+

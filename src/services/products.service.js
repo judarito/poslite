@@ -402,6 +402,41 @@ class ProductsService {
     }
   }
 
+  /**
+   * Obtener variantes activas para catálogos internos (lotes, compras, etc.)
+   */
+  async getActiveVariants(tenantId, limit = 500) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from(this.variantsTable)
+        .select(`
+          variant_id,
+          sku,
+          variant_name,
+          cost,
+          price,
+          is_active,
+          is_component,
+          requires_expiration,
+          product:product_id(
+            product_id,
+            name,
+            requires_expiration,
+            is_component
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('sku', { ascending: true })
+        .limit(limit)
+
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
   async createOrUpdateSimpleProduct(tenantId, payload) {
     if (!tenantId) {
       throw new Error('tenant_id es requerido para crear productos desde importación masiva')

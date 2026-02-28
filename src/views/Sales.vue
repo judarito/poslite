@@ -362,7 +362,7 @@
                       hide-details 
                       style="width:90px; margin: 0 auto;" 
                       :min="0" 
-                      :max="line.quantity" 
+                      :max="getLineMaxReturnQty(line)" 
                       :disabled="!line.selected"
                     ></v-text-field>
                   </td>
@@ -405,13 +405,85 @@
                       label="Devolver"
                       style="max-width: 100px;" 
                       :min="0" 
-                      :max="line.quantity" 
+                      :max="getLineMaxReturnQty(line)" 
                       :disabled="!line.selected"
                     ></v-text-field>
                   </div>
                 </v-card-text>
               </v-card>
             </div>
+
+            <v-divider class="my-3"></v-divider>
+            <div class="d-flex align-center mb-2">
+              <div class="text-subtitle-2">Reembolso por método de pago</div>
+              <v-spacer></v-spacer>
+              <v-btn size="small" variant="text" color="primary" @click="distributeRefundsEqually">
+                Auto distribuir
+              </v-btn>
+            </div>
+
+            <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+              Total devolución: <strong>{{ formatMoney(getExpectedRefundTotal()) }}</strong>
+              · Total reembolso: <strong>{{ formatMoney(getRefundsTotal()) }}</strong>
+            </v-alert>
+
+            <v-row
+              v-for="(refund, idx) in returnRefunds"
+              :key="`refund-${idx}`"
+              dense
+              class="mb-1"
+            >
+              <v-col cols="12" sm="5">
+                <v-select
+                  v-model="refund.payment_method_id"
+                  :items="paymentMethods"
+                  item-title="name"
+                  item-value="payment_method_id"
+                  label="Método"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model.number="refund.amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  label="Monto"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+              <v-col cols="10" sm="3">
+                <v-text-field
+                  v-model="refund.reference"
+                  label="Referencia"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+              <v-col cols="2" sm="1" class="d-flex align-center justify-end">
+                <v-btn
+                  icon
+                  size="small"
+                  variant="text"
+                  color="error"
+                  :disabled="returnRefunds.length <= 1"
+                  @click="removeRefundLine(idx)"
+                >
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-btn size="small" variant="tonal" color="primary" @click="addRefundLine">
+              <v-icon start size="small">mdi-plus</v-icon>
+              Agregar método
+            </v-btn>
           </v-form>
         </v-card-text>
         <v-card-actions class="pa-3">
@@ -448,6 +520,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import salesService from '@/services/sales.service'
 import locationsService from '@/services/locations.service'
+import paymentMethodsService from '@/services/paymentMethods.service'
 import supabaseService from '@/services/supabase.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
@@ -492,6 +565,8 @@ const voidDialog = ref(false)
 const saleDetail = ref(null)
 const returnSale = ref(null)
 const returnReason = ref('')
+const paymentMethods = ref([])
+const returnRefunds = ref([{ payment_method_id: null, amount: 0, reference: '' }])
 const saleToVoid = ref(null)
 const processing = ref(false)
 const processingReturn = ref(false)
@@ -509,6 +584,64 @@ const feStatusColor = (s) => ({ ACCEPTED: 'success', PROCESSING: 'blue', PENDING
 const feStatusLabel = (s) => ({ ACCEPTED: 'Aceptada DIAN', PROCESSING: 'Procesando', PENDING: 'Pendiente', REJECTED: 'Rechazada', ERROR: 'Error envío' }[s] || (s ? s : 'Sin enviar'))
 
 const retrying = ref(false)
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+
+const getLineMaxReturnQty = (line) => {
+  const soldQty = Number(line.quantity) || 0
+  const returnedQty = Number(line.returned_qty) || 0
+  return Math.max(0, soldQty - returnedQty)
+}
+
+const getSelectedReturnLines = () => {
+  if (!returnSale.value?.sale_lines) return []
+  return returnSale.value.sale_lines
+    .filter(l => l.selected && Number(l.return_qty) > 0)
+    .map(l => ({
+      sale_line_id: l.sale_line_id,
+      qty: Number(l.return_qty)
+    }))
+}
+
+const getExpectedRefundTotal = () => {
+  if (!returnSale.value?.sale_lines) return 0
+  return round2(
+    returnSale.value.sale_lines
+      .filter(l => l.selected && Number(l.return_qty) > 0)
+      .reduce((sum, l) => {
+        const lineQty = Number(l.quantity) || 0
+        if (lineQty <= 0) return sum
+        const lineTotal = Number(l.line_total) || 0
+        const perUnitTotal = lineTotal / lineQty
+        return sum + (perUnitTotal * (Number(l.return_qty) || 0))
+      }, 0)
+  )
+}
+
+const getRefundsTotal = () => round2(
+  returnRefunds.value.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+)
+
+const addRefundLine = () => {
+  returnRefunds.value.push({ payment_method_id: null, amount: 0, reference: '' })
+}
+
+const removeRefundLine = (index) => {
+  if (returnRefunds.value.length <= 1) return
+  returnRefunds.value.splice(index, 1)
+}
+
+const distributeRefundsEqually = () => {
+  const expected = getExpectedRefundTotal()
+  const count = returnRefunds.value.length
+  if (count <= 0) return
+  const base = round2(expected / count)
+  let assigned = 0
+  returnRefunds.value = returnRefunds.value.map((line, i) => {
+    const amount = i === count - 1 ? round2(expected - assigned) : base
+    assigned += amount
+    return { ...line, amount }
+  })
+}
 const retryFE = async (sale) => {
   retrying.value = true
   try {
@@ -615,9 +748,32 @@ const handlePrintSale = async (item) => {
 const openReturnDialog = async (item) => {
   const r = await salesService.getSaleById(tenantId.value, item.sale_id)
   if (r.success) {
-    r.data.sale_lines.forEach(l => { l.selected = false; l.return_qty = l.quantity })
+    const saleLineIds = r.data.sale_lines.map(l => l.sale_line_id)
+    const { data: returnLines } = await supabaseService.client
+      .from('sale_return_lines')
+      .select('sale_line_id, quantity, return:return_id!inner(status)')
+      .eq('return.status', 'COMPLETED')
+      .in('sale_line_id', saleLineIds)
+
+    const returnedQtyByLine = {}
+    ;(returnLines || []).forEach(rl => {
+      returnedQtyByLine[rl.sale_line_id] = (returnedQtyByLine[rl.sale_line_id] || 0) + (Number(rl.quantity) || 0)
+    })
+
+    r.data.sale_lines.forEach(l => {
+      l.returned_qty = returnedQtyByLine[l.sale_line_id] || 0
+      l.selected = false
+      l.return_qty = getLineMaxReturnQty(l)
+    })
+
     returnSale.value = r.data
     returnReason.value = ''
+    returnRefunds.value = [{ payment_method_id: null, amount: 0, reference: '' }]
+    const pmR = await paymentMethodsService.getPaymentMethodsForDropdown(tenantId.value, 1, 100)
+    paymentMethods.value = pmR.success ? (pmR.data || []).filter(pm => pm.code !== 'CREDITO') : []
+    if (paymentMethods.value.length > 0) {
+      returnRefunds.value[0].payment_method_id = paymentMethods.value[0].payment_method_id
+    }
     returnDialog.value = true
   }
 }
@@ -625,17 +781,50 @@ const openReturnDialog = async (item) => {
 const processReturn = async () => {
   const { valid } = await returnForm.value.validate()
   if (!valid || !returnSale.value) return
-  const lines = returnSale.value.sale_lines.filter(l => l.selected && l.return_qty > 0).map(l => ({
-    sale_line_id: l.sale_line_id, qty: l.return_qty
-  }))
+  const lines = getSelectedReturnLines()
   if (lines.length === 0) { showMsg('Seleccione al menos un producto', 'error'); return }
+  const invalidQty = lines.find(l => {
+    const sourceLine = returnSale.value.sale_lines.find(s => s.sale_line_id === l.sale_line_id)
+    return !sourceLine || l.qty > getLineMaxReturnQty(sourceLine)
+  })
+  if (invalidQty) {
+    showMsg('Una o más cantidades superan el saldo pendiente por devolver', 'error')
+    return
+  }
+
+  const expectedRefund = getExpectedRefundTotal()
+  if (expectedRefund <= 0) {
+    showMsg('El total de devolución debe ser mayor que 0', 'error')
+    return
+  }
+
+  const refunds = returnRefunds.value
+    .filter(r => r.payment_method_id && Number(r.amount) > 0)
+    .map(r => ({
+      payment_method_id: r.payment_method_id,
+      amount: round2(r.amount),
+      reference: r.reference || null
+    }))
+
+  if (refunds.length === 0) {
+    showMsg('Registra al menos un método de reembolso', 'error')
+    return
+  }
+
+  const refundsTotal = round2(refunds.reduce((sum, r) => sum + Number(r.amount), 0))
+  if (Math.abs(refundsTotal - expectedRefund) > 0.01) {
+    showMsg(`El reembolso (${formatMoney(refundsTotal)}) debe cuadrar con la devolución (${formatMoney(expectedRefund)})`, 'error')
+    return
+  }
+
   processingReturn.value = true
   try {
     const r = await salesService.createReturn(tenantId.value, {
       sale_id: returnSale.value.sale_id,
       created_by: userProfile.value?.user_id,
       reason: returnReason.value,
-      lines
+      lines,
+      refunds
     })
     if (r.success) { showMsg('Devolución procesada'); returnDialog.value = false; loadSales({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error || 'Error', 'error')

@@ -113,12 +113,34 @@ class SalesService {
 
   // Crear devolución usando SP
   async createReturn(tenantId, returnData) {
+    if (Array.isArray(returnData.refunds) && returnData.refunds.length > 0) {
+      return this.createReturnV2(tenantId, returnData)
+    }
+
     try {
       const { data, error } = await supabaseService.client.rpc('sp_create_return', {
         p_tenant: tenantId,
         p_sale_id: returnData.sale_id,
         p_created_by: returnData.created_by,
         p_lines: returnData.lines,
+        p_reason: returnData.reason || null
+      })
+
+      if (error) throw error
+      return { success: true, data: { return_id: data } }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  async createReturnV2(tenantId, returnData) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_create_return_v2', {
+        p_tenant: tenantId,
+        p_sale_id: returnData.sale_id,
+        p_created_by: returnData.created_by,
+        p_lines: returnData.lines,
+        p_refunds: returnData.refunds,
         p_reason: returnData.reason || null
       })
 

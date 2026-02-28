@@ -169,6 +169,26 @@
                 Plan Separe
               </v-badge>
             </v-tab>
+            <v-tab value="payable">
+              <v-badge
+                :content="payableAlertsCount"
+                :color="payableAlertsCount > 0 ? 'error' : 'grey'"
+                :model-value="payableAlertsCount > 0"
+                inline
+              >
+                CxP
+              </v-badge>
+            </v-tab>
+            <v-tab value="receivable">
+              <v-badge
+                :content="receivableAlertsCount"
+                :color="receivableAlertsCount > 0 ? 'warning' : 'grey'"
+                :model-value="receivableAlertsCount > 0"
+                inline
+              >
+                Cartera
+              </v-badge>
+            </v-tab>
           </v-tabs>
 
           <v-window v-model="alertsTab">
@@ -622,6 +642,249 @@
                 </v-btn>
               </v-card-actions>
             </v-window-item>
+
+            <!-- Tab de Cuentas por Pagar -->
+            <v-window-item value="payable">
+              <!-- Filtros CxP -->
+              <v-card-text class="pa-4">
+                <v-row dense>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="payableFilters.alert_level"
+                      :items="payableAlertLevels"
+                      label="Nivel de alerta"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field
+                      v-model="payableFilters.search"
+                      label="Buscar proveedor, factura o sede"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                      @keyup.enter="loadPayableAlerts"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
+                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de cuentas por pagar</p>
+                </div>
+                <v-card
+                  v-else
+                  v-for="alert in payableAlerts"
+                  :key="alert.alert_id"
+                  class="mb-2"
+                  :color="getPayableAlertColor(alert.alert_level) + '-lighten-5'"
+                  variant="outlined"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center mb-2">
+                      <v-chip :color="getPayableAlertColor(alert.alert_level)" size="small" label>
+                        <v-icon start size="small">{{ getPayableAlertIcon(alert.alert_level) }}</v-icon>
+                        {{ getPayableAlertLabel(alert.alert_level) }}
+                      </v-chip>
+                      <v-spacer></v-spacer>
+                      <span class="text-caption">{{ formatDate(alert.data.due_date) }}</span>
+                    </div>
+                    <div class="mb-1"><strong>{{ alert.data.supplier_name }}</strong></div>
+                    <div class="text-caption text-grey mb-2">Factura: {{ alert.data.invoice_number || 'Sin numero' }}</div>
+                    <v-row dense class="text-caption">
+                      <v-col cols="6">
+                        <div class="text-grey">Sede:</div>
+                        <div class="font-weight-bold">{{ alert.data.location_name || '-' }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Saldo:</div>
+                        <div class="font-weight-bold text-error">{{ formatMoney(alert.data.balance) }}</div>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+              </v-card-text>
+
+              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
+                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de cuentas por pagar</p>
+                </div>
+                <v-table v-else density="compact" fixed-header height="500">
+                  <thead>
+                    <tr>
+                      <th>Estado</th>
+                      <th>Proveedor</th>
+                      <th>Sede</th>
+                      <th>Factura</th>
+                      <th>Vencimiento</th>
+                      <th class="text-right">Saldo</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alert in payableAlerts" :key="alert.alert_id">
+                      <td>
+                        <v-chip :color="getPayableAlertColor(alert.alert_level)" size="small" label>
+                          <v-icon start size="small">{{ getPayableAlertIcon(alert.alert_level) }}</v-icon>
+                          {{ getPayableAlertLabel(alert.alert_level) }}
+                        </v-chip>
+                      </td>
+                      <td>{{ alert.data.supplier_name }}</td>
+                      <td>{{ alert.data.location_name || '-' }}</td>
+                      <td>{{ alert.data.invoice_number || 'Sin numero' }}</td>
+                      <td>{{ formatDate(alert.data.due_date) }}</td>
+                      <td class="text-right text-error font-weight-bold">{{ formatMoney(alert.data.balance) }}</td>
+                      <td>
+                        <v-btn size="small" color="error" variant="text" @click="goToPurchases">
+                          Ver compras
+                        </v-btn>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-actions class="pa-4">
+                <v-btn color="error" variant="text" @click="loadPayableAlerts">
+                  <v-icon start>mdi-refresh</v-icon>
+                  Actualizar
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="error" variant="tonal" @click="goToPurchases">
+                  <v-icon start>mdi-cart-plus</v-icon>
+                  Ir a Compras
+                </v-btn>
+              </v-card-actions>
+            </v-window-item>
+
+            <!-- Tab de Cartera / CxC -->
+            <v-window-item value="receivable">
+              <v-card-text class="pa-4">
+                <v-row dense>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="receivableFilters.alert_level"
+                      :items="receivableAlertLevels"
+                      label="Nivel de alerta"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field
+                      v-model="receivableFilters.search"
+                      label="Buscar cliente o documento"
+                      prepend-inner-icon="mdi-magnify"
+                      clearable
+                      density="compact"
+                      variant="outlined"
+                      @keyup.enter="loadReceivableAlerts"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
+                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de cartera</p>
+                </div>
+                <v-card
+                  v-else
+                  v-for="alert in receivableAlerts"
+                  :key="alert.alert_id"
+                  class="mb-2"
+                  :color="getReceivableAlertColor(alert.alert_level) + '-lighten-5'"
+                  variant="outlined"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center mb-2">
+                      <v-chip :color="getReceivableAlertColor(alert.alert_level)" size="small" label>
+                        <v-icon start size="small">{{ getReceivableAlertIcon(alert.alert_level) }}</v-icon>
+                        {{ getReceivableAlertLabel(alert.alert_level) }}
+                      </v-chip>
+                    </div>
+                    <div class="mb-1"><strong>{{ alert.data.customer_name }}</strong></div>
+                    <div class="text-caption text-grey mb-2">{{ alert.data.customer_document || 'Sin documento' }}</div>
+                    <v-row dense class="text-caption">
+                      <v-col cols="6">
+                        <div class="text-grey">Saldo:</div>
+                        <div class="font-weight-bold text-error">{{ formatMoney(alert.data.current_balance) }}</div>
+                      </v-col>
+                      <v-col cols="6">
+                        <div class="text-grey">Cupo:</div>
+                        <div class="font-weight-bold">{{ formatMoney(alert.data.credit_limit) }}</div>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+              </v-card-text>
+
+              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+                <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
+                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
+                  <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
+                  <p class="mt-4">No hay alertas de cartera</p>
+                </div>
+                <v-table v-else density="compact" fixed-header height="500">
+                  <thead>
+                    <tr>
+                      <th>Estado</th>
+                      <th>Cliente</th>
+                      <th>Documento</th>
+                      <th class="text-right">Saldo</th>
+                      <th class="text-right">Cupo</th>
+                      <th class="text-right">Exceso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alert in receivableAlerts" :key="alert.alert_id">
+                      <td>
+                        <v-chip :color="getReceivableAlertColor(alert.alert_level)" size="small" label>
+                          <v-icon start size="small">{{ getReceivableAlertIcon(alert.alert_level) }}</v-icon>
+                          {{ getReceivableAlertLabel(alert.alert_level) }}
+                        </v-chip>
+                      </td>
+                      <td>{{ alert.data.customer_name }}</td>
+                      <td>{{ alert.data.customer_document || '-' }}</td>
+                      <td class="text-right text-error font-weight-bold">{{ formatMoney(alert.data.current_balance) }}</td>
+                      <td class="text-right">{{ formatMoney(alert.data.credit_limit) }}</td>
+                      <td class="text-right">{{ formatMoney(alert.data.over_limit_amount || 0) }}</td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card-text>
+
+              <v-divider></v-divider>
+
+              <v-card-actions class="pa-4">
+                <v-btn color="warning" variant="text" @click="loadReceivableAlerts">
+                  <v-icon start>mdi-refresh</v-icon>
+                  Actualizar
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn color="warning" variant="tonal" @click="goToCartera">
+                  <v-icon start>mdi-account-credit-card</v-icon>
+                  Ir a Cartera
+                </v-btn>
+              </v-card-actions>
+            </v-window-item>
           </v-window>
         </v-card>
       </v-dialog>
@@ -700,16 +963,18 @@ const alertsTab = ref('stock')
 // Composable: alertas del sistema + ubicaciones
 const {
   allAlerts, loadingAlerts, locations,
-  stockFilters, expirationFilters, layawayFilters,
-  stockAlertLevels, expirationAlertLevels, layawayAlertLevels,
-  stockAlerts, expirationAlerts, layawayAlerts,
-  stockAlertsCount, expirationAlertsCount, layawayAlertsCount, totalAlertsCount,
+  stockFilters, expirationFilters, layawayFilters, payableFilters, receivableFilters,
+  stockAlertLevels, expirationAlertLevels, layawayAlertLevels, payableAlertLevels, receivableAlertLevels,
+  stockAlerts, expirationAlerts, layawayAlerts, payableAlerts, receivableAlerts,
+  stockAlertsCount, expirationAlertsCount, layawayAlertsCount, payableAlertsCount, receivableAlertsCount, totalAlertsCount,
   filteredLayawayAlerts,
   loadAlerts, loadLocations, subscribeToAlerts, unsubscribeFromAlerts,
-  loadStockAlerts, loadExpirationAlerts, loadLayawayAlerts,
+  loadStockAlerts, loadExpirationAlerts, loadLayawayAlerts, loadPayableAlerts, loadReceivableAlerts,
   getStockAlertColor, getStockAlertIcon, getStockAlertLabel,
   getExpirationAlertColor, getExpirationAlertIcon, getExpirationAlertLabel,
-  getLayawayAlertColor, getLayawayAlertIcon, getLayawayAlertLabel
+  getLayawayAlertColor, getLayawayAlertIcon, getLayawayAlertLabel,
+  getPayableAlertColor, getPayableAlertIcon, getPayableAlertLabel,
+  getReceivableAlertColor, getReceivableAlertIcon, getReceivableAlertLabel
 } = useAppAlerts()
 
 // Verificar si estamos en una ruta de autenticación
@@ -835,6 +1100,16 @@ const goToLayaway = () => {
 const goToLayawayDetail = (layawayId) => {
   alertsDialog.value = false
   router.push(`/layaway/${layawayId}`)
+}
+
+const goToPurchases = () => {
+  alertsDialog.value = false
+  router.push('/purchases')
+}
+
+const goToCartera = () => {
+  alertsDialog.value = false
+  router.push('/cartera')
 }
 
 // Cargar alertas y locations al abrir el dialog

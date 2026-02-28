@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -343,7 +343,9 @@
                 <div class="nav-section">
                     <h3>Configuración</h3>
                     <a href="#configuracion-inicial" class="nav-item">Configuración Inicial</a>
+                    <a href="#configuracion-tenant" class="nav-item">Configuración por Tenant</a>
                     <a href="#usuarios-roles" class="nav-item">Usuarios y Roles</a>
+                    <a href="#administracion-avanzada" class="nav-item">Administracion Avanzada</a>
                     <a href="#ubicaciones" class="nav-item">Ubicaciones</a>
                     <a href="#cajas" class="nav-item">Cajas Registradoras</a>
                 </div>
@@ -377,6 +379,7 @@
                     <a href="#carga-masiva" class="nav-item">Carga Masiva Excel</a>
                     <a href="#pos" class="nav-item">Punto de Venta (POS)</a>
                     <a href="#ventas" class="nav-item">Consulta de Ventas</a>
+                    <a href="#cartera" class="nav-item">Cartera (Crédito)</a>
                     <a href="#layaway" class="nav-item">Plan Separe</a>
                 </div>
 
@@ -387,8 +390,10 @@
 
                 <div class="nav-section">
                     <h3>Control</h3>
+                    <a href="#alertas-globales" class="nav-item">Alertas Globales</a>
                     <a href="#sesiones-caja" class="nav-item">Sesiones de Caja</a>
                     <a href="#reportes" class="nav-item">Reportes</a>
+                    <a href="#funciones-ia" class="nav-item">Funciones de IA</a>
                 </div>
             </nav>
         </aside>
@@ -566,6 +571,72 @@
                 </table>
             </section>
 
+            <!-- CONFIGURACION POR TENANT -->
+            <section id="configuracion-tenant" class="section">
+                <h2>Configuración por Tenant</h2>
+
+                <p>Este módulo define cómo opera <strong>su empresa (tenant)</strong> en POSLite. Cada tenant tiene su propia configuración, aislada de los demás.</p>
+
+                <div class="alert alert-info">
+                    <strong>Rol requerido:</strong> Administrador o Gerente (según permisos asignados).
+                </div>
+
+                <h3>Ruta de acceso</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Vaya a <strong>Configuración → Tenant</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Actualice y guarde los parámetros operativos
+                </div>
+
+                <h3>Parámetros recomendados</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Parámetro</th>
+                            <th>Qué controla</th>
+                            <th>Recomendación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Tamaño de página por defecto</td>
+                            <td>Paginación server-side en listados</td>
+                            <td>10-25 según volumen</td>
+                        </tr>
+                        <tr>
+                            <td>Horas máximas de sesión de caja</td>
+                            <td>Tiempo permitido para una caja abierta</td>
+                            <td>8-12 horas por turno</td>
+                        </tr>
+                        <tr>
+                            <td>Tema de interfaz</td>
+                            <td>Modo visual de la aplicación</td>
+                            <td>Definir estándar para todo el equipo</td>
+                        </tr>
+                        <tr>
+                            <td>Políticas comerciales</td>
+                            <td>Descuento máximo, redondeo, impuestos</td>
+                            <td>Alinear con política interna y fiscal</td>
+                        </tr>
+                        <tr>
+                            <td>Facturación electrónica</td>
+                            <td>Activación FE y datos DIAN del tenant</td>
+                            <td>Completar antes de operar FE</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Buenas prácticas</h3>
+                <ul>
+                    <li>Documente quién modifica configuración crítica y cuándo.</li>
+                    <li>Pruebe en horario de baja operación cambios en parámetros sensibles (caja, impuestos, FE).</li>
+                    <li>Evite usar valores por defecto sin revisión de negocio.</li>
+                </ul>
+            </section>
+
             <!-- USUARIOS Y ROLES -->
             <section id="usuarios-roles" class="section">
                 <h2>👥 Usuarios y Roles</h2>
@@ -674,7 +745,35 @@
                 </ul>
             </section>
 
-            <!-- UBICACIONES -->
+            <!-- Administracion Avanzada -->
+            <section id="administracion-avanzada" class="section">
+                <h2>Administracion Avanzada</h2>
+                <h3>Setup Wizard (Onboarding Inicial)</h3>
+                <p>El asistente de configuraci?n gu?a la puesta en marcha del tenant en pocos pasos.</p>
+                <ul>
+                    <li>Datos b?sicos de la empresa</li>
+                    <li>Ubicaci?n principal y caja inicial</li>
+                    <li>Usuarios base y roles iniciales</li>
+                    <li>M?todos de pago recomendados</li>
+                </ul>
+                <h3>Gesti?n de Tenants (Super Admin)</h3>
+                <p>Disponible solo para usuarios Super Admin del sistema.</p>
+                <ul>
+                    <li>Crear y administrar tenants</li>
+                    <li>Activar o desactivar tenants</li>
+                    <li>Monitorear configuraci?n general por tenant</li>
+                </ul>
+                <h3>Roles, Permisos y Men?s (Super Admin)</h3>
+                <p>Permite administrar el cat?logo global de roles y men?s y su asignaci?n por plantillas.</p>
+                <ul>
+                    <li>Crear/editar roles globales</li>
+                    <li>Definir permisos por modulo</li>
+                    <li>Dise?ar estructura de men?s por rol</li>
+                </ul>
+                <div class="alert alert-warning">
+                    <strong>Importante:</strong> estos modulos impactan permisos de navegaci?n y acceso a datos. Realice cambios en horarios de bajo uso y con respaldo.
+                </div>
+            </section>            <!-- UBICACIONES -->
             <section id="ubicaciones" class="section">
                 <h2>📍 Ubicaciones</h2>
 
@@ -1577,7 +1676,41 @@
 
                 <div class="alert alert-info">
                     <strong>💡 Consejo:</strong> Registre las compras tan pronto reciba la mercancía para mantener el inventario actualizado.
-                </div>
+                </div>                <h3>Ordenes de Compra (Borrador)</h3>
+                <p>Puede guardar compras como orden para recibir luego.</p>
+                <ul>
+                    <li>Estados: <strong>DRAFT</strong>, <strong>PARTIAL</strong>, <strong>RECEIVED</strong>, <strong>CANCELLED</strong></li>
+                    <li>Boton: <strong>Guardar como OC</strong></li>
+                    <li>Bandeja: <strong>OC Pendientes</strong></li>
+                </ul>
+                <h3>Recepcion Parcial</h3>
+                <p>Al recibir mercancia, puede confirmar cantidades por linea sin exceder lo ordenado.</p>
+                <ul>
+                    <li>Si recibe parte de la OC, queda en estado <strong>PARTIAL</strong></li>
+                    <li>Cuando recibe el saldo completo, pasa a <strong>RECEIVED</strong></li>
+                    <li>Cada recepcion impacta inventario en la sede seleccionada</li>
+                </ul>
+                <h3>Devolucion a Proveedor</h3>
+                <p>Desde el detalle de compra puede devolver lineas parciales o totales al proveedor.</p>
+                <ul>
+                    <li>No permite devolver mas de lo comprado por linea</li>
+                    <li>No permite devolver si no hay stock disponible</li>
+                    <li>Registra movimiento de inventario de salida por devolucion</li>
+                </ul>
+                <h3>Cuentas por Pagar (CxP Proveedores)</h3>
+                <p>Puede crear una cuenta por pagar asociada a la compra y registrar abonos.</p>
+                <ul>
+                    <li>Estados: <strong>OPEN</strong>, <strong>PARTIAL</strong>, <strong>PAID</strong>, <strong>CANCELLED</strong></li>
+                    <li>Bandeja global por vencer y vencidas</li>
+                    <li>Pago masivo para multiples cuentas seleccionadas</li>
+                </ul>
+                <h3>Mercancia en Transito</h3>
+                <p>Los traslados entre sedes se manejan con solicitudes en transito.</p>
+                <ul>
+                    <li>Crear traslado: salida en sede origen (<strong>IN_TRANSIT</strong>)</li>
+                    <li>Recibir traslado: entrada en sede destino (<strong>RECEIVED</strong>)</li>
+                    <li>Control por rol/sede segun asignacion de caja</li>
+                </ul>
             </section>
 
             <!-- CLIENTES -->
@@ -2010,6 +2143,89 @@
 
                 <h3>Reimprimir Ticket</h3>
                 <p>Puede reimprimir el ticket de cualquier venta desde su detalle.</p>
+
+                <h3>Devoluciones (Parciales o Totales)</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    En la venta <strong>Completada</strong>, haga clic en <strong>"Devolver"</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Seleccione los productos y cantidades a devolver (sin exceder lo pendiente por devolver)
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Ingrese el motivo de la devolución
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    Registre el <strong>reembolso por método de pago</strong>:
+                    <ul>
+                        <li>Puede usar uno o varios métodos</li>
+                        <li>El total de reembolso debe cuadrar con el total devuelto</li>
+                        <li>Puede capturar referencia por método (voucher, transferencia, etc.)</li>
+                    </ul>
+                </div>
+                <div class="step">
+                    <span class="step-number">5</span>
+                    Confirme la devolución
+                </div>
+
+                <p>El sistema:</p>
+                <ul>
+                    <li>✅ Incrementa inventario de las unidades devueltas</li>
+                    <li>✅ Registra la devolución y sus líneas</li>
+                    <li>✅ Registra el detalle de reembolsos por método</li>
+                    <li>✅ Actualiza el estado de la venta (devuelta total o parcial)</li>
+                </ul>
+
+                <div class="alert alert-info">
+                    <strong>💡 Recomendación:</strong> Use el botón <strong>"Auto distribuir"</strong> cuando quiera repartir el total devuelto entre varios métodos de reembolso.
+                </div>
+            </section>
+
+            <!-- CARTERA -->
+            <section id="cartera" class="section">
+                <h2>💳 Cartera (Ventas a Crédito)</h2>
+
+                <p>El módulo de Cartera permite controlar cuentas por cobrar de clientes, registrar abonos y monitorear saldos en tiempo real.</p>
+
+                <h3>Acceder al módulo</h3>
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Vaya a <strong>Operaciones → Cartera</strong>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Use filtros y búsqueda para encontrar clientes con deuda
+                </div>
+
+                <h3>Flujo básico de cartera</h3>
+                <ul>
+                    <li>Crear/activar cuenta de crédito por cliente</li>
+                    <li>Definir cupo de crédito</li>
+                    <li>Registrar ventas a crédito</li>
+                    <li>Registrar abonos parciales o totales</li>
+                    <li>Consultar historial de movimientos (venta/abono)</li>
+                </ul>
+
+                <h3>Alertas en tiempo real (campana)</h3>
+                <p>La campana global de alertas incluye una pestaña <strong>Cartera</strong> con dos niveles:</p>
+                <ul>
+                    <li><span class="badge badge-warning">Con saldo</span> Cliente con deuda activa</li>
+                    <li><span class="badge badge-danger">Cupo excedido</span> Saldo actual mayor al cupo configurado</li>
+                </ul>
+
+                <p>Desde esta vista puede:</p>
+                <ul>
+                    <li>Filtrar por nivel de alerta</li>
+                    <li>Buscar por cliente o documento</li>
+                    <li>Ir directamente al módulo de Cartera</li>
+                </ul>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Control operativo:</strong> mantener cartera al día reduce riesgo de sobreendeudamiento y mejora el flujo de caja.
+                </div>
             </section>
 
             <!-- LAYAWAY -->
@@ -2198,6 +2414,29 @@
                 </div>
             </section>
 
+            <!-- ALERTAS GLOBALES -->
+            <section id="alertas-globales" class="section">
+                <h2>Alertas Globales (Tiempo Real)</h2>
+                <p>La campana superior centraliza alertas operativas del tenant en tiempo real.</p>
+                <h3>Tipos de alerta</h3>
+                <ul>
+                    <li><strong>Stock:</strong> sin stock, stock bajo, disponible bajo</li>
+                    <li><strong>Vencimientos:</strong> lotes vencidos o proximos a vencer</li>
+                    <li><strong>Plan Separe:</strong> contratos vencidos o por vencer</li>
+                    <li><strong>CxP:</strong> cuentas por pagar vencidas o por vencer</li>
+                    <li><strong>Cartera:</strong> clientes con saldo o con cupo excedido</li>
+                </ul>
+                <h3>Acciones rapidas</h3>
+                <ul>
+                    <li>Aplicar filtros por nivel y busqueda</li>
+                    <li>Navegar al modulo origen: Inventario, Lotes, Plan Separe, Compras o Cartera</li>
+                    <li>Actualizar manualmente desde cada pestana</li>
+                </ul>
+                <div class="alert alert-info">
+                    <strong>Nota:</strong> ademas del tiempo real, el sistema ejecuta refrescos programados para asegurar consistencia de alertas.
+                </div>
+            </section>
+
             <!-- REPORTES -->
             <section id="reportes" class="section">
                 <h2>📊 Reportes y Análisis</h2>
@@ -2287,6 +2526,38 @@
 
                 <div class="alert alert-success">
                     <strong>✅ Dashboard:</strong> Los reportes más importantes se resumen en el Dashboard principal al iniciar sesión.
+                </div>
+            </section>
+
+            <!-- FUNCIONES IA -->
+            <section id="funciones-ia" class="section">
+                <h2>Funciones de IA</h2>
+
+                <p>POSLite incluye funciones de inteligencia artificial para apoyar decisiones de ventas y compras. Estas funciones se habilitan por tenant y dependen de la configuración de la integración IA.</p>
+
+                <h3>Pronóstico de Ventas</h3>
+                <ul>
+                    <li>Analiza histórico por sede y periodo.</li>
+                    <li>Genera proyección de demanda y tendencias.</li>
+                    <li>Sugiere acciones de reposición y planificación.</li>
+                </ul>
+
+                <h3>Asesor de Compras</h3>
+                <ul>
+                    <li>Evalúa rotación, stock y alertas.</li>
+                    <li>Sugiere productos y cantidades para reabastecer.</li>
+                    <li>Prioriza ítems críticos (quiebre o riesgo operativo).</li>
+                </ul>
+
+                <h3>Requisitos técnicos</h3>
+                <ul>
+                    <li>Configurar endpoint y llave de IA en backend/edge function.</li>
+                    <li>Habilitar flags de IA en configuración del tenant.</li>
+                    <li>Contar con datos históricos suficientes para mejores resultados.</li>
+                </ul>
+
+                <div class="alert alert-warning">
+                    <strong>Importante:</strong> la IA asiste la decisión, pero no reemplaza la validación comercial y financiera del responsable operativo.
                 </div>
             </section>
 
@@ -2450,7 +2721,7 @@
                 <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #ddd; text-align: center; color: #757575;">
                     <p><strong>POS Lite</strong> - Sistema de Punto de Venta</p>
                     <p>Versión 1.0 - © 2026 Todos los derechos reservados</p>
-                    <p>Última actualización de este manual: Febrero 25, 2026</p>
+                    <p>Última actualización de este manual: Febrero 28, 2026</p>
                 </div>
             </section>
         </main>
@@ -2501,3 +2772,8 @@
     </script>
 </body>
 </html>
+
+
+
+
+

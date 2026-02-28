@@ -117,6 +117,34 @@ const alertsService = {
   },
 
   /**
+   * Refrescar alertas de cuentas por pagar manualmente
+   */
+  async refreshSupplierPayableAlerts() {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_refresh_supplier_payable_alerts')
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error refreshing supplier payable alerts:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Refrescar alertas de cartera (cuentas por cobrar) manualmente
+   */
+  async refreshCustomerReceivableAlerts() {
+    try {
+      const { error } = await supabaseService.client.rpc('fn_refresh_customer_receivable_alerts')
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error refreshing customer receivable alerts:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  /**
    * Refrescar todas las alertas
    */
   async refreshAllAlerts() {

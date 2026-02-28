@@ -532,6 +532,221 @@ class PurchasesService {
       }
     }
   }
+
+  /**
+   * Obtener cuenta por pagar asociada a una compra.
+   * @param {string} tenantId
+   * @param {string} purchaseId
+   */
+  async getSupplierPayableByPurchase(tenantId, purchaseId) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('supplier_payables')
+        .select(`
+          payable_id,
+          tenant_id,
+          supplier_id,
+          purchase_id,
+          invoice_number,
+          due_date,
+          total_amount,
+          paid_amount,
+          balance,
+          status,
+          note,
+          created_at,
+          updated_at,
+          supplier:supplier_id(third_party_id, legal_name, document_number),
+          payments:supplier_payable_payments(
+            payable_payment_id,
+            amount,
+            payment_method,
+            note,
+            created_at,
+            created_by_user:created_by(full_name)
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('purchase_id', purchaseId)
+        .maybeSingle()
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data: data || null
+      }
+    } catch (error) {
+      console.error('Error getting supplier payable by purchase:', error)
+      return {
+        success: false,
+        error: error.message,
+        data: null
+      }
+    }
+  }
+
+  /**
+   * Crear cuenta por pagar para una compra.
+   * @param {Object} payload
+   */
+  async createSupplierPayable({ tenantId, purchaseId, createdBy, dueDate = null, invoiceNumber = null, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_create_supplier_payable', {
+        p_tenant: tenantId,
+        p_purchase_id: purchaseId,
+        p_created_by: createdBy,
+        p_due_date: dueDate,
+        p_invoice_number: invoiceNumber,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error creating supplier payable:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Registrar abono en cuenta por pagar.
+   * @param {Object} payload
+   */
+  async registerSupplierPayment({ tenantId, payableId, amount, createdBy, paymentMethod = null, note = null }) {
+    try {
+      const { data, error } = await supabaseService.client.rpc('sp_register_supplier_payment', {
+        p_tenant: tenantId,
+        p_payable_id: payableId,
+        p_amount: amount,
+        p_created_by: createdBy,
+        p_payment_method: paymentMethod,
+        p_note: note
+      })
+
+      if (error) throw error
+
+      return {
+        success: true,
+        data
+      }
+    } catch (error) {
+      console.error('Error registering supplier payment:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Obtener bandeja global de cuentas por pagar a proveedores.
+   * @param {Object} payload
+   * @param {string} payload.tenantId
+   * @param {string} [payload.status='OPEN_PARTIAL'] - ALL | OPEN_PARTIAL | OPEN | PARTIAL | PAID | CANCELLED
+   * @param {number|null} [payload.dueInDays=null] - incluir facturas con vencimiento <= hoy + n dias
+   * @param {number} [payload.page=1] - pagina actual
+   * @param {number} [payload.pageSize=20] - tamano de pagina
+   */
+  async getSupplierPayablesDashboard({
+    tenantId,
+    status = 'OPEN_PARTIAL',
+    dueInDays = null,
+    page = 1,
+    pageSize = 20
+  }) {
+    try {
+      const safePage = Number.isInteger(page) && page > 0 ? page : 1
+      const safePageSize = Number.isInteger(pageSize) && pageSize > 0 ? pageSize : 20
+      const from = (safePage - 1) * safePageSize
+      const to = from + safePageSize - 1
+
+      let query = supabaseService.client
+        .from('supplier_payables')
+        .select(`
+          payable_id,
+          purchase_id,
+          supplier_id,
+          invoice_number,
+          due_date,
+          total_amount,
+          paid_amount,
+          balance,
+          status,
+          created_at,
+          purchase:purchase_id(
+            location_id,
+            location:location_id(name)
+          ),
+          supplier:supplier_id(
+            legal_name,
+            trade_name
+          )
+        `, { count: 'exact' })
+        .eq('tenant_id', tenantId)
+
+      if (status === 'OPEN_PARTIAL') {
+        query = query.in('status', ['OPEN', 'PARTIAL'])
+      } else if (status && status !== 'ALL') {
+        query = query.eq('status', status)
+      }
+
+      if (dueInDays !== null && dueInDays !== undefined) {
+        const baseDate = new Date()
+        const untilDate = new Date(baseDate)
+        untilDate.setDate(baseDate.getDate() + Number(dueInDays))
+        const untilDateStr = untilDate.toISOString().slice(0, 10)
+        query = query.not('due_date', 'is', null).lte('due_date', untilDateStr)
+      }
+
+      const { data, error, count } = await query
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (error) throw error
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const mapped = (data || []).map(row => {
+        const dueDate = row.due_date ? new Date(`${row.due_date}T00:00:00`) : null
+        const daysToDue = dueDate
+          ? Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null
+
+        return {
+          ...row,
+          supplier_name: row.supplier?.trade_name || row.supplier?.legal_name || 'Proveedor',
+          location_id: row.purchase?.location_id || null,
+          location_name: row.purchase?.location?.name || 'Sin sede',
+          days_to_due: daysToDue,
+          is_overdue: dueDate ? dueDate.getTime() < today.getTime() : false
+        }
+      })
+
+      return {
+        success: true,
+        data: mapped,
+        total: count || 0
+      }
+    } catch (error) {
+      console.error('Error getting supplier payables dashboard:', error)
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+        total: 0
+      }
+    }
+  }
 }
 
 export default new PurchasesService()

@@ -390,6 +390,9 @@
                   <v-text-field v-model.number="transfer.quantity" type="number" label="Cantidad *" variant="outlined" min="1" :rules="[rules.required, rules.positive]"></v-text-field>
                   <v-textarea v-model="transfer.note" label="Nota" variant="outlined" rows="2"></v-textarea>
                   <v-btn type="submit" color="blue" block :loading="transferring" prepend-icon="mdi-swap-horizontal">Registrar Traslado</v-btn>
+                  <v-btn class="mt-2" color="indigo" variant="tonal" block :loading="loadingPendingTransfers" prepend-icon="mdi-truck-fast" @click="openPendingTransfersDialog">
+                    Recibir Traslados en Transito ({{ pendingTransfers.length }})
+                  </v-btn>
                 </v-form>
               </v-card-text>
             </v-card>
@@ -418,6 +421,77 @@
         </v-row>
       </v-window-item>
     </v-window>
+
+    <v-dialog v-model="pendingTransfersDialog" max-width="980" scrollable>
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          <v-icon start color="indigo">mdi-truck-fast</v-icon>
+          Traslados en Transito
+        </v-card-title>
+        <v-card-text>
+          <v-row dense class="mb-2">
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="pendingTransfersToLocation"
+                :items="locations"
+                item-title="name"
+                item-value="location_id"
+                label="Filtrar por sede destino"
+                variant="outlined"
+                density="compact"
+                clearable
+                @update:model-value="loadPendingTransfers"
+              />
+            </v-col>
+          </v-row>
+
+          <v-alert v-if="loadingPendingTransfers" type="info" variant="tonal">
+            Cargando traslados en transito...
+          </v-alert>
+
+          <v-alert v-else-if="pendingTransfers.length === 0" type="info" variant="tonal">
+            No hay traslados pendientes.
+          </v-alert>
+
+          <v-card v-for="tr in pendingTransfers" :key="tr.transfer_id" variant="outlined" class="mb-2">
+            <v-card-text>
+              <v-row align="center" dense>
+                <v-col cols="12" md="5">
+                  <div class="text-body-2 font-weight-bold">
+                    {{ tr.variant?.product?.name }}{{ tr.variant?.variant_name ? ' - ' + tr.variant.variant_name : '' }}
+                  </div>
+                  <div class="text-caption text-grey">SKU: {{ tr.variant?.sku || '-' }}</div>
+                  <div class="text-caption text-grey">{{ formatDate(tr.created_at) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-caption">Origen: <strong>{{ tr.from_location?.name || '-' }}</strong></div>
+                  <div class="text-caption">Destino: <strong>{{ tr.to_location?.name || '-' }}</strong></div>
+                  <div class="text-caption">Cantidad: <strong>{{ tr.quantity }}</strong></div>
+                </v-col>
+                <v-col cols="12" md="3" class="text-md-right">
+                  <v-btn
+                    color="indigo"
+                    size="small"
+                    prepend-icon="mdi-check"
+                    :loading="receivingTransferId === tr.transfer_id"
+                    @click="receivePendingTransfer(tr)"
+                  >
+                    Confirmar recepcion
+                  </v-btn>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="indigo" variant="tonal" prepend-icon="mdi-refresh" :loading="loadingPendingTransfers" @click="loadPendingTransfers">
+            Actualizar
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn @click="pendingTransfersDialog = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
@@ -468,6 +542,11 @@ const purchaseForm = ref(null)
 const adjusting = ref(false)
 const transferring = ref(false)
 const purchasing = ref(false)
+const pendingTransfersDialog = ref(false)
+const loadingPendingTransfers = ref(false)
+const pendingTransfers = ref([])
+const pendingTransfersToLocation = ref(null)
+const receivingTransferId = ref(null)
 
 const adjust = ref({ location_id: null, variant: null, is_increase: true, quantity: 1, unit_cost: 0, note: '' })
 const transfer = ref({ from_location_id: null, to_location_id: null, variant: null, quantity: 1, note: '' })
@@ -632,15 +711,62 @@ const doTransfer = async () => {
       created_by: userProfile.value?.user_id
     })
     if (r.success) { 
-      showMsg('Traslado registrado')
+      showMsg('Traslado enviado en transito')
       transfer.value = { from_location_id: null, to_location_id: null, variant: null, quantity: 0, note: '' }
       variantResults2.value = []
       transferForm.value.resetValidation()
       loadStock()
       loadKardex()
+      loadPendingTransfers()
     }
     else showMsg(r.error, 'error')
   } finally { transferring.value = false }
+}
+
+const loadPendingTransfers = async () => {
+  if (!tenantId.value) return
+  loadingPendingTransfers.value = true
+  try {
+    const r = await inventoryService.getPendingTransfers(tenantId.value, pendingTransfersToLocation.value || null)
+    if (r.success) {
+      pendingTransfers.value = r.data || []
+    } else {
+      showMsg(r.error || 'Error cargando traslados pendientes', 'error')
+    }
+  } finally {
+    loadingPendingTransfers.value = false
+  }
+}
+
+const openPendingTransfersDialog = async () => {
+  pendingTransfersDialog.value = true
+  await loadPendingTransfers()
+}
+
+const receivePendingTransfer = async (transferItem) => {
+  if (!tenantId.value || !transferItem?.transfer_id) return
+  if (!userProfile.value?.user_id) {
+    showMsg('Usuario no identificado', 'error')
+    return
+  }
+
+  receivingTransferId.value = transferItem.transfer_id
+  try {
+    const r = await inventoryService.receiveTransfer(
+      tenantId.value,
+      transferItem.transfer_id,
+      userProfile.value.user_id,
+      transferItem.note || null
+    )
+    if (r.success) {
+      showMsg('Traslado recibido en destino')
+      await Promise.all([loadPendingTransfers(), loadStock(), loadKardex()])
+    } else {
+      showMsg(r.error || 'Error recibiendo traslado', 'error')
+    }
+  } finally {
+    receivingTransferId.value = null
+  }
 }
 
 // Compra
@@ -692,6 +818,7 @@ onMounted(async () => {
   await loadLocations()
   loadStock()
   loadKardex()
+  loadPendingTransfers()
   if (tab.value === 'components') {
     loadComponents()
   }

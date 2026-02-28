@@ -26,6 +26,8 @@ export function useAppAlerts() {
   const stockFilters = ref({ alert_level: null, location_id: null, search: '' })
   const expirationFilters = ref({ alert_level: null, location_id: null, search: '' })
   const layawayFilters = ref({ alert_level: null, search: '' })
+  const payableFilters = ref({ alert_level: null, search: '' })
+  const receivableFilters = ref({ alert_level: null, search: '' })
 
   // ── Niveles de alerta (para <v-select> en template) ──────────────────────
   const stockAlertLevels = [
@@ -44,6 +46,16 @@ export function useAppAlerts() {
   const layawayAlertLevels = [
     { title: 'Vencido', value: 'EXPIRED' },
     { title: 'Próximo a vencer', value: 'DUE_SOON' }
+  ]
+
+  const payableAlertLevels = [
+    { title: 'Vencida', value: 'OVERDUE' },
+    { title: 'Por vencer', value: 'DUE_SOON' }
+  ]
+
+  const receivableAlertLevels = [
+    { title: 'Cupo excedido', value: 'OVER_LIMIT' },
+    { title: 'Con saldo', value: 'WITH_DEBT' }
   ]
 
   // ── Computeds filtrados ───────────────────────────────────────────────────
@@ -100,11 +112,50 @@ export function useAppAlerts() {
     return alerts
   })
 
+  const payableAlerts = computed(() => {
+    let alerts = allAlerts.value.filter(a => a.alert_type === 'PAYABLE')
+    if (payableFilters.value.alert_level) {
+      alerts = alerts.filter(a => a.alert_level === payableFilters.value.alert_level)
+    }
+    if (payableFilters.value.search) {
+      const q = payableFilters.value.search.toLowerCase()
+      alerts = alerts.filter(a =>
+        a.data.supplier_name?.toLowerCase().includes(q) ||
+        a.data.invoice_number?.toLowerCase().includes(q) ||
+        a.data.location_name?.toLowerCase().includes(q)
+      )
+    }
+    return alerts
+  })
+
+  const receivableAlerts = computed(() => {
+    let alerts = allAlerts.value.filter(a => a.alert_type === 'RECEIVABLE')
+    if (receivableFilters.value.alert_level) {
+      alerts = alerts.filter(a => a.alert_level === receivableFilters.value.alert_level)
+    }
+    if (receivableFilters.value.search) {
+      const q = receivableFilters.value.search.toLowerCase()
+      alerts = alerts.filter(a =>
+        a.data.customer_name?.toLowerCase().includes(q) ||
+        a.data.customer_document?.toLowerCase().includes(q)
+      )
+    }
+    return alerts
+  })
+
   const stockAlertsCount = computed(() => stockAlerts.value.length)
   const expirationAlertsCount = computed(() => expirationAlerts.value.length)
   const layawayAlertsCount = computed(() => layawayAlerts.value.length)
+  const payableAlertsCount = computed(() => payableAlerts.value.length)
+  const receivableAlertsCount = computed(() => receivableAlerts.value.length)
   const totalAlertsCount = computed(
-    () => stockAlertsCount.value + expirationAlertsCount.value + layawayAlertsCount.value
+    () => (
+      stockAlertsCount.value +
+      expirationAlertsCount.value +
+      layawayAlertsCount.value +
+      payableAlertsCount.value +
+      receivableAlertsCount.value
+    )
   )
 
   // Alias de compatibilidad (deprecated)
@@ -179,6 +230,8 @@ export function useAppAlerts() {
   const loadStockAlerts = async () => { await alertsService.refreshStockAlerts() }
   const loadExpirationAlerts = async () => { await alertsService.refreshExpirationAlerts() }
   const loadLayawayAlerts = async () => { await alertsService.refreshLayawayAlerts() }
+  const loadPayableAlerts = async () => { await alertsService.refreshSupplierPayableAlerts() }
+  const loadReceivableAlerts = async () => { await alertsService.refreshCustomerReceivableAlerts() }
 
   // ── Helpers de color / ícono / etiqueta ───────────────────────────────────
   const getStockAlertColor = (level) => (
@@ -211,6 +264,26 @@ export function useAppAlerts() {
     { EXPIRED: 'Vencido', DUE_SOON: 'Próximo a vencer' }[level] || level
   )
 
+  const getPayableAlertColor = (level) => (
+    { OVERDUE: 'error', DUE_SOON: 'warning' }[level] || 'grey'
+  )
+  const getPayableAlertIcon = (level) => (
+    { OVERDUE: 'mdi-alert-circle', DUE_SOON: 'mdi-calendar-clock' }[level] || 'mdi-information'
+  )
+  const getPayableAlertLabel = (level) => (
+    { OVERDUE: 'Vencida', DUE_SOON: 'Por vencer' }[level] || level
+  )
+
+  const getReceivableAlertColor = (level) => (
+    { OVER_LIMIT: 'error', WITH_DEBT: 'warning' }[level] || 'grey'
+  )
+  const getReceivableAlertIcon = (level) => (
+    { OVER_LIMIT: 'mdi-alert-circle', WITH_DEBT: 'mdi-account-cash' }[level] || 'mdi-information'
+  )
+  const getReceivableAlertLabel = (level) => (
+    { OVER_LIMIT: 'Cupo excedido', WITH_DEBT: 'Con saldo' }[level] || level
+  )
+
   return {
     // Estado
     allAlerts,
@@ -220,17 +293,25 @@ export function useAppAlerts() {
     stockFilters,
     expirationFilters,
     layawayFilters,
+    payableFilters,
+    receivableFilters,
     // Niveles
     stockAlertLevels,
     expirationAlertLevels,
     layawayAlertLevels,
+    payableAlertLevels,
+    receivableAlertLevels,
     // Computeds
     stockAlerts,
     expirationAlerts,
     layawayAlerts,
+    payableAlerts,
+    receivableAlerts,
     stockAlertsCount,
     expirationAlertsCount,
     layawayAlertsCount,
+    payableAlertsCount,
+    receivableAlertsCount,
     totalAlertsCount,
     filteredLayawayAlerts,
     // Funciones
@@ -241,6 +322,8 @@ export function useAppAlerts() {
     loadStockAlerts,
     loadExpirationAlerts,
     loadLayawayAlerts,
+    loadPayableAlerts,
+    loadReceivableAlerts,
     // Helpers
     getStockAlertColor,
     getStockAlertIcon,
@@ -250,6 +333,12 @@ export function useAppAlerts() {
     getExpirationAlertLabel,
     getLayawayAlertColor,
     getLayawayAlertIcon,
-    getLayawayAlertLabel
+    getLayawayAlertLabel,
+    getPayableAlertColor,
+    getPayableAlertIcon,
+    getPayableAlertLabel,
+    getReceivableAlertColor,
+    getReceivableAlertIcon,
+    getReceivableAlertLabel
   }
 }

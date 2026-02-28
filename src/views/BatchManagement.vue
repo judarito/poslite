@@ -357,15 +357,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
+import { useTenantSettings } from '@/composables/useTenantSettings'
 import batchesService from '@/services/batches.service'
 import locationsService from '@/services/locations.service'
 import productsService from '@/services/products.service'
-import supabaseService from '@/services/supabase.service'
 import ExpirationAlerts from '@/components/ExpirationAlerts.vue'
 
-const router = useRouter()
 const tab = ref('batches')
 
 // Current tenant
@@ -398,6 +396,7 @@ const alertLevels = [
 // Dialog
 const dialog = ref(false)
 const isEditing = ref(false)
+const form = ref(null)
 const formData = ref({
   location_id: null,
   variant_id: null,
@@ -499,8 +498,8 @@ async function generateBatchNumber() {
 
 async function saveBatch() {
   if (!tenantId.value) return
-  const form = this.$refs.form
-  if (!form.validate()) return
+  const validation = await form.value?.validate()
+  if (!validation?.valid) return
 
   try {
     const result = isEditing.value

@@ -26,6 +26,19 @@
         </v-btn>
       </v-col>
       <v-col cols="12" sm="auto">
+        <v-btn
+          color="deep-orange"
+          prepend-icon="mdi-file-document-multiple"
+          variant="tonal"
+          @click="openSupplierPayablesDialog"
+          :loading="loadingSupplierPayablesBoard"
+          :block="isMobile"
+        >
+          CxP Proveedores
+          <v-badge v-if="supplierPayablesOpenCount > 0" color="error" :content="supplierPayablesOpenCount" inline></v-badge>
+        </v-btn>
+      </v-col>
+      <v-col cols="12" sm="auto">
         <v-btn 
           color="purple" 
           prepend-icon="mdi-lightbulb-on" 
@@ -119,14 +132,14 @@
         </v-row>
       </template>
 
-      <!-- TÃ­tulo del item -->
+      <!-- Titulo del item -->
       <template #title="{ item }">
         {{ item.product_name }}{{ item.variant_name ? ' - ' + item.variant_name : '' }}
       </template>
 
-      <!-- SubtÃ­tulo -->
+      <!-- Subtitulo -->
       <template #subtitle="{ item }">
-        {{ formatDate(item.purchased_at) }} â€¢ {{ item.purchased_by_name }} â€¢ {{ item.location_name }}
+        {{ formatDate(item.purchased_at) }} • {{ item.purchased_by_name }} • {{ item.location_name }}
       </template>
 
       <!-- Contenido -->
@@ -144,6 +157,178 @@
         </div>
       </template>
     </ListView>
+
+    <!-- Dialog CxP proveedores -->
+    <v-dialog v-model="supplierPayablesDialog" max-width="1200" scrollable>
+      <v-card>
+        <v-card-title class="bg-deep-orange">
+          <v-icon start color="white">mdi-file-document-multiple</v-icon>
+          <span class="text-white">Cuentas por Pagar a Proveedores</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-row dense class="mb-3">
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="supplierPayablesStatusFilter"
+                :items="supplierPayablesStatusOptions"
+                item-title="label"
+                item-value="value"
+                label="Estado"
+                density="compact"
+                variant="outlined"
+                @update:model-value="applySupplierPayablesFilters"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="supplierPayablesDueFilter"
+                :items="supplierPayablesDueOptions"
+                item-title="label"
+                item-value="value"
+                label="Vencimiento"
+                density="compact"
+                variant="outlined"
+                @update:model-value="applySupplierPayablesFilters"
+              />
+            </v-col>
+            <v-col cols="12" md="4" class="d-flex align-center justify-end" style="gap: 8px; flex-wrap: wrap;">
+              <v-btn
+                color="success"
+                variant="tonal"
+                prepend-icon="mdi-cash-multiple"
+                :disabled="selectedSupplierPayablesRows.length === 0"
+                @click="openBulkSupplierPaymentDialog"
+                class="mr-2"
+              >
+                Pagar seleccionadas
+              </v-btn>
+              <v-btn
+                color="primary"
+                variant="text"
+                size="small"
+                @click="toggleSelectAllSupplierPayables(!allSupplierPayablesSelected)"
+              >
+                {{ allSupplierPayablesSelected ? 'Limpiar selección' : 'Seleccionar todas' }}
+              </v-btn>
+              <v-chip color="warning" variant="tonal" class="mr-2">
+                Abiertas: {{ supplierPayablesOpenCount }}
+              </v-chip>
+              <v-chip color="error" variant="tonal">
+                Vencidas: {{ supplierPayablesOverdueCount }}
+              </v-chip>
+            </v-col>
+          </v-row>
+
+          <ListView
+            title="Listado CxP"
+            icon="mdi-file-document-multiple"
+            :items="supplierPayablesBoard"
+            :total-items="supplierPayablesTotal"
+            :loading="loadingSupplierPayablesBoard"
+            :searchable="false"
+            :page-size="supplierPayablesPageSize"
+            item-key="payable_id"
+            :show-create-button="false"
+            :editable="false"
+            :deletable="false"
+            :clickable="false"
+            empty-message="No hay cuentas por pagar para los filtros seleccionados"
+            empty-icon="mdi-check-circle"
+            @load-page="loadSupplierPayablesPage"
+          >
+            <template #avatar="{ item }">
+              <div class="d-flex align-center justify-center" style="width: 32px;">
+                <v-checkbox-btn
+                  :model-value="supplierPayablesSelectedIds.includes(item.payable_id)"
+                  :disabled="!isSupplierPayableSelectable(item)"
+                  @update:model-value="val => toggleSupplierPayableSelection(item.payable_id, val)"
+                />
+              </div>
+            </template>
+            <template #title="{ item }">
+              <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 8px;">
+                <span class="font-weight-bold text-body-1">{{ item.supplier_name || 'Proveedor' }}</span>
+                <v-chip size="small" :color="payableStatusColor(item.status)" variant="tonal" class="text-no-wrap">
+                  {{ payableStatusLabel(item.status) }}
+                </v-chip>
+              </div>
+            </template>
+            <template #subtitle="{ item }">
+              {{ item.location_name || 'Sin sede' }} • Factura: {{ item.invoice_number || 'Sin numero' }}
+            </template>
+            <template #content="{ item }">
+              <div class="mt-2 d-flex flex-wrap ga-2">
+                <v-chip size="small" variant="tonal" color="error">Saldo: {{ formatMoney(item.balance) }}</v-chip>
+                <v-chip size="small" variant="tonal" color="success">Pagado: {{ formatMoney(item.paid_amount) }}</v-chip>
+                <v-chip size="small" variant="tonal">Vence: {{ item.due_date ? formatDate(item.due_date) : 'Sin fecha' }}</v-chip>
+                <v-chip v-if="item.is_overdue" size="small" color="error" variant="flat">Vencida</v-chip>
+                <v-chip v-else-if="item.days_to_due !== null" size="small" color="warning" variant="tonal">
+                  En {{ item.days_to_due }} dias
+                </v-chip>
+              </div>
+              <div class="mt-2 d-flex justify-end">
+                <v-btn size="small" color="primary" variant="text" @click="openPurchaseDetailByPurchaseId(item.purchase_id)">
+                  Ver compra
+                </v-btn>
+              </div>
+            </template>
+          </ListView>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="supplierPayablesDialog = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="bulkSupplierPaymentDialog" max-width="620">
+      <v-card>
+        <v-card-title class="bg-success">
+          <v-icon start color="white">mdi-cash-multiple</v-icon>
+          <span class="text-white">Pago masivo de CxP</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-alert type="info" variant="tonal" class="mb-3">
+            Se registrará un abono por el saldo total de cada cuenta seleccionada.
+          </v-alert>
+
+          <v-row dense>
+            <v-col cols="12" md="6">
+              <div class="text-caption text-grey">Cuentas seleccionadas</div>
+              <div class="text-h6">{{ selectedSupplierPayablesRows.length }}</div>
+            </v-col>
+            <v-col cols="12" md="6" class="text-right">
+              <div class="text-caption text-grey">Total a pagar</div>
+              <div class="text-h6 text-success">{{ formatMoney(selectedSupplierPayablesTotal) }}</div>
+            </v-col>
+          </v-row>
+
+          <v-text-field
+            v-model="bulkSupplierPaymentForm.payment_method"
+            label="Método de pago"
+            variant="outlined"
+            density="compact"
+            prepend-inner-icon="mdi-credit-card-outline"
+            class="mt-3"
+          />
+
+          <v-textarea
+            v-model="bulkSupplierPaymentForm.note"
+            label="Nota (opcional)"
+            variant="outlined"
+            rows="2"
+            auto-grow
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="bulkSupplierPaymentDialog = false" :disabled="savingBulkSupplierPayment">Cancelar</v-btn>
+          <v-btn color="success" @click="confirmBulkSupplierPayment" :loading="savingBulkSupplierPayment">
+            Confirmar pago masivo
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Dialog Sugerencias Inteligentes -->
     <v-dialog v-model="suggestionsDialog" max-width="1200" scrollable>
@@ -997,6 +1182,94 @@
               </v-card-text>
             </v-card>
 
+            <v-card variant="outlined" class="mb-4">
+              <v-card-title class="text-subtitle-1 d-flex align-center">
+                <v-icon start color="deep-orange">mdi-cash-clock</v-icon>
+                Cuenta por pagar
+              </v-card-title>
+              <v-card-text>
+                <v-alert v-if="loadingSupplierPayable" type="info" variant="tonal" density="compact">
+                  Cargando cuenta por pagar...
+                </v-alert>
+
+                <template v-else-if="purchasePayable">
+                  <v-row dense>
+                    <v-col cols="12" md="3">
+                      <div class="text-caption text-grey">Estado</div>
+                      <v-chip size="small" :color="payableStatusColor(purchasePayable.status)" variant="tonal">
+                        {{ payableStatusLabel(purchasePayable.status) }}
+                      </v-chip>
+                    </v-col>
+                    <v-col cols="12" md="3">
+                      <div class="text-caption text-grey">Total factura</div>
+                      <div class="text-body-1 font-weight-bold">{{ formatMoney(purchasePayable.total_amount) }}</div>
+                    </v-col>
+                    <v-col cols="12" md="3">
+                      <div class="text-caption text-grey">Abonado</div>
+                      <div class="text-body-1 text-success">{{ formatMoney(purchasePayable.paid_amount) }}</div>
+                    </v-col>
+                    <v-col cols="12" md="3">
+                      <div class="text-caption text-grey">Saldo</div>
+                      <div class="text-body-1 text-error font-weight-bold">{{ formatMoney(purchasePayable.balance) }}</div>
+                    </v-col>
+                    <v-col cols="12" md="4">
+                      <div class="text-caption text-grey">Factura proveedor</div>
+                      <div class="text-body-2">{{ purchasePayable.invoice_number || 'Sin numero' }}</div>
+                    </v-col>
+                    <v-col cols="12" md="4">
+                      <div class="text-caption text-grey">Vencimiento</div>
+                      <div class="text-body-2">{{ purchasePayable.due_date ? formatDate(purchasePayable.due_date) : 'Sin fecha' }}</div>
+                    </v-col>
+                    <v-col cols="12" md="4" class="text-md-right">
+                      <v-btn
+                        color="deep-orange"
+                        variant="tonal"
+                        prepend-icon="mdi-cash-plus"
+                        :disabled="purchasePayable.status === 'PAID' || purchasePayable.status === 'CANCELLED'"
+                        @click="openSupplierPaymentDialog"
+                      >
+                        Registrar abono
+                      </v-btn>
+                    </v-col>
+                  </v-row>
+
+                  <v-divider class="my-3"></v-divider>
+
+                  <div class="text-caption text-grey mb-1">Ultimos abonos</div>
+                  <v-row v-if="purchasePayable.payments && purchasePayable.payments.length > 0" dense>
+                    <v-col v-for="pay in purchasePayable.payments.slice(0, 5)" :key="pay.payable_payment_id" cols="12" md="6">
+                      <v-card variant="tonal" color="deep-orange">
+                        <v-card-text class="py-2">
+                          <div class="d-flex justify-space-between">
+                            <span class="text-body-2">{{ formatDate(pay.created_at) }}</span>
+                            <span class="text-body-2 font-weight-bold">{{ formatMoney(pay.amount) }}</span>
+                          </div>
+                          <div class="text-caption">{{ pay.payment_method || 'Sin metodo' }} {{ pay.note ? '• ' + pay.note : '' }}</div>
+                        </v-card-text>
+                      </v-card>
+                    </v-col>
+                  </v-row>
+                  <v-alert v-else type="info" variant="tonal" density="compact">
+                    Sin abonos registrados.
+                  </v-alert>
+                </template>
+
+                <template v-else>
+                  <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
+                    Esta compra aun no tiene cuenta por pagar.
+                  </v-alert>
+                  <v-btn
+                    color="deep-orange"
+                    prepend-icon="mdi-plus-circle"
+                    variant="tonal"
+                    :disabled="!purchaseDetail?.supplier"
+                    @click="openCreatePayableDialog"
+                  >
+                    Crear cuenta por pagar
+                  </v-btn>
+                </template>
+              </v-card-text>
+            </v-card>
             <!-- LÃ­neas de la compra -->
             <div class="text-subtitle-1 font-weight-bold mb-2">Productos Comprados</div>
             <v-card v-for="(line, idx) in purchaseDetail.lines" :key="line.line_id" variant="outlined" class="mb-2">
@@ -1129,6 +1402,96 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="createPayableDialog" max-width="520">
+      <v-card>
+        <v-card-title class="bg-deep-orange">
+          <v-icon start color="white">mdi-file-document-plus</v-icon>
+          <span class="text-white">Crear cuenta por pagar</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <v-text-field
+            v-model="payableForm.invoice_number"
+            label="Numero de factura proveedor"
+            prepend-inner-icon="mdi-file-document"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model="payableForm.due_date"
+            label="Fecha de vencimiento"
+            type="date"
+            prepend-inner-icon="mdi-calendar"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          />
+          <v-textarea
+            v-model="payableForm.note"
+            label="Nota (opcional)"
+            prepend-inner-icon="mdi-note-text"
+            variant="outlined"
+            rows="2"
+            density="compact"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="createPayableDialog = false">Cancelar</v-btn>
+          <v-btn color="deep-orange" :loading="savingPayable" prepend-icon="mdi-check" @click="confirmCreatePayable">
+            Crear
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="supplierPaymentDialog" max-width="520">
+      <v-card>
+        <v-card-title class="bg-deep-orange">
+          <v-icon start color="white">mdi-cash-plus</v-icon>
+          <span class="text-white">Registrar abono proveedor</span>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <div class="text-caption text-grey mb-2">
+            Saldo actual: <strong>{{ formatMoney(purchasePayable?.balance || 0) }}</strong>
+          </div>
+          <v-text-field
+            v-model.number="supplierPaymentForm.amount"
+            label="Monto"
+            type="number"
+            min="0.01"
+            :max="purchasePayable?.balance || undefined"
+            prepend-inner-icon="mdi-cash"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model="supplierPaymentForm.payment_method"
+            label="Metodo de pago"
+            prepend-inner-icon="mdi-credit-card-outline"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          />
+          <v-textarea
+            v-model="supplierPaymentForm.note"
+            label="Nota (opcional)"
+            prepend-inner-icon="mdi-note-text"
+            variant="outlined"
+            rows="2"
+            density="compact"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="supplierPaymentDialog = false">Cancelar</v-btn>
+          <v-btn color="deep-orange" :loading="savingSupplierPayment" prepend-icon="mdi-check" @click="confirmSupplierPayment">
+            Registrar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMessage }}</v-snackbar>
   </div>
 </template>
@@ -1162,6 +1525,22 @@ const detailDialog = ref(false)
 const purchaseDetail = ref(null)
 const loadingDetail = ref(false)
 const detailError = ref(null)
+const loadingSupplierPayable = ref(false)
+const purchasePayable = ref(null)
+const createPayableDialog = ref(false)
+const savingPayable = ref(false)
+const supplierPaymentDialog = ref(false)
+const savingSupplierPayment = ref(false)
+const payableForm = ref({
+  invoice_number: '',
+  due_date: null,
+  note: ''
+})
+const supplierPaymentForm = ref({
+  amount: 0,
+  payment_method: '',
+  note: ''
+})
 const returnDialog = ref(false)
 const returningPurchase = ref(false)
 const returnDraftLines = ref([])
@@ -1223,6 +1602,58 @@ const aiSuggestionsTab = ref('all')
 const aiAvailable = ref(false)
 const pendingPurchaseOrdersCount = computed(() => pendingPurchaseOrders.value.length)
 
+const supplierPayablesDialog = ref(false)
+const supplierPayablesBoard = ref([])
+const loadingSupplierPayablesBoard = ref(false)
+const supplierPayablesStatusFilter = ref('OPEN_PARTIAL')
+const supplierPayablesDueFilter = ref(30)
+const supplierPayablesTotal = ref(0)
+const supplierPayablesPage = ref(1)
+const supplierPayablesPageSize = computed(() => defaultPageSize.value || 20)
+const supplierPayablesStatusOptions = [
+  { label: 'Abiertas y parciales', value: 'OPEN_PARTIAL' },
+  { label: 'Todas', value: 'ALL' },
+  { label: 'Abiertas', value: 'OPEN' },
+  { label: 'Parciales', value: 'PARTIAL' },
+  { label: 'Pagadas', value: 'PAID' },
+  { label: 'Canceladas', value: 'CANCELLED' }
+]
+const supplierPayablesDueOptions = [
+  { label: 'Sin filtro', value: null },
+  { label: 'Vence hoy o en 7 dias', value: 7 },
+  { label: 'Vence hoy o en 15 dias', value: 15 },
+  { label: 'Vence hoy o en 30 dias', value: 30 },
+  { label: 'Vence hoy o en 60 dias', value: 60 }
+]
+const supplierPayablesOpenCount = computed(() =>
+  supplierPayablesBoard.value.filter(x => ['OPEN', 'PARTIAL'].includes(x.status)).length
+)
+const supplierPayablesOverdueCount = computed(() =>
+  supplierPayablesBoard.value.filter(x => x.is_overdue && ['OPEN', 'PARTIAL'].includes(x.status)).length
+)
+const supplierPayablesSelectedIds = ref([])
+const bulkSupplierPaymentDialog = ref(false)
+const savingBulkSupplierPayment = ref(false)
+const bulkSupplierPaymentForm = ref({
+  payment_method: '',
+  note: ''
+})
+const selectedSupplierPayablesRows = computed(() =>
+  supplierPayablesBoard.value.filter(row =>
+    supplierPayablesSelectedIds.value.includes(row.payable_id) && isSupplierPayableSelectable(row)
+  )
+)
+const selectedSupplierPayablesTotal = computed(() =>
+  selectedSupplierPayablesRows.value.reduce((sum, row) => sum + Number(row.balance || 0), 0)
+)
+const selectableSupplierPayablesIds = computed(() =>
+  supplierPayablesBoard.value.filter(isSupplierPayableSelectable).map(row => row.payable_id)
+)
+const allSupplierPayablesSelected = computed(() =>
+  selectableSupplierPayablesIds.value.length > 0 &&
+  selectableSupplierPayablesIds.value.every(id => supplierPayablesSelectedIds.value.includes(id))
+)
+
 // Verificar disponibilidad de IA
 onMounted(() => {
   aiAvailable.value = purchasesService.isAIAvailable()
@@ -1235,6 +1666,20 @@ const rules = {
   required: v => !!v || v === 0 || 'Campo requerido',
   positive: v => v > 0 || 'Debe ser mayor a 0'
 }
+
+const payableStatusLabel = (status) => ({
+  OPEN: 'Abierta',
+  PARTIAL: 'Parcial',
+  PAID: 'Pagada',
+  CANCELLED: 'Cancelada'
+}[status] || status)
+
+const payableStatusColor = (status) => ({
+  OPEN: 'warning',
+  PARTIAL: 'info',
+  PAID: 'success',
+  CANCELLED: 'grey'
+}[status] || 'grey')
 
 // Funciones de sugerencias
 const openSuggestionsDialog = async () => {
@@ -1383,6 +1828,7 @@ onMounted(async () => {
   await loadLocations()
   await loadPurchases()
   await loadPendingPurchaseOrders()
+  await loadSupplierPayablesBoard()
   // Cargar sugerencias en background para mostrar badge
   loadSuggestions()
 })
@@ -1407,6 +1853,136 @@ const loadPendingPurchaseOrders = async () => {
 const openPurchaseOrdersDialog = async () => {
   purchaseOrdersDialog.value = true
   await loadPendingPurchaseOrders()
+}
+
+const loadSupplierPayablesBoard = async (pageParam = supplierPayablesPage.value, pageSizeParam = supplierPayablesPageSize.value) => {
+  if (!tenantId.value) return
+  loadingSupplierPayablesBoard.value = true
+  try {
+    const actualPage = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+    const actualPageSize = Number.isInteger(pageSizeParam) && pageSizeParam > 0
+      ? pageSizeParam
+      : supplierPayablesPageSize.value
+
+    const result = await purchasesService.getSupplierPayablesDashboard({
+      tenantId: tenantId.value,
+      status: supplierPayablesStatusFilter.value,
+      dueInDays: supplierPayablesDueFilter.value,
+      page: actualPage,
+      pageSize: actualPageSize
+    })
+
+    if (result.success) {
+      supplierPayablesBoard.value = result.data || []
+      supplierPayablesTotal.value = Number(result.total || 0)
+      supplierPayablesPage.value = actualPage
+      const validIds = new Set((supplierPayablesBoard.value || []).map(x => x.payable_id))
+      supplierPayablesSelectedIds.value = supplierPayablesSelectedIds.value.filter(id => validIds.has(id))
+    } else {
+      throw new Error(result.error)
+    }
+  } catch (error) {
+    showMsg('Error al cargar cuentas por pagar: ' + error.message, 'error')
+  } finally {
+    loadingSupplierPayablesBoard.value = false
+  }
+}
+
+const loadSupplierPayablesPage = ({ page, pageSize }) => {
+  loadSupplierPayablesBoard(page, pageSize)
+}
+
+const applySupplierPayablesFilters = async () => {
+  supplierPayablesPage.value = 1
+  supplierPayablesSelectedIds.value = []
+  await loadSupplierPayablesBoard(1, supplierPayablesPageSize.value)
+}
+
+const openSupplierPayablesDialog = async () => {
+  supplierPayablesDialog.value = true
+  supplierPayablesPage.value = 1
+  await loadSupplierPayablesBoard(1, supplierPayablesPageSize.value)
+}
+
+const isSupplierPayableSelectable = (row) => {
+  return ['OPEN', 'PARTIAL'].includes(row?.status) && Number(row?.balance || 0) > 0
+}
+
+const toggleSupplierPayableSelection = (payableId, checked) => {
+  if (!payableId) return
+  if (checked) {
+    if (!supplierPayablesSelectedIds.value.includes(payableId)) {
+      supplierPayablesSelectedIds.value.push(payableId)
+    }
+  } else {
+    supplierPayablesSelectedIds.value = supplierPayablesSelectedIds.value.filter(id => id !== payableId)
+  }
+}
+
+const toggleSelectAllSupplierPayables = (checked) => {
+  if (checked) {
+    supplierPayablesSelectedIds.value = [...selectableSupplierPayablesIds.value]
+  } else {
+    supplierPayablesSelectedIds.value = []
+  }
+}
+
+const openBulkSupplierPaymentDialog = () => {
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+  if (selectedSupplierPayablesRows.value.length === 0) {
+    showMsg('No hay cuentas seleccionadas para pagar', 'warning')
+    return
+  }
+  bulkSupplierPaymentForm.value = {
+    payment_method: '',
+    note: ''
+  }
+  bulkSupplierPaymentDialog.value = true
+}
+
+const confirmBulkSupplierPayment = async () => {
+  if (!tenantId.value || !userProfile.value?.user_id) return
+  const rows = selectedSupplierPayablesRows.value
+  if (rows.length === 0) {
+    showMsg('No hay cuentas válidas para pagar', 'warning')
+    return
+  }
+  savingBulkSupplierPayment.value = true
+  let ok = 0
+  let failed = 0
+  try {
+    for (const row of rows) {
+      const amount = Number(row.balance || 0)
+      if (amount <= 0) continue
+      const result = await purchasesService.registerSupplierPayment({
+        tenantId: tenantId.value,
+        payableId: row.payable_id,
+        amount,
+        createdBy: userProfile.value.user_id,
+        paymentMethod: bulkSupplierPaymentForm.value.payment_method || null,
+        note: bulkSupplierPaymentForm.value.note || 'Pago masivo de cuentas por pagar'
+      })
+      if (result.success) ok++
+      else failed++
+    }
+    if (ok > 0 && failed === 0) {
+      showMsg(`Pago masivo completado. Cuentas pagadas: ${ok}`)
+    } else if (ok > 0 && failed > 0) {
+      showMsg(`Pago masivo parcial. Exitosas: ${ok}, fallidas: ${failed}`, 'warning')
+    } else {
+      showMsg('No se pudo registrar el pago masivo', 'error')
+    }
+    bulkSupplierPaymentDialog.value = false
+    supplierPayablesSelectedIds.value = []
+    await loadSupplierPayablesBoard(supplierPayablesPage.value, supplierPayablesPageSize.value)
+  } catch (error) {
+    showMsg('Error en pago masivo: ' + error.message, 'error')
+  } finally {
+    savingBulkSupplierPayment.value = false
+  }
 }
 
 const loadLocations = async () => {
@@ -1455,33 +2031,22 @@ const handleSearch = ({ search: searchTerm, page, pageSize }) => {
 }
 
 // Ver detalle de compra
-const viewPurchaseDetail = async (item) => {
-  if (!tenantId.value || !item.purchase_id) return
-  
+const openPurchaseDetailByPurchaseId = async (purchaseId) => {
+  if (!tenantId.value || !purchaseId) return
+
   detailDialog.value = true
+  supplierPayablesDialog.value = false
   loadingDetail.value = true
   detailError.value = null
   purchaseDetail.value = null
+  purchasePayable.value = null
 
   try {
-    // El purchase_id en el listado es inventory_move_id
-    // Necesitamos buscar por source_id que es el ID real de la compra
-    // Primero obtener el source_id del item clickeado
-    const { data: moveData, error: moveError } = await supabaseService.client
-      .from('inventory_moves')
-      .select('source_id')
-      .eq('inventory_move_id', item.purchase_id)
-      .eq('tenant_id', tenantId.value)
-      .single()
-
-    if (moveError) throw moveError
-    
-    const purchaseId = moveData.source_id
-    
     const result = await purchasesService.getPurchaseDetail(tenantId.value, purchaseId)
-    
+
     if (result.success) {
       purchaseDetail.value = result.data
+      await loadSupplierPayable(purchaseId)
     } else {
       detailError.value = result.error
     }
@@ -1493,6 +2058,137 @@ const viewPurchaseDetail = async (item) => {
   }
 }
 
+// Ver detalle de compra
+const viewPurchaseDetail = async (item) => {
+  if (!tenantId.value || !item.purchase_id) return
+
+  try {
+    const { data: moveData, error: moveError } = await supabaseService.client
+      .from('inventory_moves')
+      .select('source_id')
+      .eq('inventory_move_id', item.purchase_id)
+      .eq('tenant_id', tenantId.value)
+      .single()
+
+    if (moveError) throw moveError
+
+    await openPurchaseDetailByPurchaseId(moveData.source_id)
+  } catch (error) {
+    showMsg('Error al abrir detalle de compra: ' + error.message, 'error')
+  }
+}
+
+const loadSupplierPayable = async (purchaseId) => {
+  if (!tenantId.value || !purchaseId) return
+  loadingSupplierPayable.value = true
+  try {
+    const result = await purchasesService.getSupplierPayableByPurchase(tenantId.value, purchaseId)
+    if (result.success) {
+      purchasePayable.value = result.data
+    } else {
+      throw new Error(result.error)
+    }
+  } catch (error) {
+    purchasePayable.value = null
+    showMsg('Error al cargar cuenta por pagar: ' + error.message, 'error')
+  } finally {
+    loadingSupplierPayable.value = false
+  }
+}
+
+const openCreatePayableDialog = () => {
+  payableForm.value = {
+    invoice_number: '',
+    due_date: null,
+    note: ''
+  }
+  createPayableDialog.value = true
+}
+
+const confirmCreatePayable = async () => {
+  if (!tenantId.value || !purchaseDetail.value?.purchase_id) return
+
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+
+  savingPayable.value = true
+  try {
+    const result = await purchasesService.createSupplierPayable({
+      tenantId: tenantId.value,
+      purchaseId: purchaseDetail.value.purchase_id,
+      createdBy: userProfile.value.user_id,
+      dueDate: payableForm.value.due_date || null,
+      invoiceNumber: payableForm.value.invoice_number || null,
+      note: payableForm.value.note || null
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    showMsg('Cuenta por pagar creada')
+    createPayableDialog.value = false
+    await loadSupplierPayable(purchaseDetail.value.purchase_id)
+  } catch (error) {
+    showMsg('Error al crear cuenta por pagar: ' + error.message, 'error')
+  } finally {
+    savingPayable.value = false
+  }
+}
+
+const openSupplierPaymentDialog = () => {
+  supplierPaymentForm.value = {
+    amount: purchasePayable.value?.balance || 0,
+    payment_method: '',
+    note: ''
+  }
+  supplierPaymentDialog.value = true
+}
+
+const confirmSupplierPayment = async () => {
+  if (!tenantId.value || !purchasePayable.value?.payable_id) return
+
+  if (!userProfile.value?.user_id) {
+    showMsg('Error: Usuario no identificado', 'error')
+    return
+  }
+
+  const amount = Number(supplierPaymentForm.value.amount || 0)
+  if (amount <= 0) {
+    showMsg('El monto debe ser mayor a 0', 'warning')
+    return
+  }
+  if (amount > Number(purchasePayable.value.balance || 0)) {
+    showMsg('El abono no puede superar el saldo', 'warning')
+    return
+  }
+
+  savingSupplierPayment.value = true
+  try {
+    const result = await purchasesService.registerSupplierPayment({
+      tenantId: tenantId.value,
+      payableId: purchasePayable.value.payable_id,
+      amount,
+      createdBy: userProfile.value.user_id,
+      paymentMethod: supplierPaymentForm.value.payment_method || null,
+      note: supplierPaymentForm.value.note || null
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    showMsg('Abono registrado correctamente')
+    supplierPaymentDialog.value = false
+    await loadSupplierPayable(purchaseDetail.value.purchase_id)
+  } catch (error) {
+    showMsg('Error al registrar abono: ' + error.message, 'error')
+  } finally {
+    savingSupplierPayment.value = false
+  }
+}
 const openReturnDialog = () => {
   if (!purchaseDetail.value?.lines?.length) {
     showMsg('No hay lineas para devolver', 'warning')
@@ -1941,6 +2637,26 @@ const showMsg = (msg, color = 'success') => {
   snackbar.value = true
 }
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

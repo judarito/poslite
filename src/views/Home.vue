@@ -20,6 +20,33 @@
       </template>
     </v-alert>
 
+    <!-- Alerta: cuentas por pagar a proveedores vencidas / por vencer -->
+    <v-alert
+      v-if="canViewSupplierPayables && (supplierPayablesOverdueCount > 0 || supplierPayablesDueSoonCount > 0)"
+      :type="supplierPayablesOverdueCount > 0 ? 'error' : 'warning'"
+      variant="tonal"
+      class="mb-4"
+      prepend-icon="mdi-file-alert"
+      :title="supplierPayablesAlertTitle"
+    >
+      <div class="text-body-2 mt-1">
+        <span v-if="supplierPayablesOverdueCount > 0">
+          Vencidas: <strong>{{ supplierPayablesOverdueCount }}</strong>
+          ({{ formatMoney(supplierPayablesOverdueAmount) }})
+        </span>
+        <span v-if="supplierPayablesDueSoonCount > 0">
+          <span v-if="supplierPayablesOverdueCount > 0"> • </span>
+          Por vencer (7 días): <strong>{{ supplierPayablesDueSoonCount }}</strong>
+          ({{ formatMoney(supplierPayablesDueSoonAmount) }})
+        </span>
+      </div>
+      <template #append>
+        <v-btn size="small" variant="outlined" :color="supplierPayablesOverdueCount > 0 ? 'error' : 'warning'" to="/purchases">
+          Ver compras
+        </v-btn>
+      </template>
+    </v-alert>
+
     <!-- KPI Cards de ventas -->
     <v-row class="mb-1">
       <!-- Ventas Hoy -->
@@ -207,7 +234,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import VueApexCharts from 'vue3-apexcharts'
 import { useCashSession } from '@/composables/useCashSession'
@@ -218,6 +245,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
 import cashService from '@/services/cash.service'
+import alertsService from '@/services/alerts.service'
 import { formatMoney } from '@/utils/formatters'
 
 const apexchart = VueApexCharts
@@ -236,6 +264,21 @@ const dailySeries    = ref([])
 const topProducts    = ref([])
 const paymentMethods = ref([])
 const expiredSessions = ref([])
+let supplierPayablesAlertsChannel = null
+const supplierPayablesOverdueCount = ref(0)
+const supplierPayablesDueSoonCount = ref(0)
+const supplierPayablesOverdueAmount = ref(0)
+const supplierPayablesDueSoonAmount = ref(0)
+const canViewSupplierPayables = computed(() => {
+  const roles = (userProfile.value?.roles || []).map(r => r.name)
+  return roles.includes('ADMINISTRADOR') || roles.includes('GERENTE')
+})
+const supplierPayablesAlertTitle = computed(() => {
+  if (supplierPayablesOverdueCount.value > 0) {
+    return `${supplierPayablesOverdueCount.value} CxP de proveedores vencidas`
+  }
+  return `${supplierPayablesDueSoonCount.value} CxP de proveedores por vencer`
+})
 
 // Trend chart
 const trendSeries = computed(() => [{
@@ -301,12 +344,46 @@ async function loadKPIs() {
   kpiLoading.value = false
 }
 
+async function loadSupplierPayablesAlerts() {
+  if (!tenantId.value || !canViewSupplierPayables.value) return
+
+  const result = await alertsService.getAlertsByType(tenantId.value, 'PAYABLE')
+
+  if (!result.success) return
+
+  const rows = result.data || []
+  const overdue = rows.filter(r => r.alert_level === 'OVERDUE')
+  const dueSoon = rows.filter(r => r.alert_level === 'DUE_SOON')
+
+  supplierPayablesOverdueCount.value = overdue.length
+  supplierPayablesDueSoonCount.value = dueSoon.length
+  supplierPayablesOverdueAmount.value = overdue.reduce((acc, r) => acc + Number(r?.data?.balance || 0), 0)
+  supplierPayablesDueSoonAmount.value = dueSoon.reduce((acc, r) => acc + Number(r?.data?.balance || 0), 0)
+}
+
 onMounted(async () => {
   await loadPOSContext()
   await loadKPIs()
+  await loadSupplierPayablesAlerts()
   if (tenantId.value) {
     const r = await cashService.getExpiredSessions(tenantId.value, cashSessionMaxHours.value)
     if (r.success) expiredSessions.value = r.data
+  }
+
+  if (tenantId.value && canViewSupplierPayables.value) {
+    supplierPayablesAlertsChannel = alertsService.subscribeToAlerts(tenantId.value, (payload) => {
+      const alertType = payload?.new?.alert_type || payload?.old?.alert_type
+      if (alertType === 'PAYABLE') {
+        loadSupplierPayablesAlerts()
+      }
+    })
+  }
+})
+
+onBeforeUnmount(() => {
+  if (supplierPayablesAlertsChannel) {
+    alertsService.unsubscribe(supplierPayablesAlertsChannel)
+    supplierPayablesAlertsChannel = null
   }
 })
 
