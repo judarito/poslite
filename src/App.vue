@@ -4,7 +4,7 @@
     <template v-if="!isAuthRoute">
       <v-app-bar
         color="primary"
-        prominent
+        density="default"
         dark
         elevation="4"
       >
