@@ -251,7 +251,7 @@ export const useAuth = () => {
     loading.value = true
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/login`
       })
 
       if (error) throw error
@@ -259,6 +259,24 @@ export const useAuth = () => {
       return { success: true }
     } catch (error) {
       console.error('Error al restablecer contraseña:', error)
+      return { success: false, error: error.message }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Actualizar contraseña durante flujo de recovery
+  const updatePassword = async (newPassword) => {
+    loading.value = true
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('Error al actualizar contraseña:', error)
       return { success: false, error: error.message }
     } finally {
       loading.value = false
@@ -322,6 +340,7 @@ export const useAuth = () => {
     signUp,
     signOut,
     resetPassword,
+    updatePassword,
     updateProfile,
     fetchUserProfile,
     

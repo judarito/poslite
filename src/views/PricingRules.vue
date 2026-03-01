@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <v-card flat class="mb-3">
       <v-card-text class="pa-2 d-flex justify-end" style="gap: 8px; flex-wrap: wrap;">
@@ -275,7 +275,7 @@
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
         <v-card-title>Confirmar Eliminacion</v-card-title>
-        <v-card-text>�Esta seguro de eliminar esta politica de precio?</v-card-text>
+        <v-card-text>¿Esta seguro de eliminar esta politica de precio?</v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn @click="deleteDialog = false" :disabled="deleting">Cancelar</v-btn>
@@ -379,9 +379,9 @@
                     <v-chip size="x-small" variant="tonal" color="deep-purple">Sugerido: {{ item.suggested_price }}</v-chip>
                     <v-chip size="x-small" variant="tonal" color="orange">Delta: {{ item.delta_pct }}%</v-chip>
                     <v-chip size="x-small" variant="tonal" color="teal">Vendidos 30d: {{ item.sold_last_30d }}</v-chip>
-                    <v-chip size="x-small" variant="tonal" color="indigo">Dias stock: {{ item.days_of_stock_remaining ?? 'N/A' }}</v-chip>
+                    <v-chip size="x-small" variant="tonal" color="indigo">Cobertura est.: {{ item.days_of_stock_remaining ?? 'N/A' }}d</v-chip>
                   </div>
-                  <div class="text-caption mt-1">{{ item.reason }}</div>
+                  <div class="text-caption mt-1">{{ item.reason }}</div><div class="text-caption text-medium-emphasis">{{ item.stock_days_note }}</div>
                 </template>
               </v-list-item>
             </v-list>
@@ -670,3 +670,7 @@ onMounted(async () => {
   await loadLocations()
 })
 </script>
+
+
+
+

@@ -33,84 +33,145 @@
               </div>
 
               <div class="form-panel">
-                <div class="form-header">
-                  <div class="form-logo">
-                    <v-icon size="26">mdi-storefront-outline</v-icon>
+                <template v-if="recoveryMode">
+                  <div class="form-header">
+                    <div class="form-logo">
+                      <v-icon size="26">mdi-lock-reset</v-icon>
+                    </div>
+                    <div>
+                      <h2 class="form-title">Nueva contrasena</h2>
+                      <p class="form-subtitle">Define una nueva contrasena para tu cuenta</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 class="form-title">Iniciar sesion</h2>
-                    <p class="form-subtitle">Ingresa tus credenciales para continuar</p>
-                  </div>
-                </div>
 
-                <v-form @submit.prevent="handleLogin" ref="loginForm">
-                  <v-text-field
-                    v-model="loginData.email"
-                    label="Correo electronico"
-                    prepend-inner-icon="mdi-email-outline"
-                    variant="outlined"
-                    :bg-color="isDark ? 'grey-darken-3' : 'white'"
-                    type="email"
-                    :rules="[rules.required, rules.email]"
-                    required
-                    class="mb-2"
-                  ></v-text-field>
+                  <v-form @submit.prevent="handleUpdatePassword">
+                    <v-text-field
+                      v-model="recoveryPassword"
+                      label="Nueva contrasena"
+                      prepend-inner-icon="mdi-lock-outline"
+                      :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                      :type="showPassword ? 'text' : 'password'"
+                      variant="outlined"
+                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
+                      required
+                      class="mb-2"
+                      @click:append-inner="showPassword = !showPassword"
+                    ></v-text-field>
 
-                  <v-text-field
-                    v-model="loginData.password"
-                    label="Contrasena"
-                    prepend-inner-icon="mdi-lock-outline"
-                    :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
-                    :type="showPassword ? 'text' : 'password'"
-                    variant="outlined"
-                    :bg-color="isDark ? 'grey-darken-3' : 'white'"
-                    :rules="[rules.required]"
-                    required
-                    class="mb-2"
-                    @click:append-inner="showPassword = !showPassword"
-                  ></v-text-field>
+                    <v-text-field
+                      v-model="recoveryPasswordConfirm"
+                      label="Confirmar contrasena"
+                      prepend-inner-icon="mdi-lock-check-outline"
+                      :type="showPassword ? 'text' : 'password'"
+                      variant="outlined"
+                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
+                      required
+                      class="mb-3"
+                    ></v-text-field>
 
-                  <div class="form-actions-row">
-                    <v-checkbox
-                      v-model="rememberMe"
-                      label="Recordarme"
-                      density="compact"
-                      hide-details
-                    ></v-checkbox>
                     <v-btn
-                      variant="text"
-                      size="small"
+                      type="submit"
                       color="primary"
-                      class="login-link-btn"
-                      @click="showResetPassword = true"
+                      size="large"
+                      block
+                      :loading="loading"
+                      class="login-btn"
                     >
-                      Olvide mi contrasena
+                      <v-icon start>mdi-content-save-check</v-icon>
+                      Guardar contrasena
                     </v-btn>
+
+                    <v-alert
+                      v-if="recoveryMessage"
+                      :type="recoverySuccess ? 'success' : 'error'"
+                      variant="tonal"
+                      class="mt-4"
+                    >
+                      {{ recoveryMessage }}
+                    </v-alert>
+                  </v-form>
+                </template>
+
+                <template v-else>
+                  <div class="form-header">
+                    <div class="form-logo">
+                      <v-icon size="26">mdi-storefront-outline</v-icon>
+                    </div>
+                    <div>
+                      <h2 class="form-title">Iniciar sesion</h2>
+                      <p class="form-subtitle">Ingresa tus credenciales para continuar</p>
+                    </div>
                   </div>
 
-                  <v-btn
-                    type="submit"
-                    color="primary"
-                    size="large"
-                    block
-                    :loading="loading"
-                    class="login-btn"
-                  >
-                    <v-icon start>mdi-login</v-icon>
-                    Entrar al sistema
-                  </v-btn>
+                  <v-form @submit.prevent="handleLogin" ref="loginForm">
+                    <v-text-field
+                      v-model="loginData.email"
+                      label="Correo electronico"
+                      prepend-inner-icon="mdi-email-outline"
+                      variant="outlined"
+                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
+                      type="email"
+                      :rules="[rules.required, rules.email]"
+                      required
+                      class="mb-2"
+                    ></v-text-field>
 
-                  <v-alert
-                    v-if="loginError"
-                    type="error"
-                    variant="tonal"
-                    closable
-                    class="mt-4"
-                    @click:close="loginError = ''"
-                  >
-                    {{ loginError }}
-                  </v-alert>
-                </v-form>
+                    <v-text-field
+                      v-model="loginData.password"
+                      label="Contrasena"
+                      prepend-inner-icon="mdi-lock-outline"
+                      :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                      :type="showPassword ? 'text' : 'password'"
+                      variant="outlined"
+                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
+                      :rules="[rules.required]"
+                      required
+                      class="mb-2"
+                      @click:append-inner="showPassword = !showPassword"
+                    ></v-text-field>
+
+                    <div class="form-actions-row">
+                      <v-checkbox
+                        v-model="rememberMe"
+                        label="Recordarme"
+                        density="compact"
+                        hide-details
+                      ></v-checkbox>
+                      <v-btn
+                        variant="text"
+                        size="small"
+                        color="primary"
+                        class="login-link-btn"
+                        @click="showResetPassword = true"
+                      >
+                        Olvide mi contrasena
+                      </v-btn>
+                    </div>
+
+                    <v-btn
+                      type="submit"
+                      color="primary"
+                      size="large"
+                      block
+                      :loading="loading"
+                      class="login-btn"
+                    >
+                      <v-icon start>mdi-login</v-icon>
+                      Entrar al sistema
+                    </v-btn>
+
+                    <v-alert
+                      v-if="loginError"
+                      type="error"
+                      variant="tonal"
+                      closable
+                      class="mt-4"
+                      @click:close="loginError = ''"
+                    >
+                      {{ loginError }}
+                    </v-alert>
+                  </v-form>
+                </template>
               </div>
             </v-sheet>
           </v-col>
@@ -163,20 +224,21 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
-const { signIn, resetPassword, loading } = useAuth()
+const { signIn, resetPassword, updatePassword, loading } = useAuth()
 const { saveTenant } = useTenant()
 const { syncThemeFromTenant, isDark } = useTheme()
 
 const showPassword = ref(false)
 const rememberMe = ref(false)
 const showResetPassword = ref(false)
+const recoveryMode = ref(false)
 
 const loginData = ref({
   email: '',
@@ -187,6 +249,10 @@ const resetEmail = ref('')
 const loginError = ref('')
 const resetMessage = ref('')
 const resetSuccess = ref(false)
+const recoveryPassword = ref('')
+const recoveryPasswordConfirm = ref('')
+const recoveryMessage = ref('')
+const recoverySuccess = ref(false)
 
 const loginForm = ref(null)
 
@@ -224,11 +290,17 @@ const handleLogin = async () => {
 }
 
 const handleResetPassword = async () => {
-  if (!resetEmail.value) return
+  const normalizedEmail = (resetEmail.value || '').trim()
+  if (!normalizedEmail) return
+  if (rules.email(normalizedEmail) !== true) {
+    resetSuccess.value = false
+    resetMessage.value = 'Correo electronico invalido'
+    return
+  }
 
   resetMessage.value = ''
 
-  const result = await resetPassword(resetEmail.value)
+  const result = await resetPassword(normalizedEmail)
 
   if (result.success) {
     resetSuccess.value = true
@@ -238,6 +310,44 @@ const handleResetPassword = async () => {
     resetMessage.value = result.error || 'Error al enviar correo'
   }
 }
+
+const handleUpdatePassword = async () => {
+  recoveryMessage.value = ''
+
+  if (!recoveryPassword.value || recoveryPassword.value.length < 6) {
+    recoverySuccess.value = false
+    recoveryMessage.value = 'La contrasena debe tener al menos 6 caracteres'
+    return
+  }
+
+  if (recoveryPassword.value !== recoveryPasswordConfirm.value) {
+    recoverySuccess.value = false
+    recoveryMessage.value = 'Las contrasenas no coinciden'
+    return
+  }
+
+  const result = await updatePassword(recoveryPassword.value)
+  if (!result.success) {
+    recoverySuccess.value = false
+    recoveryMessage.value = result.error || 'No se pudo actualizar la contrasena'
+    return
+  }
+
+  recoverySuccess.value = true
+  recoveryMessage.value = 'Contrasena actualizada. Redirigiendo...'
+  setTimeout(() => {
+    router.push('/')
+  }, 1200)
+}
+
+onMounted(() => {
+  const hash = (window.location.hash || '').toLowerCase()
+  const search = (window.location.search || '').toLowerCase()
+  recoveryMode.value =
+    hash.includes('type=recovery') ||
+    search.includes('type=recovery') ||
+    (hash.includes('access_token=') && hash.includes('refresh_token='))
+})
 </script>
 
 <style scoped>

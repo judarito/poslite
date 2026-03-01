@@ -102,9 +102,12 @@ class AIPricingAdvisorService {
     const cost = Number(row.unit_cost || 0)
     const price = Number(row.unit_price || 0)
     const sold30 = Number(row.sold_last_30d || 0)
-    const stockDays = row.days_of_stock_remaining == null ? null : Number(row.days_of_stock_remaining)
+    const rawStockDays = row.days_of_stock_remaining == null ? null : Number(row.days_of_stock_remaining)
     const trend = Number(row.trend_percentage || 0)
+    const avgDailyDemand = Number(row.avg_daily_demand || 0)
     const marginNow = price > 0 ? ((price - cost) / price) * 100 : 0
+    const stockDaysMeta = this._normalizeStockDays(rawStockDays, sold30, avgDailyDemand)
+    const stockDays = stockDaysMeta.value
 
     let suggestedMargin = marginNow
     let action = 'KEEP'
@@ -151,7 +154,11 @@ class AIPricingAdvisorService {
       delta_price: deltaPrice,
       delta_pct: deltaPct,
       sold_last_30d: sold30,
+      avg_daily_demand: this._round2(avgDailyDemand),
       days_of_stock_remaining: stockDays,
+      days_of_stock_raw: rawStockDays,
+      stock_days_reliability: stockDaysMeta.reliability,
+      stock_days_note: stockDaysMeta.note,
       trend_percentage: this._round2(trend),
       action,
       reason,
@@ -202,7 +209,10 @@ class AIPricingAdvisorService {
       sku: s.sku,
       product_name: s.product_name,
       sold_last_30d: s.sold_last_30d,
-      stock_days: s.days_of_stock_remaining,
+      avg_daily_demand: s.avg_daily_demand,
+      stock_days_estimated: s.days_of_stock_remaining,
+      stock_days_reliability: s.stock_days_reliability,
+      stock_days_note: s.stock_days_note,
       trend: s.trend_percentage,
       current_margin: s.current_margin_pct,
       suggested_margin: s.suggested_margin_pct,
@@ -216,8 +226,15 @@ Genera maximo 4 insights accionables, en JSON valido:
     { "title": "string", "detail": "string", "level": "high|medium|info" }
   ]
 }
+
+REGLAS OBLIGATORIAS:
+- Usa SOLO los datos numericos provistos.
+- NO inventes antiguedad de producto ni historial mayor a 30 dias.
+- "stock_days_estimated" es COBERTURA ESTIMADA (stock / demanda 30d), NO edad del producto.
+- Si "stock_days_reliability" es "low", tratala como dato incierto y mencionalo.
+
 Datos:
-${JSON.stringify({ config: cfg, top }, null, 2)}`
+${JSON.stringify({ config: cfg, metrics_definition: { sample_window_days: 30 }, top }, null, 2)}`
 
     const { data, error } = await supabase.functions.invoke(AI_EDGE_FUNCTION, {
       body: {
@@ -247,6 +264,34 @@ ${JSON.stringify({ config: cfg, top }, null, 2)}`
 
   _round2(value) {
     return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
+  }
+
+  _normalizeStockDays(rawStockDays, sold30, avgDailyDemand) {
+    if (rawStockDays == null || !Number.isFinite(rawStockDays)) {
+      return {
+        value: null,
+        reliability: 'low',
+        note: 'Sin cobertura calculable'
+      }
+    }
+
+    if (sold30 <= 2 || avgDailyDemand < 0.1) {
+      return {
+        value: null,
+        reliability: 'low',
+        note: 'Muestra insuficiente en ventana de 30 dias'
+      }
+    }
+
+    // Evita lecturas desproporcionadas por demanda muy baja.
+    const capped = Math.min(rawStockDays, 120)
+    return {
+      value: this._round2(capped),
+      reliability: rawStockDays > 120 ? 'medium' : 'high',
+      note: rawStockDays > 120
+        ? 'Cobertura estimada truncada a 120 dias para evitar sobreinterpretacion'
+        : 'Cobertura estimada sobre demanda 30 dias'
+    }
   }
 }
 

@@ -41,6 +41,55 @@ import BOMs from '@/views/BOMs.vue'
 import Cartera from '@/views/Cartera.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
+const MENU_ROUTES_CACHE_TTL_MS = 60 * 1000
+const menuRoutesCache = {
+  authUserId: null,
+  routes: null,
+  loadedAt: 0,
+}
+function isRouteAlwaysAllowed(path) {
+  return path === '/' || path === '/about'
+}
+function canAccessPathByMenu(path, allowedRoutes) {
+  if (!Array.isArray(allowedRoutes) || allowedRoutes.length === 0) return true
+  if (isRouteAlwaysAllowed(path)) return true
+  return allowedRoutes.some((menuRoute) => {
+    if (!menuRoute || menuRoute === '/') return path === menuRoute
+    return path === menuRoute || path.startsWith(`${menuRoute}/`)
+  })
+}
+
+function isRecoveryNavigation(to) {
+  const hash = (to.hash || '').toLowerCase()
+  const fullPath = (to.fullPath || '').toLowerCase()
+  return hash.includes('type=recovery') || fullPath.includes('type=recovery')
+}
+async function getAllowedMenuRoutes(authUserId) {
+  const now = Date.now()
+  if (
+    menuRoutesCache.authUserId === authUserId &&
+    Array.isArray(menuRoutesCache.routes) &&
+    now - menuRoutesCache.loadedAt <= MENU_ROUTES_CACHE_TTL_MS
+  ) {
+    return menuRoutesCache.routes
+  }
+  try {
+    const { data, error } = await supabase.rpc('fn_get_user_menus', { p_auth_user_id: authUserId })
+    if (error) {
+      console.warn('No se pudo validar acceso por menu (fn_get_user_menus):', error.message)
+      return null
+    }
+    const routes = [...new Set((data || []).map((item) => item.route).filter(Boolean))]
+    menuRoutesCache.authUserId = authUserId
+    menuRoutesCache.routes = routes
+    menuRoutesCache.loadedAt = now
+    return routes
+  } catch (error) {
+    console.warn('Error al cargar menus para guard de rutas:', error.message)
+    return null
+  }
+}
+
 async function canAccessTenantConfig() {
   try {
     if (await canManageTenants()) return true
@@ -343,6 +392,10 @@ router.beforeEach(async (to, from, next) => {
     }
     
     if (to.meta.requiresGuest && isAuthenticated) {
+      if (to.path === '/login' && isRecoveryNavigation(to)) {
+        next()
+        return
+      }
       next('/')
       return
     }
@@ -365,7 +418,21 @@ router.beforeEach(async (to, from, next) => {
         return
       }
     }
-
+    // Guard adicional: bloquear acceso directo por URL si la ruta no existe en el menu permitido del usuario.
+    // Excluye rutas con validacion dedicada (superadmin/tenant-config).
+    if (
+      to.meta.requiresAuth &&
+      !to.meta.requiresSuperAdmin &&
+      !to.meta.requiresTenantConfigAccess &&
+      session?.user?.id
+    ) {
+      const allowedRoutes = await getAllowedMenuRoutes(session.user.id)
+      if (Array.isArray(allowedRoutes) && !canAccessPathByMenu(to.path, allowedRoutes)) {
+        console.warn(`Acceso denegado por menú: ${to.path}`)
+        next('/')
+        return
+      }
+    }
     next()
   } catch (error) {
     console.error('Router guard error:', error)
@@ -379,3 +446,4 @@ router.beforeEach(async (to, from, next) => {
 })
 
 export default router
+
