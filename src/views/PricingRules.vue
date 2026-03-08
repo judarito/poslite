@@ -259,15 +259,15 @@
               </v-col>
 
               <v-col cols="12">
-                <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details />
+                <v-switch v-model="formData.is_active" :label="t('common.active')" color="success" hide-details />
               </v-col>
             </v-row>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="dialog = false" :disabled="saving">Cancelar</v-btn>
-          <v-btn color="primary" @click="save" :loading="saving">Guardar</v-btn>
+          <v-btn @click="dialog = false" :disabled="saving">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" @click="save" :loading="saving">{{ t('common.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -278,8 +278,8 @@
         <v-card-text>¿Esta seguro de eliminar esta politica de precio?</v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="deleteDialog = false" :disabled="deleting">Cancelar</v-btn>
-          <v-btn color="error" @click="doDelete" :loading="deleting">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false" :disabled="deleting">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" @click="doDelete" :loading="deleting">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -389,7 +389,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="pricingAIDialog = false">Cerrar</v-btn>
+          <v-btn @click="pricingAIDialog = false">{{ t('common.close') }}</v-btn>
           <v-btn color="deep-purple" @click="loadPricingAI(true)" :loading="loadingPricingAI">Recalcular</v-btn>
         </v-card-actions>
       </v-card>
@@ -410,6 +410,9 @@ import pricingRulesService from '@/services/pricingRules.service'
 import categoriesService from '@/services/categories.service'
 import productsService from '@/services/products.service'
 import aiPricingAdvisorService from '@/services/ai-pricing-advisor.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()

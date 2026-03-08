@@ -8,21 +8,21 @@
     <v-card class="mb-4">
       <v-card-title class="d-flex align-center">
         <v-icon start color="purple">mdi-factory</v-icon>
-        Reporte de Producción
+        {{ t('reports.productionTitle') }}
       </v-card-title>
       <v-card-text>
         <v-row class="ga-2" align="center">
           <v-col cols="12" sm="3">
-            <v-text-field v-model="fromDate" type="date" label="Desde" variant="outlined" density="compact" hide-details></v-text-field>
+            <v-text-field v-model="fromDate" type="date" :label="t('reports.from')" variant="outlined" density="compact" hide-details></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
-            <v-text-field v-model="toDate" type="date" label="Hasta" variant="outlined" density="compact" hide-details></v-text-field>
+            <v-text-field v-model="toDate" type="date" :label="t('reports.to')" variant="outlined" density="compact" hide-details></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
-            <v-select v-model="locationFilter" :items="locations" item-title="name" item-value="location_id" label="Sede" variant="outlined" density="compact" hide-details clearable></v-select>
+            <v-select v-model="locationFilter" :items="locations" item-title="name" item-value="location_id" :label="t('app.branch')" variant="outlined" density="compact" hide-details clearable></v-select>
           </v-col>
           <v-col cols="12" sm="3">
-            <v-btn color="purple" prepend-icon="mdi-magnify" @click="loadAll" :loading="loading">Consultar</v-btn>
+            <v-btn color="purple" prepend-icon="mdi-magnify" @click="loadAll" :loading="loading">{{ t('reports.query') }}</v-btn>
           </v-col>
         </v-row>
       </v-card-text>
@@ -223,11 +223,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from '@/i18n'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
+const { t } = useI18n()
 
 const breadcrumbs = [
   { title: 'Reportes', to: '/reports', disabled: false },

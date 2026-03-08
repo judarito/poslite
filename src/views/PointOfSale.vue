@@ -56,6 +56,51 @@
                 </v-list-item>
               </template>
             </v-autocomplete>
+
+            <v-textarea
+              v-model="chatOrderText"
+              label="Pedido por chat (IA)"
+              placeholder="Ej: Hola, para Ana: 2 cocas 350 ml y 1 arroz diana 500 g, entrega hoy"
+              prepend-inner-icon="mdi-chat-processing-outline"
+              variant="outlined"
+              density="compact"
+              rows="2"
+              auto-grow
+              class="mt-2"
+              hide-details="auto"
+            ></v-textarea>
+
+            <v-btn
+              class="mt-2"
+              block
+              color="secondary"
+              prepend-icon="mdi-creation"
+              :loading="processingChatOrder"
+              :disabled="processingChatOrder || !chatOrderText.trim()"
+              @click="parseChatOrderWithAgent"
+            >
+              Convertir chat a venta (IA)
+            </v-btn>
+
+            <v-alert
+              v-if="chatOrderSummary"
+              class="mt-2"
+              :type="chatOrderSummary.matchedCount > 0 ? 'success' : 'warning'"
+              variant="tonal"
+              density="compact"
+            >
+              <div class="text-body-2">
+                Cargados: <strong>{{ chatOrderSummary.matchedCount }}</strong>
+                <span class="ml-2">Sin match: <strong>{{ chatOrderSummary.unmatchedCount }}</strong></span>
+                <span class="ml-2">Confianza IA: <strong>{{ chatOrderSummary.confidencePercent }}%</strong></span>
+                <span v-if="chatOrderSummary.customerSuggestion" class="ml-2">
+                  Cliente sugerido: <strong>{{ chatOrderSummary.customerSuggestion.full_name }}</strong>
+                </span>
+                <span v-if="chatOrderSummary.cacheHit" class="ml-2">
+                  (cache)
+                </span>
+              </div>
+            </v-alert>
           </v-card-text>
 
           <!-- Líneas del carrito -->
@@ -421,7 +466,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="showGlobalDiscountDialog = false">Cancelar</v-btn>
+          <v-btn @click="showGlobalDiscountDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" @click="applyGlobalDiscount">Aplicar</v-btn>
         </v-card-actions>
       </v-card>
@@ -437,9 +482,12 @@ import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 
+const { t } = useI18n()
+
 import productsService from '@/services/products.service'
 import customersService from '@/services/customers.service'
 import thirdPartiesService from '@/services/thirdParties.service'
+import { analyzeChatOrderText, matchChatLinesToCatalog, findBestCustomerMatch } from '@/services/chatOrderAgent.service'
 import salesService from '@/services/sales.service'
 import cashService from '@/services/cash.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
@@ -449,6 +497,7 @@ import creditService from '@/services/credit.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
 import { formatMoney } from '@/utils/formatters'
 import { applyLineTaxes } from '@/utils/taxCalculator'
+import { useI18n } from '@/i18n'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
@@ -461,6 +510,9 @@ const selectedCustomer = ref(null)
 const customerResults = ref([])
 const searchingCustomer = ref(false)
 const customerCreditInfo = ref(null)
+const chatOrderText = ref('')
+const processingChatOrder = ref(false)
+const chatOrderSummary = ref(null)
 
 // Cargar info de crédito cuando cambie el cliente
 watch(selectedCustomer, async (customer) => {
@@ -630,10 +682,11 @@ const clearSearch = () => {
   }
 }
 
-const addToCart = async (variant) => {
+const addToCart = async (variant, quantity = 1) => {
+  const qty = Math.max(1, Math.round(Number(quantity || 1)))
   const existing = cart.value.find(l => l.variant_id === variant.variant_id)
   if (existing) {
-    existing.quantity++
+    existing.quantity += qty
     await recalculateTaxes(existing)
     // Forzar actualización reactiva
     cart.value = [...cart.value]
@@ -643,7 +696,7 @@ const addToCart = async (variant) => {
       sku: variant.sku,
       productName: variant.product?.name || '',
       variantName: variant.variant_name || '',
-      quantity: 1,
+      quantity: qty,
       unit_price: parseFloat(variant.price) || 0,
       unit_cost: parseFloat(variant.cost) || 0,
       price_includes_tax: variant.price_includes_tax || false, // 🆕 NUEVO
@@ -666,6 +719,18 @@ const addToCart = async (variant) => {
   }
   // Auto-llenar primer pago
   if (payments.value.length === 1) payments.value[0].amount = totals.value.total
+}
+
+const listCatalogForChatMatching = async () => {
+  const r = await productsService.getActiveVariants(tenantId.value, 3500)
+  if (!r.success) return r
+
+  const filtered = (r.data || []).filter(v => {
+    const effectiveIsComponent = v.is_component !== null ? v.is_component : (v.product?.is_component || false)
+    return !effectiveIsComponent
+  })
+
+  return { success: true, data: filtered }
 }
 
 const recalculateTaxes = async (line) => {
@@ -783,6 +848,98 @@ const removeGlobalDiscount = async () => {
   }
   cart.value = [...cart.value]
   showMsg('Descuento global removido')
+}
+
+const parseChatOrderWithAgent = async () => {
+  chatOrderSummary.value = null
+  if (!tenantId.value) {
+    showMsg('Tenant inválido para conversión de chat.', 'error')
+    return
+  }
+
+  if (!chatOrderText.value.trim()) {
+    showMsg('Pega o escribe el pedido del chat.', 'warning')
+    return
+  }
+
+  processingChatOrder.value = true
+  try {
+    const catalogResult = await listCatalogForChatMatching()
+    if (!catalogResult.success || !catalogResult.data?.length) {
+      showMsg(catalogResult.error || 'No hay catálogo disponible para matching.', 'error')
+      return
+    }
+
+    const aiResult = await analyzeChatOrderText({
+      tenantId: tenantId.value,
+      chatText: chatOrderText.value
+    })
+
+    if (!aiResult.success) {
+      showMsg(aiResult.error || 'No fue posible convertir el chat.', 'error')
+      return
+    }
+
+    const { matched, unmatched } = matchChatLinesToCatalog(aiResult.data.line_items, catalogResult.data)
+
+    const customerName = String(aiResult?.data?.order?.customer_name || '').trim()
+    let customerSuggestion = null
+    let customerAutoloaded = false
+    if (customerName.length >= 2) {
+      const customerLookup = await customersService.searchCustomers(tenantId.value, customerName, 20)
+      const customerList = customerLookup.success ? customerLookup.data || [] : []
+      const bestCustomer = findBestCustomerMatch(customerName, customerList)
+      if (bestCustomer?.customer) {
+        customerSuggestion = bestCustomer.customer
+        if (!selectedCustomer.value?.customer_id) {
+          selectedCustomer.value = bestCustomer.customer
+          customerAutoloaded = true
+        }
+      } else if (!selectedCustomer.value?.customer_id && customerList.length) {
+        customerResults.value = customerList.slice(0, 6)
+      }
+    }
+
+    if (!matched.length) {
+      chatOrderSummary.value = {
+        matchedCount: 0,
+        unmatchedCount: unmatched.length,
+        confidencePercent: Math.round(Number(aiResult?.data?.order?.confidence || 0) * 100),
+        customerSuggestion,
+        customerAutoloaded,
+        notes: aiResult?.data?.order?.notes || null,
+        cacheHit: Boolean(aiResult?.data?.cache_hit)
+      }
+      showMsg('La IA entendió el chat pero no encontró coincidencias en tu catálogo.', 'warning')
+      return
+    }
+
+    for (const item of matched) {
+      await addToCart(item.variant, item.line.quantity || 1)
+    }
+
+    const aiNotes = String(aiResult?.data?.order?.notes || '').trim()
+    if (aiNotes) {
+      const currentNote = String(saleNote.value || '').trim()
+      if (!currentNote) saleNote.value = aiNotes
+      else if (!currentNote.includes(aiNotes)) saleNote.value = `${currentNote}\n${aiNotes}`
+    }
+
+    chatOrderSummary.value = {
+      matchedCount: matched.length,
+      unmatchedCount: unmatched.length,
+      confidencePercent: Math.round(Number(aiResult?.data?.order?.confidence || 0) * 100),
+      customerSuggestion,
+      customerAutoloaded,
+      notes: aiResult?.data?.order?.notes || null,
+      cacheHit: Boolean(aiResult?.data?.cache_hit)
+    }
+
+    showMsg(`Chat convertido: ${matched.length} item(s) cargados${unmatched.length ? `, ${unmatched.length} sin match` : ''}${aiResult?.data?.cache_hit ? ' (cache)' : ''}.`)
+  } finally {
+    processingChatOrder.value = false
+    chatOrderText.value = ''
+  }
 }
 
 // Cliente
@@ -943,6 +1100,8 @@ const clearSale = () => {
   selectedThirdParty.value = null
   payments.value = [{ method: paymentMethods.value[0]?.code || '', amount: 0 }]
   saleNote.value = ''
+  chatOrderText.value = ''
+  chatOrderSummary.value = null
   searchTerm.value = ''
   searchResults.value = []
 }

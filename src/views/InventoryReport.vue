@@ -8,15 +8,15 @@
     <v-card class="mb-4">
       <v-card-title class="d-flex align-center">
         <v-icon start color="green">mdi-package-variant-closed</v-icon>
-        Reporte de Inventario
+        {{ t('reports.inventoryTitle') }}
       </v-card-title>
       <v-card-text>
         <v-row class="ga-2" align="center">
           <v-col cols="12" sm="4">
-            <v-select v-model="locationFilter" :items="locations" item-title="name" item-value="location_id" label="Sede" variant="outlined" density="compact" hide-details clearable></v-select>
+            <v-select v-model="locationFilter" :items="locations" item-title="name" item-value="location_id" :label="t('app.branch')" variant="outlined" density="compact" hide-details clearable></v-select>
           </v-col>
           <v-col cols="12" sm="4">
-            <v-btn color="primary" prepend-icon="mdi-refresh" @click="loadAll" :loading="loading">Consultar</v-btn>
+            <v-btn color="primary" prepend-icon="mdi-refresh" @click="loadAll" :loading="loading">{{ t('reports.query') }}</v-btn>
           </v-col>
         </v-row>
       </v-card-text>
@@ -304,7 +304,7 @@
               variant="outlined" density="compact" hide-details
               style="max-width: 150px;" class="mr-2"
             ></v-select>
-            <v-btn size="small" color="primary" prepend-icon="mdi-refresh" @click="loadNoMovement" :loading="loadingNoMovement">Actualizar</v-btn>
+            <v-btn size="small" color="primary" prepend-icon="mdi-refresh" @click="loadNoMovement" :loading="loadingNoMovement">{{ t('common.update') }}</v-btn>
           </v-card-title>
           <v-card-subtitle class="pb-2">
             Productos con stock disponible que no han tenido movimientos de inventario en los últimos {{ noMovementDays }} días.
@@ -370,7 +370,7 @@
               variant="outlined" density="compact" hide-details
               style="max-width: 150px;" class="mr-2"
             ></v-select>
-            <v-btn size="small" color="primary" prepend-icon="mdi-refresh" @click="loadExpiring" :loading="loadingExpiring">Actualizar</v-btn>
+            <v-btn size="small" color="primary" prepend-icon="mdi-refresh" @click="loadExpiring" :loading="loadingExpiring">{{ t('common.update') }}</v-btn>
           </v-card-title>
           <v-card-subtitle class="pb-2">
             Lotes que vencen en los próximos {{ expiringDays }} días.
@@ -440,12 +440,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from '@/i18n'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import inventoryService from '@/services/inventory.service'
 import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
+const { t } = useI18n()
 
 const breadcrumbs = [
   { title: 'Reportes', to: '/reports', disabled: false },

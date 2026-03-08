@@ -174,7 +174,7 @@
           <v-form ref="form" @submit.prevent="save">
             <v-row>
               <v-col cols="12" sm="8">
-                <v-text-field v-model="formData.name" label="Nombre" prepend-inner-icon="mdi-text" variant="outlined" :rules="[rules.required]"></v-text-field>
+                <v-text-field v-model="formData.name" :label="t('common.name')" prepend-inner-icon="mdi-text" variant="outlined" :rules="[rules.required]"></v-text-field>
               </v-col>
               <v-col cols="12" sm="4">
                 <v-select v-model="formData.category_id" label="Categoría" prepend-inner-icon="mdi-shape" variant="outlined" :items="categoryOptions" item-title="name" item-value="category_id" clearable></v-select>
@@ -347,7 +347,7 @@
             </div>
             <v-row>
               <v-col cols="6">
-                <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details></v-switch>
+                <v-switch v-model="formData.is_active" :label="t('common.active')" color="success" hide-details></v-switch>
               </v-col>
               <v-col cols="6">
                 <v-switch 
@@ -475,7 +475,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="dialog = false">Cancelar</v-btn>
+          <v-btn @click="dialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" :loading="saving" @click="save">{{ isEditing ? 'Actualizar' : 'Crear' }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -610,7 +610,7 @@
                 No disponible para productos tipo {{ formData.inventory_behavior === 'SERVICE' ? 'Servicio' : 'Combo' }}
               </div>
             </div>
-            <v-switch v-model="variantData.is_active" label="Activo" color="success" hide-details></v-switch>
+            <v-switch v-model="variantData.is_active" :label="t('common.active')" color="success" hide-details></v-switch>
 
             <v-divider class="my-4"></v-divider>
             <div class="text-subtitle-2 mb-3">
@@ -659,8 +659,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="variantDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="savingVariant" @click="saveVariant">Guardar</v-btn>
+          <v-btn @click="variantDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" :loading="savingVariant" @click="saveVariant">{{ t('common.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -668,12 +668,12 @@
     <!-- Delete confirmations -->
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
-        <v-card-title><v-icon start color="error">mdi-alert</v-icon>Confirmar Eliminación</v-card-title>
+        <v-card-title><v-icon start color="error">mdi-alert</v-icon>{{ t('common.confirmDelete') }}</v-card-title>
         <v-card-text>¿Eliminar el producto <strong>{{ itemToDelete?.name }}</strong> y todas sus variantes?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="deleting" @click="doDelete">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" :loading="deleting" @click="doDelete">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -697,6 +697,9 @@ import manufacturingService from '@/services/manufacturing.service'
 import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 import { utils, writeFileXLSX } from 'xlsx'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()

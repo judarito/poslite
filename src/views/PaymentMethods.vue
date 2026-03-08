@@ -1,7 +1,7 @@
 <template>
   <div>
     <ListView
-      title="Métodos de Pago"
+      :title="t('paymentMethods.title')"
       icon="mdi-credit-card"
       :items="paymentMethods"
       :total-items="totalItems"
@@ -12,8 +12,8 @@
       subtitle-field="code"
       avatar-icon="mdi-cash"
       avatar-color="success"
-      empty-message="No hay métodos de pago registrados"
-      create-button-text="Nuevo Método"
+      :empty-message="t('paymentMethods.empty')"
+      :create-button-text="t('paymentMethods.new')"
       :creatable="canManage"
       :editable="canManage"
       :deletable="canManage"
@@ -31,10 +31,10 @@
             size="small"
             variant="flat"
           >
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            {{ item.is_active ? t('common.active') : t('common.inactive') }}
           </v-chip>
           <v-chip size="small" variant="tonal" color="blue" prepend-icon="mdi-sort-numeric-ascending">
-            Orden: {{ item.sort_order ?? 0 }}
+            {{ t('paymentMethods.order') }}: {{ item.sort_order ?? 0 }}
           </v-chip>
         </div>
       </template>
@@ -45,26 +45,26 @@
       <v-card>
         <v-card-title>
           <v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-          {{ isEditing ? 'Editar Método de Pago' : 'Nuevo Método de Pago' }}
+          {{ isEditing ? t('paymentMethods.edit') : t('paymentMethods.new') }}
         </v-card-title>
 
         <v-card-text>
           <v-form ref="form" @submit.prevent="savePaymentMethod">
             <v-text-field
               v-model="formData.code"
-              label="Código"
+              :label="t('common.code')"
               prepend-inner-icon="mdi-barcode"
               variant="outlined"
               :rules="[rules.required, rules.code]"
               :disabled="isEditing"
-              hint="Ej: CASH, CARD, TRANSFER"
+              :hint="t('paymentMethods.codeHint')"
               persistent-hint
               class="mb-2"
             ></v-text-field>
 
             <v-text-field
               v-model="formData.name"
-              label="Nombre"
+              :label="t('common.name')"
               prepend-inner-icon="mdi-text"
               variant="outlined"
               :rules="[rules.required]"
@@ -73,20 +73,20 @@
 
             <v-text-field
               v-model.number="formData.sort_order"
-              label="Orden de aparición"
+              :label="t('paymentMethods.sortOrder')"
               prepend-inner-icon="mdi-sort-numeric-ascending"
               variant="outlined"
               type="number"
               :min="0"
               density="compact"
-              hint="Número menor aparece primero (0 = primero)"
+              :hint="t('paymentMethods.sortOrderHint')"
               persistent-hint
               class="mb-3"
             ></v-text-field>
 
             <v-switch
               v-model="formData.is_active"
-              label="Activo"
+              :label="t('common.active')"
               color="success"
               hide-details
             ></v-switch>
@@ -95,13 +95,13 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog">Cancelar</v-btn>
+          <v-btn @click="closeDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             :loading="saving"
             @click="savePaymentMethod"
           >
-            {{ isEditing ? 'Actualizar' : 'Crear' }}
+            {{ isEditing ? t('common.update') : t('common.create') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -112,24 +112,24 @@
       <v-card>
         <v-card-title class="text-h5">
           <v-icon start color="error">mdi-alert</v-icon>
-          Confirmar Eliminación
+          {{ t('common.confirmDelete') }}
         </v-card-title>
 
         <v-card-text>
-          ¿Está seguro que desea eliminar el método de pago
+          {{ t('paymentMethods.deleteQuestionPrefix') }}
           <strong>{{ itemToDelete?.name }}</strong>?
-          Esta acción no se puede deshacer.
+          {{ t('common.irreversibleAction') }}
         </v-card-text>
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="error"
             :loading="deleting"
             @click="deletePaymentMethod"
           >
-            Eliminar
+            {{ t('common.delete') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -151,12 +151,14 @@ import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import paymentMethodsService from '@/services/paymentMethods.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
 const { hasPermission } = useAuth()
+const { t } = useI18n()
 
 const canManage = hasPermission('SETTINGS.PAYMENT_METHODS.MANAGE')
 
@@ -184,10 +186,10 @@ const formData = ref({
 })
 
 const rules = {
-  required: value => !!value || 'Campo requerido',
+  required: value => !!value || t('common.requiredField'),
   code: value => {
     if (!value) return true
-    return /^[A-Z_]+$/.test(value) || 'Solo letras mayúsculas y guiones bajos'
+    return /^[A-Z_]+$/.test(value) || t('paymentMethods.codeRule')
   }
 }
 
@@ -207,10 +209,10 @@ const loadPaymentMethods = async ({ page, pageSize, search, tenantId: tid }) => 
       paymentMethods.value = result.data
       totalItems.value = result.total
     } else {
-      showMessage('Error al cargar métodos de pago', 'error')
+      showMessage(t('paymentMethods.loadError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al cargar métodos de pago', 'error')
+    showMessage(t('paymentMethods.loadError'), 'error')
   } finally {
     loading.value = false
   }
@@ -246,7 +248,7 @@ const savePaymentMethod = async () => {
   if (!valid) return
 
   if (!tenantId.value) {
-    showMessage('No se pudo obtener el tenant', 'error')
+    showMessage(t('common.tenantMissing'), 'error')
     return
   }
 
@@ -259,7 +261,7 @@ const savePaymentMethod = async () => {
     )
 
     if (exists) {
-      showMessage('El código ya existe', 'error')
+      showMessage(t('paymentMethods.codeExists'), 'error')
       return
     }
   }
@@ -284,8 +286,8 @@ const savePaymentMethod = async () => {
     if (result.success) {
       showMessage(
         isEditing.value
-          ? 'Método de pago actualizado'
-          : 'Método de pago creado',
+          ? t('paymentMethods.updated')
+          : t('paymentMethods.created'),
         'success'
       )
       closeDialog()
@@ -296,10 +298,10 @@ const savePaymentMethod = async () => {
         tenantId: tenantId.value
       })
     } else {
-      showMessage(result.error || 'Error al guardar', 'error')
+      showMessage(result.error || t('common.saveError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al guardar método de pago', 'error')
+    showMessage(t('paymentMethods.saveSpecificError'), 'error')
   } finally {
     saving.value = false
   }
@@ -321,7 +323,7 @@ const deletePaymentMethod = async () => {
     )
 
     if (result.success) {
-      showMessage('Método de pago eliminado', 'success')
+      showMessage(t('paymentMethods.deleted'), 'success')
       deleteDialog.value = false
       loadPaymentMethods({
         page: 1,
@@ -330,10 +332,10 @@ const deletePaymentMethod = async () => {
         tenantId: tenantId.value
       })
     } else {
-      showMessage(result.error || 'Error al eliminar', 'error')
+      showMessage(result.error || t('common.deleteError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al eliminar método de pago', 'error')
+    showMessage(t('paymentMethods.deleteSpecificError'), 'error')
   } finally {
     deleting.value = false
   }

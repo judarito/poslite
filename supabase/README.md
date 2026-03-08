@@ -51,3 +51,21 @@ Si no quieres configurar Edge Functions, simplemente:
    ```
 
 Con esta configuración, todos los usuarios se crean sin necesidad de confirmar email.
+
+## Chat a Venta (IA)
+
+Edge Function:
+
+```bash
+supabase functions deploy chat-order-parser --project-ref [TU_PROJECT_REF]
+```
+
+Secret requerido:
+
+```bash
+supabase secrets set DEEPSEEK_API_KEY=tu_api_key --project-ref [TU_PROJECT_REF]
+```
+
+Migración requerida:
+
+- `migrations/ADD_CHAT_ORDER_AI_CACHE.sql`

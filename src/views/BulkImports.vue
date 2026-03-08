@@ -66,7 +66,7 @@
             color="secondary"
             :disabled="processing"
             @click="selectedFile = null"
-          >Cancelar</v-btn>
+          >{{ t('common.cancel') }}</v-btn>
           <span class="text-caption text-grey" v-if="processing">Procesando el archivo... esto puede tardar unos segundos.</span>
         </div>
       </v-card-text>
@@ -148,7 +148,7 @@ n          <v-spacer></v-spacer>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="showNotes = false">Cerrar</v-btn>
+          <v-btn text @click="showNotes = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -162,6 +162,9 @@ import { useAuth } from '@/composables/useAuth'
 import { useNotification } from '@/composables/useNotification'
 import { uploadBulkImport, listBulkImports, getBulkImportErrors } from '@/services/bulkImportClient.service'
 import { processBulkImport } from '@/services/bulkImport.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { user, userProfile } = useAuth()

@@ -192,6 +192,9 @@ import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTheme } from '@/composables/useTheme'
 import supabaseService from '@/services/supabase.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId, currentTenant } = useTenant()
 const { userProfile } = useAuth()

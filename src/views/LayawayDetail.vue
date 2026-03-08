@@ -263,7 +263,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="paymentDialog = false">Cancelar</v-btn>
+          <v-btn @click="paymentDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="success" :loading="savingPayment" @click="savePayment">
             Registrar
           </v-btn>
@@ -286,7 +286,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="completeDialog = false">Cancelar</v-btn>
+          <v-btn @click="completeDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" :loading="completing" @click="completeContract">
             Completar
           </v-btn>
@@ -317,7 +317,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="cancelDialog = false">Cancelar</v-btn>
+          <v-btn @click="cancelDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn :color="cancelAction === 'CANCELLED' ? 'error' : 'warning'" :loading="cancelling" @click="cancelContract">
             Confirmar
           </v-btn>
@@ -343,6 +343,9 @@ import paymentMethodsService from '@/services/paymentMethods.service'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()

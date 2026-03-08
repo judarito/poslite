@@ -16,6 +16,29 @@
 
         <v-spacer></v-spacer>
 
+        <v-menu location="bottom end">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              variant="text"
+              class="text-none mr-1"
+              prepend-icon="mdi-translate"
+            >
+              {{ currentLanguageLabel }}
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              v-for="lang in languageOptions"
+              :key="lang.value"
+              :active="locale === lang.value"
+              @click="setLocale(lang.value)"
+            >
+              <v-list-item-title>{{ lang.title }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+
         <v-btn v-if="userProfile || tenantId" icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
@@ -40,8 +63,8 @@
       >
         <v-list-item
           prepend-avatar="https://randomuser.me/api/portraits/men/85.jpg"
-          :title="userProfile?.full_name || user?.email || 'Usuario'"
-          :subtitle="(canManageTenants && !userProfile) ? 'Super Administrador' : (userProfile?.tenants?.name || 'Sin empresa')"
+          :title="userProfile?.full_name || user?.email || t('app.user')"
+          :subtitle="(canManageTenants && !userProfile) ? t('app.superAdmin') : (userProfile?.tenants?.name || t('app.noCompany'))"
         ></v-list-item>
 
         <v-divider></v-divider>
@@ -85,7 +108,7 @@
           
           <!-- Mensaje cuando no hay menú disponible -->
           <v-list-item v-else>
-            <v-list-item-title class="text-caption text-grey">Cargando menú...</v-list-item-title>
+            <v-list-item-title class="text-caption text-grey">{{ t('app.loadingMenu') }}</v-list-item-title>
           </v-list-item>
         </v-list>
 
@@ -98,7 +121,7 @@
               variant="outlined"
               @click="handleLogout"
             >
-              Cerrar Sesión
+              {{ t('app.logout') }}
             </v-btn>
           </div>
         </template>
@@ -120,7 +143,7 @@
       <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
         {{ snackbarMessage }}
         <template v-slot:actions>
-          <v-btn variant="text" @click="snackbar = false">Cerrar</v-btn>
+          <v-btn variant="text" @click="snackbar = false">{{ t('common.close') }}</v-btn>
         </template>
       </v-snackbar>
 
@@ -129,7 +152,7 @@
         <v-card>
           <v-card-title class="d-flex align-center pa-4">
             <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
-            Alertas
+            {{ t('app.alerts') }}
             <v-spacer></v-spacer>
             <v-btn icon variant="text" @click="alertsDialog = false">
               <v-icon>mdi-close</v-icon>
@@ -146,7 +169,7 @@
                 :model-value="stockAlertsCount > 0"
                 inline
               >
-                Stock
+                {{ t('app.stock') }}
               </v-badge>
             </v-tab>
             <v-tab value="expiration">
@@ -156,7 +179,7 @@
                 :model-value="expirationAlertsCount > 0"
                 inline
               >
-                Vencimientos
+                {{ t('app.expirations') }}
               </v-badge>
             </v-tab>
             <v-tab value="layaway">
@@ -166,7 +189,7 @@
                 :model-value="layawayAlertsCount > 0"
                 inline
               >
-                Plan Separe
+                {{ t('app.layaway') }}
               </v-badge>
             </v-tab>
             <v-tab value="payable">
@@ -176,7 +199,7 @@
                 :model-value="payableAlertsCount > 0"
                 inline
               >
-                CxP
+                {{ t('app.payable') }}
               </v-badge>
             </v-tab>
             <v-tab value="receivable">
@@ -186,7 +209,7 @@
                 :model-value="receivableAlertsCount > 0"
                 inline
               >
-                Cartera
+                {{ t('app.receivable') }}
               </v-badge>
             </v-tab>
           </v-tabs>
@@ -201,7 +224,7 @@
                     <v-select
                       v-model="stockFilters.alert_level"
                       :items="stockAlertLevels"
-                      label="Nivel de alerta"
+                      :label="t('app.alertLevel')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -213,7 +236,7 @@
                       :items="locations"
                       item-title="name"
                       item-value="location_id"
-                      label="Sede"
+                      :label="t('app.branch')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -222,7 +245,7 @@
                   <v-col cols="12" sm="12" md="6">
                     <v-text-field
                       v-model="stockFilters.search"
-                      label="Buscar producto o SKU"
+                      :label="t('app.searchProductSku')"
                       prepend-inner-icon="mdi-magnify"
                       clearable
                       density="compact"
@@ -240,7 +263,7 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
                 <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de stock</p>
+                  <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
                 </div>
                 <v-card
                   v-else
@@ -266,11 +289,11 @@
                     <div class="text-caption text-grey mb-2">SKU: {{ alert.data.sku }}</div>
                     <v-row dense class="text-caption">
                       <v-col cols="6">
-                        <div class="text-grey">En mano:</div>
+                        <div class="text-grey">{{ t('app.onHand') }}:</div>
                         <div class="font-weight-bold">{{ alert.data.on_hand }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Disponible:</div>
+                        <div class="text-grey">{{ t('app.available') }}:</div>
                         <div class="font-weight-bold">{{ alert.data.available }}</div>
                       </v-col>
                     </v-row>
@@ -283,18 +306,18 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
                 <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de stock</p>
+                  <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
                 </div>
                 <v-table v-else density="compact" fixed-header height="500">
                   <thead>
                     <tr>
-                      <th>Alerta</th>
-                      <th>Sede</th>
-                      <th>Producto</th>
+                      <th>{{ t('app.alert') }}</th>
+                      <th>{{ t('app.branch') }}</th>
+                      <th>{{ t('app.product') }}</th>
                       <th>SKU</th>
-                      <th class="text-right">En mano</th>
-                      <th class="text-right">Disponible</th>
-                      <th class="text-right">Mínimo</th>
+                      <th class="text-right">{{ t('app.onHand') }}</th>
+                      <th class="text-right">{{ t('app.available') }}</th>
+                      <th class="text-right">{{ t('app.minimum') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -324,12 +347,12 @@
               <v-card-actions class="pa-4">
                 <v-btn color="primary" variant="text" @click="loadStockAlerts">
                   <v-icon start>mdi-refresh</v-icon>
-                  Actualizar
+                  {{ t('common.update') }}
                 </v-btn>
                 <v-spacer></v-spacer>
                 <v-btn color="primary" variant="tonal" @click="goToInventory">
                   <v-icon start>mdi-warehouse</v-icon>
-                  Ir a Inventario
+                  {{ t('app.goToInventory') }}
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -343,7 +366,7 @@
                     <v-select
                       v-model="expirationFilters.alert_level"
                       :items="expirationAlertLevels"
-                      label="Nivel de alerta"
+                      :label="t('app.alertLevel')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -355,7 +378,7 @@
                       :items="locations"
                       item-title="name"
                       item-value="location_id"
-                      label="Sede"
+                      :label="t('app.branch')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -364,7 +387,7 @@
                   <v-col cols="12" sm="12" md="6">
                     <v-text-field
                       v-model="expirationFilters.search"
-                      label="Buscar producto, SKU o lote"
+                      :label="t('app.searchProductSkuBatch')"
                       prepend-inner-icon="mdi-magnify"
                       clearable
                       density="compact"
@@ -382,7 +405,7 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
                 <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de vencimiento</p>
+                  <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
                 </div>
                 <v-card
                   v-else
@@ -406,25 +429,25 @@
                       <span v-if="alert.data.variant_name" class="text-caption ml-1">({{ alert.data.variant_name }})</span>
                     </div>
                     <div class="text-caption text-grey mb-2">
-                      Lote: {{ alert.data.batch_number }} | SKU: {{ alert.data.sku }}
+                      {{ t('app.batch') }}: {{ alert.data.batch_number }} | SKU: {{ alert.data.sku }}
                     </div>
                     <v-row dense class="text-caption">
                       <v-col cols="6">
-                        <div class="text-grey">Vence:</div>
+                        <div class="text-grey">{{ t('app.expires') }}:</div>
                         <div class="font-weight-bold">{{ formatDate(alert.data.expiration_date) }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Días:</div>
+                        <div class="text-grey">{{ t('app.days') }}:</div>
                         <div class="font-weight-bold" :class="alert.data.days_to_expiry < 0 ? 'text-error' : ''">
                           {{ alert.data.days_to_expiry }}
                         </div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Stock:</div>
+                        <div class="text-grey">{{ t('app.stock') }}:</div>
                         <div class="font-weight-bold">{{ alert.data.on_hand }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Disponible:</div>
+                        <div class="text-grey">{{ t('app.available') }}:</div>
                         <div class="font-weight-bold">{{ alert.data.available }}</div>
                       </v-col>
                     </v-row>
@@ -441,20 +464,20 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
                 <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de vencimiento</p>
+                  <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
                 </div>
                 <v-table v-else density="compact" fixed-header height="500">
                   <thead>
                     <tr>
-                      <th>Alerta</th>
-                      <th>Sede</th>
-                      <th>Producto</th>
-                      <th>Lote</th>
-                      <th>Vencimiento</th>
-                      <th class="text-right">Días</th>
-                      <th class="text-right">Stock</th>
-                      <th class="text-right">Disponible</th>
-                      <th>Ubicación</th>
+                      <th>{{ t('app.alert') }}</th>
+                      <th>{{ t('app.branch') }}</th>
+                      <th>{{ t('app.product') }}</th>
+                      <th>{{ t('app.batch') }}</th>
+                      <th>{{ t('app.expirationDate') }}</th>
+                      <th class="text-right">{{ t('app.days') }}</th>
+                      <th class="text-right">{{ t('app.stock') }}</th>
+                      <th class="text-right">{{ t('app.available') }}</th>
+                      <th>{{ t('app.location') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -494,12 +517,12 @@
               <v-card-actions class="pa-4">
                 <v-btn color="error" variant="text" @click="loadExpirationAlerts">
                   <v-icon start>mdi-refresh</v-icon>
-                  Actualizar
+                  {{ t('common.update') }}
                 </v-btn>
                 <v-spacer></v-spacer>
                 <v-btn color="error" variant="tonal" @click="goToBatches">
                   <v-icon start>mdi-barcode</v-icon>
-                  Ir a Lotes
+                  {{ t('app.goToBatches') }}
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -513,7 +536,7 @@
                     <v-select
                       v-model="layawayFilters.alert_level"
                       :items="layawayAlertLevels"
-                      label="Estado"
+                      :label="t('app.status')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -522,7 +545,7 @@
                   <v-col cols="12" sm="6">
                     <v-text-field
                       v-model="layawayFilters.search"
-                      label="Buscar cliente"
+                      :label="t('app.searchCustomer')"
                       prepend-inner-icon="mdi-magnify"
                       clearable
                       density="compact"
@@ -540,7 +563,7 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
                 <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de plan separe</p>
+                  <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
                 </div>
                 <v-card
                   v-else
@@ -563,11 +586,11 @@
                     <div class="text-caption text-grey mb-2">{{ alert.data.customer_document || alert.data.customer_phone }}</div>
                     <v-row dense class="text-caption">
                       <v-col cols="6">
-                        <div class="text-grey">Total:</div>
+                        <div class="text-grey">{{ t('app.total') }}:</div>
                         <div class="font-weight-bold">{{ formatMoney(alert.data.total) }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Saldo:</div>
+                        <div class="text-grey">{{ t('app.balance') }}:</div>
                         <div class="font-weight-bold text-error">{{ formatMoney(alert.data.balance) }}</div>
                       </v-col>
                     </v-row>
@@ -580,19 +603,19 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
                 <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de plan separe</p>
+                  <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
                 </div>
                 <v-table v-else density="compact" fixed-header height="500">
                   <thead>
                     <tr>
-                      <th>Estado</th>
-                      <th>Cliente</th>
-                      <th>Sede</th>
-                      <th>Vencimiento</th>
-                      <th class="text-right">Total</th>
-                      <th class="text-right">Pagado</th>
-                      <th class="text-right">Saldo</th>
-                      <th>Acciones</th>
+                      <th>{{ t('app.status') }}</th>
+                      <th>{{ t('app.customer') }}</th>
+                      <th>{{ t('app.branch') }}</th>
+                      <th>{{ t('app.expirationDate') }}</th>
+                      <th class="text-right">{{ t('app.total') }}</th>
+                      <th class="text-right">{{ t('app.paid') }}</th>
+                      <th class="text-right">{{ t('app.balance') }}</th>
+                      <th>{{ t('app.actions') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -633,12 +656,12 @@
               <v-card-actions class="pa-4">
                 <v-btn color="warning" variant="text" @click="loadLayawayAlerts">
                   <v-icon start>mdi-refresh</v-icon>
-                  Actualizar
+                  {{ t('common.update') }}
                 </v-btn>
                 <v-spacer></v-spacer>
                 <v-btn color="warning" variant="tonal" @click="goToLayaway">
                   <v-icon start>mdi-calendar-clock</v-icon>
-                  Ir a Plan Separe
+                  {{ t('app.goToLayaway') }}
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -652,7 +675,7 @@
                     <v-select
                       v-model="payableFilters.alert_level"
                       :items="payableAlertLevels"
-                      label="Nivel de alerta"
+                      :label="t('app.alertLevel')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -661,7 +684,7 @@
                   <v-col cols="12" sm="6">
                     <v-text-field
                       v-model="payableFilters.search"
-                      label="Buscar proveedor, factura o sede"
+                      :label="t('app.searchSupplierInvoiceBranch')"
                       prepend-inner-icon="mdi-magnify"
                       clearable
                       density="compact"
@@ -678,7 +701,7 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
                 <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de cuentas por pagar</p>
+                  <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
                 </div>
                 <v-card
                   v-else
@@ -698,14 +721,14 @@
                       <span class="text-caption">{{ formatDate(alert.data.due_date) }}</span>
                     </div>
                     <div class="mb-1"><strong>{{ alert.data.supplier_name }}</strong></div>
-                    <div class="text-caption text-grey mb-2">Factura: {{ alert.data.invoice_number || 'Sin numero' }}</div>
+                    <div class="text-caption text-grey mb-2">{{ t('app.invoice') }}: {{ alert.data.invoice_number || t('app.withoutNumber') }}</div>
                     <v-row dense class="text-caption">
                       <v-col cols="6">
-                        <div class="text-grey">Sede:</div>
+                        <div class="text-grey">{{ t('app.branch') }}:</div>
                         <div class="font-weight-bold">{{ alert.data.location_name || '-' }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Saldo:</div>
+                        <div class="text-grey">{{ t('app.balance') }}:</div>
                         <div class="font-weight-bold text-error">{{ formatMoney(alert.data.balance) }}</div>
                       </v-col>
                     </v-row>
@@ -717,18 +740,18 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
                 <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de cuentas por pagar</p>
+                  <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
                 </div>
                 <v-table v-else density="compact" fixed-header height="500">
                   <thead>
                     <tr>
-                      <th>Estado</th>
-                      <th>Proveedor</th>
-                      <th>Sede</th>
-                      <th>Factura</th>
-                      <th>Vencimiento</th>
-                      <th class="text-right">Saldo</th>
-                      <th>Acción</th>
+                      <th>{{ t('app.status') }}</th>
+                      <th>{{ t('app.provider') }}</th>
+                      <th>{{ t('app.branch') }}</th>
+                      <th>{{ t('app.invoice') }}</th>
+                      <th>{{ t('app.expirationDate') }}</th>
+                      <th class="text-right">{{ t('app.balance') }}</th>
+                      <th>{{ t('app.action') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -741,12 +764,12 @@
                       </td>
                       <td>{{ alert.data.supplier_name }}</td>
                       <td>{{ alert.data.location_name || '-' }}</td>
-                      <td>{{ alert.data.invoice_number || 'Sin numero' }}</td>
+                      <td>{{ alert.data.invoice_number || t('app.withoutNumber') }}</td>
                       <td>{{ formatDate(alert.data.due_date) }}</td>
                       <td class="text-right text-error font-weight-bold">{{ formatMoney(alert.data.balance) }}</td>
                       <td>
                         <v-btn size="small" color="error" variant="text" @click="goToPurchases">
-                          Ver compras
+                          {{ t('app.viewPurchases') }}
                         </v-btn>
                       </td>
                     </tr>
@@ -759,12 +782,12 @@
               <v-card-actions class="pa-4">
                 <v-btn color="error" variant="text" @click="loadPayableAlerts">
                   <v-icon start>mdi-refresh</v-icon>
-                  Actualizar
+                  {{ t('common.update') }}
                 </v-btn>
                 <v-spacer></v-spacer>
                 <v-btn color="error" variant="tonal" @click="goToPurchases">
                   <v-icon start>mdi-cart-plus</v-icon>
-                  Ir a Compras
+                  {{ t('app.goToPurchases') }}
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -777,7 +800,7 @@
                     <v-select
                       v-model="receivableFilters.alert_level"
                       :items="receivableAlertLevels"
-                      label="Nivel de alerta"
+                      :label="t('app.alertLevel')"
                       clearable
                       density="compact"
                       variant="outlined"
@@ -786,7 +809,7 @@
                   <v-col cols="12" sm="6">
                     <v-text-field
                       v-model="receivableFilters.search"
-                      label="Buscar cliente o documento"
+                      :label="t('app.searchCustomerDocument')"
                       prepend-inner-icon="mdi-magnify"
                       clearable
                       density="compact"
@@ -803,7 +826,7 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
                 <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de cartera</p>
+                  <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
                 </div>
                 <v-card
                   v-else
@@ -821,14 +844,14 @@
                       </v-chip>
                     </div>
                     <div class="mb-1"><strong>{{ alert.data.customer_name }}</strong></div>
-                    <div class="text-caption text-grey mb-2">{{ alert.data.customer_document || 'Sin documento' }}</div>
+                    <div class="text-caption text-grey mb-2">{{ alert.data.customer_document || t('app.withoutDocument') }}</div>
                     <v-row dense class="text-caption">
                       <v-col cols="6">
-                        <div class="text-grey">Saldo:</div>
+                        <div class="text-grey">{{ t('app.balance') }}:</div>
                         <div class="font-weight-bold text-error">{{ formatMoney(alert.data.current_balance) }}</div>
                       </v-col>
                       <v-col cols="6">
-                        <div class="text-grey">Cupo:</div>
+                        <div class="text-grey">{{ t('app.limit') }}:</div>
                         <div class="font-weight-bold">{{ formatMoney(alert.data.credit_limit) }}</div>
                       </v-col>
                     </v-row>
@@ -840,17 +863,17 @@
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
                 <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
-                  <p class="mt-4">No hay alertas de cartera</p>
+                  <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
                 </div>
                 <v-table v-else density="compact" fixed-header height="500">
                   <thead>
                     <tr>
-                      <th>Estado</th>
-                      <th>Cliente</th>
-                      <th>Documento</th>
-                      <th class="text-right">Saldo</th>
-                      <th class="text-right">Cupo</th>
-                      <th class="text-right">Exceso</th>
+                      <th>{{ t('app.status') }}</th>
+                      <th>{{ t('app.customer') }}</th>
+                      <th>{{ t('app.document') }}</th>
+                      <th class="text-right">{{ t('app.balance') }}</th>
+                      <th class="text-right">{{ t('app.limit') }}</th>
+                      <th class="text-right">{{ t('app.excess') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -862,7 +885,7 @@
                         </v-chip>
                       </td>
                       <td>{{ alert.data.customer_name }}</td>
-                      <td>{{ alert.data.customer_document || '-' }}</td>
+                      <td>{{ alert.data.customer_document || t('app.withoutDocument') }}</td>
                       <td class="text-right text-error font-weight-bold">{{ formatMoney(alert.data.current_balance) }}</td>
                       <td class="text-right">{{ formatMoney(alert.data.credit_limit) }}</td>
                       <td class="text-right">{{ formatMoney(alert.data.over_limit_amount || 0) }}</td>
@@ -876,12 +899,12 @@
               <v-card-actions class="pa-4">
                 <v-btn color="warning" variant="text" @click="loadReceivableAlerts">
                   <v-icon start>mdi-refresh</v-icon>
-                  Actualizar
+                  {{ t('common.update') }}
                 </v-btn>
                 <v-spacer></v-spacer>
                 <v-btn color="warning" variant="tonal" @click="goToCartera">
                   <v-icon start>mdi-account-credit-card</v-icon>
-                  Ir a Cartera
+                  {{ t('app.goToReceivable') }}
                 </v-btn>
               </v-card-actions>
             </v-window-item>
@@ -910,16 +933,27 @@ import { useDisplay } from 'vuetify'
 import rolesService from '@/services/roles.service'
 import { useAppAlerts } from '@/composables/useAppAlerts'
 import { formatMoney, formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
 const { tenantId, clearTenant } = useTenant()
-const { theme, loadSettings } = useTenantSettings()
+const { theme, locale: tenantLocale, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 const { isDark, setTheme } = useTheme()
 const { canManageTenants } = useSuperAdmin()
 const { mobile: isMobile } = useDisplay()
+const { t, setLocale, locale } = useI18n()
+
+const languageOptions = computed(() => [
+  { title: 'Español', value: 'es' },
+  { title: 'English', value: 'en' }
+])
+
+const currentLanguageLabel = computed(() => {
+  return locale.value === 'en' ? 'EN' : 'ES'
+})
 
 const drawer = ref(true)
 const windowWidth = ref(window.innerWidth)
@@ -981,19 +1015,19 @@ const {
 const isAuthRoute = computed(() => route.path === '/login')
 
 // Menú específico para Super Admin (usuarios sin tenant)
-const superAdminMenuItems = [
+const superAdminMenuItems = computed(() => [
   {
-    title: 'Gestión del Sistema',
+    title: t('app.systemManagement'),
     icon: 'mdi-cog-outline',
     permissions: [],
     children: [
-      { title: 'Gestión de Tenants', icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
-      { title: 'Roles, Permisos y Menús', icon: 'mdi-shield-crown', route: '/superadmin/roles-menus', permissions: ['SUPER_ADMIN_ONLY'] },
+      { title: t('app.tenantManagement'), icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
+      { title: t('app.rolesPermissionsMenus'), icon: 'mdi-shield-crown', route: '/superadmin/roles-menus', permissions: ['SUPER_ADMIN_ONLY'] },
     ]
   },
-  { title: 'Manual de Usuario', icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
-  { title: 'Acerca de', icon: 'mdi-information', route: '/about', permissions: [] },
-]
+  { title: t('app.userManual'), icon: 'mdi-book-open-page-variant', action: 'openManual', permissions: [] },
+  { title: t('app.about'), icon: 'mdi-information', route: '/about', permissions: [] },
+])
 
 // Filtrar menú según permisos del usuario
 const menuSections = computed(() => {
@@ -1004,7 +1038,7 @@ const menuSections = computed(() => {
 
   // Superadmin (sin perfil de tenant): menú especial hardcodeado
   if (!userProfile.value && canManageTenants.value) {
-    return superAdminMenuItems
+    return superAdminMenuItems.value
   }
 
   // Si no tiene perfil, no mostrar menú
@@ -1137,6 +1171,9 @@ onMounted(async () => {
   // Cargar configuración del tenant y aplicar tema
   if (tenantId.value) {
     await loadSettings()
+    if (tenantLocale.value) {
+      setLocale(tenantLocale.value)
+    }
     if (theme.value) {
       setTheme(theme.value)
     }
@@ -1173,6 +1210,12 @@ watch(
 watch(theme, (newTheme) => {
   if (newTheme && ['light', 'dark', 'auto'].includes(newTheme)) {
     setTheme(newTheme)
+  }
+})
+
+watch(tenantLocale, (newLocale) => {
+  if (newLocale) {
+    setLocale(newLocale)
   }
 })
 

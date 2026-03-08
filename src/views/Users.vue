@@ -1,7 +1,7 @@
 <template>
   <div>
     <ListView
-      title="Usuarios"
+      :title="t('users.title')"
       icon="mdi-account-group"
       :items="users"
       :total-items="totalUsers"
@@ -11,8 +11,8 @@
       title-field="full_name"
       avatar-icon="mdi-account"
       avatar-color="primary"
-      empty-message="No hay usuarios registrados"
-      create-button-text="Nuevo Usuario"
+      :empty-message="t('users.empty')"
+      :create-button-text="t('users.new')"
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="null"
@@ -35,10 +35,10 @@
             {{ role.name }}
           </v-chip>
           <v-chip v-if="!item.roles || item.roles.length === 0" size="small" color="grey">
-            Sin roles
+            {{ t('users.noRoles') }}
           </v-chip>
           <v-chip :color="item.is_active ? 'success' : 'error'" size="small">
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            {{ item.is_active ? t('common.active') : t('common.inactive') }}
           </v-chip>
         </div>
       </template>
@@ -49,7 +49,7 @@
             size="small"
             variant="text"
             @click.stop="openPasswordDialog(item)"
-            title="Cambiar Contraseña"
+            :title="t('users.changePassword')"
           ></v-btn>
           <v-btn
             :icon="item.is_active ? 'mdi-account-off' : 'mdi-account-check'"
@@ -57,7 +57,7 @@
             variant="text"
             :color="item.is_active ? 'error' : 'success'"
             @click.stop="toggleUserStatus(item)"
-            :title="item.is_active ? 'Desactivar' : 'Activar'"
+            :title="item.is_active ? t('users.deactivate') : t('users.activate')"
           ></v-btn>
         </div>
       </template>
@@ -69,7 +69,7 @@
         <v-card-title>
           <span class="text-h5">
             <v-icon class="mr-2">{{ isEdit ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-            {{ isEdit ? 'Editar Usuario' : 'Nuevo Usuario' }}
+            {{ isEdit ? t('users.edit') : t('users.new') }}
           </span>
         </v-card-title>
 
@@ -77,20 +77,20 @@
           <v-form ref="formRef" v-model="formValid">
             <v-text-field
               v-model="form.email"
-              label="Correo Electrónico"
+              :label="t('settings.email')"
               prepend-inner-icon="mdi-email"
               variant="outlined"
               type="email"
               :rules="[rules.required, rules.email]"
               :disabled="isEdit"
-              :hint="isEdit ? 'El email no puede ser modificado' : ''"
+              :hint="isEdit ? t('users.emailImmutable') : ''"
               persistent-hint
             ></v-text-field>
 
             <v-text-field
               v-if="!isEdit"
               v-model="form.password"
-              label="Contraseña"
+              :label="t('login.password')"
               prepend-inner-icon="mdi-lock"
               variant="outlined"
               :type="showPassword ? 'text' : 'password'"
@@ -101,7 +101,7 @@
 
             <v-text-field
               v-model="form.full_name"
-              label="Nombre Completo"
+              :label="t('users.fullName')"
               prepend-inner-icon="mdi-account"
               variant="outlined"
               :rules="[rules.required]"
@@ -112,7 +112,7 @@
               :items="availableRoles"
               item-title="name"
               item-value="role_id"
-              label="Roles"
+              :label="t('users.roles')"
               prepend-inner-icon="mdi-shield-account"
               variant="outlined"
               multiple
@@ -129,7 +129,7 @@
 
             <v-switch
               v-model="form.is_active"
-              label="Usuario Activo"
+              :label="t('users.activeUser')"
               color="primary"
               hide-details
             ></v-switch>
@@ -138,7 +138,7 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeDialog">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             variant="elevated"
@@ -146,7 +146,7 @@
             :disabled="!formValid"
             @click="saveUser"
           >
-            {{ isEdit ? 'Guardar' : 'Crear' }}
+            {{ isEdit ? t('common.save') : t('common.create') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -158,19 +158,19 @@
         <v-card-title>
           <span class="text-h5">
             <v-icon class="mr-2">mdi-lock-reset</v-icon>
-            Cambiar Contraseña
+            {{ t('users.changePassword') }}
           </span>
         </v-card-title>
 
         <v-card-text>
           <v-alert type="info" variant="tonal" class="mb-4">
-            Cambiar la contraseña de: <strong>{{ selectedUser?.email }}</strong>
+            {{ t('users.changePasswordFor') }} <strong>{{ selectedUser?.email }}</strong>
           </v-alert>
 
           <v-form ref="passwordFormRef" v-model="passwordFormValid">
             <v-text-field
               v-model="passwordForm.newPassword"
-              label="Nueva Contraseña"
+              :label="t('login.newPassword')"
               prepend-inner-icon="mdi-lock"
               variant="outlined"
               :type="showNewPassword ? 'text' : 'password'"
@@ -181,7 +181,7 @@
 
             <v-text-field
               v-model="passwordForm.confirmPassword"
-              label="Confirmar Contraseña"
+              :label="t('login.confirmPassword')"
               prepend-inner-icon="mdi-lock-check"
               variant="outlined"
               :type="showConfirmPassword ? 'text' : 'password'"
@@ -194,7 +194,7 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closePasswordDialog">Cancelar</v-btn>
+          <v-btn variant="text" @click="closePasswordDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             variant="elevated"
@@ -202,7 +202,7 @@
             :disabled="!passwordFormValid"
             @click="changePassword"
           >
-            Cambiar Contraseña
+            {{ t('users.changePassword') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -212,7 +212,7 @@
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
       {{ snackbarText }}
       <template #actions>
-        <v-btn variant="text" @click="snackbar = false">Cerrar</v-btn>
+        <v-btn variant="text" @click="snackbar = false">{{ t('common.close') }}</v-btn>
       </template>
     </v-snackbar>
   </div>
@@ -222,6 +222,7 @@
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import {
   getUsers,
@@ -234,6 +235,7 @@ import {
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
+const { t } = useI18n()
 
 // Estado
 const users = ref([])
@@ -275,11 +277,11 @@ const passwordForm = ref({
 
 // Reglas de validación
 const rules = {
-  required: v => !!v || 'Este campo es requerido',
-  email: v => /.+@.+\..+/.test(v) || 'Email inválido',
-  minLength: v => (v && v.length >= 6) || 'Mínimo 6 caracteres',
-  atLeastOne: v => (v && v.length > 0) || 'Seleccione al menos un rol',
-  passwordMatch: v => v === passwordForm.value.newPassword || 'Las contraseñas no coinciden'
+  required: v => !!v || t('users.fieldRequired'),
+  email: v => /.+@.+\..+/.test(v) || t('login.invalidEmail'),
+  minLength: v => (v && v.length >= 6) || t('users.minLength'),
+  atLeastOne: v => (v && v.length > 0) || t('users.selectAtLeastOneRole'),
+  passwordMatch: v => v === passwordForm.value.newPassword || t('login.passwordMismatch')
 }
 
 // Métodos
@@ -292,10 +294,10 @@ async function loadUsers({ page, pageSize, search, tenantId: tid }) {
       users.value = result.data
       totalUsers.value = result.total
     } else {
-      showMessage('Error al cargar usuarios', 'error')
+      showMessage(t('users.loadError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al cargar usuarios', 'error')
+    showMessage(t('users.loadError'), 'error')
   } finally {
     loading.value = false
   }
@@ -306,7 +308,7 @@ async function loadRoles() {
   try {
     availableRoles.value = await getRoles(tenantId.value)
   } catch (error) {
-    showMessage('Error al cargar roles', 'error')
+    showMessage(t('roles.loadError'), 'error')
   }
 }
 
@@ -353,7 +355,7 @@ async function saveUser() {
         is_active: form.value.is_active,
         roleIds: form.value.roleIds
       })
-      showMessage('Usuario actualizado exitosamente', 'success')
+      showMessage(t('users.updatedSuccessfully'), 'success')
     } else {
       await createUser({
         email: form.value.email,
@@ -362,14 +364,14 @@ async function saveUser() {
         roleIds: form.value.roleIds,
         is_active: form.value.is_active
       })
-      showMessage('Usuario creado exitosamente', 'success')
+      showMessage(t('users.createdSuccessfully'), 'success')
     }
 
     closeDialog()
     // Recargar la lista
     await loadUsers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
   } catch (error) {
-    showMessage(error.message || 'Error al guardar usuario', 'error')
+    showMessage(error.message || t('users.saveError'), 'error')
   } finally {
     saving.value = false
   }
@@ -399,10 +401,10 @@ async function changePassword() {
       selectedUser.value.auth_user_id,
       passwordForm.value.newPassword
     )
-    showMessage('Contraseña actualizada exitosamente', 'success')
+    showMessage(t('users.passwordUpdatedSuccessfully'), 'success')
     closePasswordDialog()
   } catch (error) {
-    showMessage(error.message || 'Error al cambiar contraseña', 'error')
+    showMessage(error.message || t('users.changePasswordError'), 'error')
   } finally {
     savingPassword.value = false
   }
@@ -417,13 +419,13 @@ async function toggleUserStatus(user) {
       roleIds: user.roles.map(r => r.role_id)
     })
     showMessage(
-      `Usuario ${!user.is_active ? 'activado' : 'desactivado'} exitosamente`,
+      t(!user.is_active ? 'users.activatedSuccessfully' : 'users.deactivatedSuccessfully'),
       'success'
     )
     // Recargar la lista
     await loadUsers({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
   } catch (error) {
-    showMessage('Error al cambiar estado del usuario', 'error')
+    showMessage(t('users.changeStatusError'), 'error')
   }
 }
 

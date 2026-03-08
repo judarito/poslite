@@ -54,31 +54,51 @@ serve(async (req) => {
     const {
       model = 'deepseek-chat',
       messages,
+      image,
+      prompt,
+      mime_type,
       temperature = 0.3,
       max_tokens = 3000
     } = body || {}
 
-    if (!Array.isArray(messages) || messages.length === 0) {
+    const isVisionRequest = typeof image === 'string' && image.trim().length > 0 && typeof prompt === 'string' && prompt.trim().length > 0
+    if (!isVisionRequest && (!Array.isArray(messages) || messages.length === 0)) {
       return new Response(
-        JSON.stringify({ error: 'messages es requerido y debe ser un array no vacío' }),
+        JSON.stringify({ error: 'Debe enviar messages[] o image+prompt' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${deepseekApiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        max_tokens,
-        stream: false
-      })
-    })
+    const deepseekResponse = isVisionRequest
+      ? await fetch('https://api.deepseek.com/v1/vision', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${deepseekApiKey}`
+          },
+          body: JSON.stringify({
+            model,
+            image,
+            prompt,
+            mime_type,
+            temperature,
+            max_tokens
+          })
+        })
+      : await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${deepseekApiKey}`
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature,
+            max_tokens,
+            stream: false
+          })
+        })
 
     if (!deepseekResponse.ok) {
       const errorData = await deepseekResponse.json().catch(() => ({}))
@@ -92,11 +112,13 @@ serve(async (req) => {
     }
 
     const data = await deepseekResponse.json()
-    const content = data?.choices?.[0]?.message?.content
+    const content = isVisionRequest
+      ? (data?.content ?? data?.text ?? data?.output_text ?? data?.result ?? data?.choices?.[0]?.message?.content ?? null)
+      : (data?.choices?.[0]?.message?.content ?? null)
 
     if (!content) {
       return new Response(
-        JSON.stringify({ error: 'DeepSeek respondió sin contenido' }),
+        JSON.stringify({ error: 'DeepSeek respondió sin contenido', raw: data }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

@@ -10,23 +10,23 @@
             <v-sheet class="login-shell" rounded="xl" elevation="0">
               <div class="brand-panel d-none d-md-flex">
                 <div class="brand-inner">
-                  <div class="brand-kicker">POSLITE CORE</div>
-                  <h1 class="brand-title">Control real de ventas e inventario</h1>
+                  <div class="brand-kicker">{{ t('login.kicker') }}</div>
+                  <h1 class="brand-title">{{ t('login.brandTitle') }}</h1>
                   <p class="brand-copy">
-                    Opera mas rapido, con reglas de negocio solidas y decisiones apoyadas por IA.
+                    {{ t('login.brandCopy') }}
                   </p>
                   <div class="brand-points">
                     <v-chip size="small" variant="flat" class="brand-chip">
                       <v-icon start>mdi-shield-check</v-icon>
-                      Seguridad tenant
+                      {{ t('login.tenantSecurity') }}
                     </v-chip>
                     <v-chip size="small" variant="flat" class="brand-chip">
                       <v-icon start>mdi-sync-circle</v-icon>
-                      Realtime
+                      {{ t('login.realtime') }}
                     </v-chip>
                     <v-chip size="small" variant="flat" class="brand-chip">
                       <v-icon start>mdi-robot-outline</v-icon>
-                      IA operativa
+                      {{ t('login.operationalAI') }}
                     </v-chip>
                   </div>
                 </div>
@@ -39,15 +39,15 @@
                       <v-icon size="26">mdi-lock-reset</v-icon>
                     </div>
                     <div>
-                      <h2 class="form-title">Nueva contrasena</h2>
-                      <p class="form-subtitle">Define una nueva contrasena para tu cuenta</p>
+                      <h2 class="form-title">{{ t('login.newPasswordTitle') }}</h2>
+                      <p class="form-subtitle">{{ t('login.newPasswordSubtitle') }}</p>
                     </div>
                   </div>
 
                   <v-form @submit.prevent="handleUpdatePassword">
                     <v-text-field
                       v-model="recoveryPassword"
-                      label="Nueva contrasena"
+                      :label="t('login.newPassword')"
                       prepend-inner-icon="mdi-lock-outline"
                       :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
                       :type="showPassword ? 'text' : 'password'"
@@ -60,7 +60,7 @@
 
                     <v-text-field
                       v-model="recoveryPasswordConfirm"
-                      label="Confirmar contrasena"
+                      :label="t('login.confirmPassword')"
                       prepend-inner-icon="mdi-lock-check-outline"
                       :type="showPassword ? 'text' : 'password'"
                       variant="outlined"
@@ -78,7 +78,7 @@
                       class="login-btn"
                     >
                       <v-icon start>mdi-content-save-check</v-icon>
-                      Guardar contrasena
+                      {{ t('login.savePassword') }}
                     </v-btn>
 
                     <v-alert
@@ -98,15 +98,15 @@
                       <v-icon size="26">mdi-storefront-outline</v-icon>
                     </div>
                     <div>
-                      <h2 class="form-title">Iniciar sesion</h2>
-                      <p class="form-subtitle">Ingresa tus credenciales para continuar</p>
+                      <h2 class="form-title">{{ t('login.signInTitle') }}</h2>
+                      <p class="form-subtitle">{{ t('login.signInSubtitle') }}</p>
                     </div>
                   </div>
 
                   <v-form @submit.prevent="handleLogin" ref="loginForm">
                     <v-text-field
                       v-model="loginData.email"
-                      label="Correo electronico"
+                      :label="t('login.email')"
                       prepend-inner-icon="mdi-email-outline"
                       variant="outlined"
                       :bg-color="isDark ? 'grey-darken-3' : 'white'"
@@ -118,7 +118,7 @@
 
                     <v-text-field
                       v-model="loginData.password"
-                      label="Contrasena"
+                      :label="t('login.password')"
                       prepend-inner-icon="mdi-lock-outline"
                       :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
                       :type="showPassword ? 'text' : 'password'"
@@ -133,7 +133,7 @@
                     <div class="form-actions-row">
                       <v-checkbox
                         v-model="rememberMe"
-                        label="Recordarme"
+                        :label="t('login.rememberMe')"
                         density="compact"
                         hide-details
                       ></v-checkbox>
@@ -144,7 +144,7 @@
                         class="login-link-btn"
                         @click="showResetPassword = true"
                       >
-                        Olvide mi contrasena
+                        {{ t('login.forgotPassword') }}
                       </v-btn>
                     </div>
 
@@ -157,7 +157,7 @@
                       class="login-btn"
                     >
                       <v-icon start>mdi-login</v-icon>
-                      Entrar al sistema
+                      {{ t('login.enterSystem') }}
                     </v-btn>
 
                     <v-alert
@@ -183,13 +183,13 @@
       <v-card rounded="xl">
         <v-card-title>
           <v-icon start>mdi-lock-reset</v-icon>
-          Restablecer contrasena
+          {{ t('login.resetPasswordTitle') }}
         </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="handleResetPassword">
             <v-text-field
               v-model="resetEmail"
-              label="Correo electronico"
+              :label="t('login.email')"
               prepend-inner-icon="mdi-email-outline"
               variant="outlined"
               :bg-color="isDark ? 'grey-darken-3' : 'white'"
@@ -209,13 +209,13 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="showResetPassword = false">Cancelar</v-btn>
+          <v-btn @click="showResetPassword = false">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             @click="handleResetPassword"
             :loading="loading"
           >
-            Enviar
+            {{ t('login.send') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -229,11 +229,13 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
+import { useI18n } from '@/i18n'
 
 const router = useRouter()
 const { signIn, resetPassword, updatePassword, loading } = useAuth()
 const { saveTenant } = useTenant()
 const { syncThemeFromTenant, isDark } = useTheme()
+const { t } = useI18n()
 
 const showPassword = ref(false)
 const rememberMe = ref(false)
@@ -257,10 +259,10 @@ const recoverySuccess = ref(false)
 const loginForm = ref(null)
 
 const rules = {
-  required: value => !!value || 'Campo requerido',
+  required: value => !!value || t('login.requiredField'),
   email: value => {
     const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return pattern.test(value) || 'Correo electronico invalido'
+    return pattern.test(value) || t('login.invalidEmail')
   }
 }
 
@@ -285,7 +287,7 @@ const handleLogin = async () => {
 
     router.push('/')
   } else {
-    loginError.value = result.error || 'Error al iniciar sesion'
+    loginError.value = result.error || t('login.loginError')
   }
 }
 
@@ -294,7 +296,7 @@ const handleResetPassword = async () => {
   if (!normalizedEmail) return
   if (rules.email(normalizedEmail) !== true) {
     resetSuccess.value = false
-    resetMessage.value = 'Correo electronico invalido'
+    resetMessage.value = t('login.invalidEmail')
     return
   }
 
@@ -304,10 +306,10 @@ const handleResetPassword = async () => {
 
   if (result.success) {
     resetSuccess.value = true
-    resetMessage.value = 'Se ha enviado un correo para restablecer tu contrasena'
+    resetMessage.value = t('login.resetSent')
   } else {
     resetSuccess.value = false
-    resetMessage.value = result.error || 'Error al enviar correo'
+    resetMessage.value = result.error || t('login.sendMailError')
   }
 }
 
@@ -316,25 +318,25 @@ const handleUpdatePassword = async () => {
 
   if (!recoveryPassword.value || recoveryPassword.value.length < 6) {
     recoverySuccess.value = false
-    recoveryMessage.value = 'La contrasena debe tener al menos 6 caracteres'
+    recoveryMessage.value = t('login.minPassword')
     return
   }
 
   if (recoveryPassword.value !== recoveryPasswordConfirm.value) {
     recoverySuccess.value = false
-    recoveryMessage.value = 'Las contrasenas no coinciden'
+    recoveryMessage.value = t('login.passwordMismatch')
     return
   }
 
   const result = await updatePassword(recoveryPassword.value)
   if (!result.success) {
     recoverySuccess.value = false
-    recoveryMessage.value = result.error || 'No se pudo actualizar la contrasena'
+    recoveryMessage.value = result.error || t('login.updatePasswordError')
     return
   }
 
   recoverySuccess.value = true
-  recoveryMessage.value = 'Contrasena actualizada. Redirigiendo...'
+  recoveryMessage.value = t('login.passwordUpdated')
   setTimeout(() => {
     router.push('/')
   }, 1200)

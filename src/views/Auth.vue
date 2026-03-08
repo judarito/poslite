@@ -3,18 +3,18 @@
     <v-card>
       <v-card-title class="text-h4 primary white--text">
         <v-icon left color="white" size="large">mdi-login</v-icon>
-        Autenticación con Supabase
+        {{ t('auth.title') }}
       </v-card-title>
       <v-card-text class="pa-6">
         <v-row>
           <v-col cols="12" md="6">
             <v-card variant="outlined">
-              <v-card-title>Iniciar Sesión</v-card-title>
+              <v-card-title>{{ t('auth.signIn') }}</v-card-title>
               <v-card-text>
                 <v-form @submit.prevent="handleSignIn">
                   <v-text-field
                     v-model="signInForm.email"
-                    label="Correo Electrónico"
+                    :label="t('settings.email')"
                     variant="outlined"
                     prepend-inner-icon="mdi-email"
                     type="email"
@@ -23,7 +23,7 @@
 
                   <v-text-field
                     v-model="signInForm.password"
-                    label="Contraseña"
+                    :label="t('login.password')"
                     variant="outlined"
                     prepend-inner-icon="mdi-lock"
                     type="password"
@@ -38,7 +38,7 @@
                     :loading="loading"
                   >
                     <v-icon left>mdi-login</v-icon>
-                    Iniciar Sesión
+                    {{ t('auth.signIn') }}
                   </v-btn>
                 </v-form>
 
@@ -57,12 +57,12 @@
 
           <v-col cols="12" md="6">
             <v-card variant="outlined">
-              <v-card-title>Registrarse</v-card-title>
+              <v-card-title>{{ t('auth.signUp') }}</v-card-title>
               <v-card-text>
                 <v-form @submit.prevent="handleSignUp">
                   <v-text-field
                     v-model="signUpForm.email"
-                    label="Correo Electrónico"
+                    :label="t('settings.email')"
                     variant="outlined"
                     prepend-inner-icon="mdi-email"
                     type="email"
@@ -71,7 +71,7 @@
 
                   <v-text-field
                     v-model="signUpForm.password"
-                    label="Contraseña"
+                    :label="t('login.password')"
                     variant="outlined"
                     prepend-inner-icon="mdi-lock"
                     type="password"
@@ -86,7 +86,7 @@
                     :loading="loading"
                   >
                     <v-icon left>mdi-account-plus</v-icon>
-                    Crear Cuenta
+                    {{ t('auth.createAccount') }}
                   </v-btn>
                 </v-form>
 
@@ -107,12 +107,12 @@
             <v-card color="success" dark>
               <v-card-title>
                 <v-icon left>mdi-account-check</v-icon>
-                Usuario Autenticado
+                {{ t('auth.authenticatedUser') }}
               </v-card-title>
               <v-card-text>
-                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>{{ t('settings.email') }}:</strong> {{ user.email }}</p>
                 <p><strong>ID:</strong> {{ user.id }}</p>
-                <p><strong>Creado:</strong> {{ new Date(user.created_at).toLocaleString() }}</p>
+                <p><strong>{{ t('auth.createdAt') }}:</strong> {{ new Date(user.created_at).toLocaleString() }}</p>
                 
                 <v-btn
                   color="white"
@@ -121,7 +121,7 @@
                   @click="handleSignOut"
                 >
                   <v-icon left>mdi-logout</v-icon>
-                  Cerrar Sesión
+                  {{ t('app.logout') }}
                 </v-btn>
               </v-card-text>
             </v-card>
@@ -131,7 +131,7 @@
             <v-card variant="outlined">
               <v-card-title>
                 <v-icon left>mdi-database</v-icon>
-                Estado de Conexión Supabase
+                {{ t('auth.connectionStatus') }}
               </v-card-title>
               <v-card-text>
                 <v-list>
@@ -142,7 +142,7 @@
                       </v-icon>
                     </template>
                     <v-list-item-title>
-                      {{ supabaseConnected ? 'Conectado a Supabase' : 'No conectado' }}
+                      {{ supabaseConnected ? t('auth.connected') : t('auth.notConnected') }}
                     </v-list-item-title>
                     <v-list-item-subtitle>
                       URL: {{ supabaseUrl }}
@@ -161,6 +161,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSupabase } from '@/plugins/supabase'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { supabase, auth } = useSupabase()
 
@@ -194,7 +197,7 @@ const handleSignIn = async () => {
     if (error) throw error
     
     signInSuccess.value = true
-    signInMessage.value = 'Inicio de sesión exitoso!'
+    signInMessage.value = t('auth.signInSuccess')
     user.value = data.user
     signInForm.value.email = ''
     signInForm.value.password = ''
@@ -216,7 +219,7 @@ const handleSignUp = async () => {
     if (error) throw error
     
     signUpSuccess.value = true
-    signUpMessage.value = 'Registro exitoso! Revisa tu correo para confirmar tu cuenta.'
+    signUpMessage.value = t('auth.signUpSuccess')
     signUpForm.value.email = ''
     signUpForm.value.password = ''
   } catch (error) {
@@ -231,7 +234,7 @@ const handleSignOut = async () => {
   try {
     await auth.signOut()
     user.value = null
-    signInMessage.value = 'Sesión cerrada exitosamente'
+    signInMessage.value = t('auth.signOutSuccess')
     signInSuccess.value = true
   } catch (error) {
     signInMessage.value = error.message

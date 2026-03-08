@@ -227,7 +227,7 @@
           </v-form>
         </v-card-text>
         <v-card-actions>
-          <v-btn variant="text" @click="closeCreateDialog">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeCreateDialog">{{ t('common.cancel') }}</v-btn>
           <v-spacer></v-spacer>
           <v-btn
             color="primary"
@@ -294,7 +294,7 @@
           </v-form>
         </v-card-text>
         <v-card-actions>
-          <v-btn variant="text" @click="closeCompleteDialog">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeCompleteDialog">{{ t('common.cancel') }}</v-btn>
           <v-spacer></v-spacer>
           <v-btn
             color="success"
@@ -402,7 +402,7 @@
         </v-card-text>
 
         <v-card-actions>
-          <v-btn variant="text" @click="closeDetailDialog">Cerrar</v-btn>
+          <v-btn variant="text" @click="closeDetailDialog">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -416,7 +416,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="confirmStartDialog = false">Cancelar</v-btn>
+          <v-btn variant="text" @click="confirmStartDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" variant="flat" @click="doStartProduction">Iniciar</v-btn>
         </v-card-actions>
       </v-card>
@@ -453,6 +453,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import manufacturingService from '@/services/manufacturing.service'
 import locationsService from '@/services/locations.service'
@@ -462,6 +463,7 @@ export default {
   components: { ListView },
 
   setup() {
+    const { t } = useI18n()
     const { tenantId } = useTenant()
     const { defaultPageSize } = useTenantSettings()
     const { userProfile } = useAuth()
@@ -828,6 +830,7 @@ export default {
     })
 
     return {
+      t,
       loading,
       saving,
       orders,

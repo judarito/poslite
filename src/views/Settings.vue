@@ -3,36 +3,38 @@
     <v-card>
       <v-card-title class="text-h4 primary white--text">
         <v-icon left color="white" size="large">mdi-cog</v-icon>
-        Configuración
+        {{ t('settings.title') }}
       </v-card-title>
       <v-card-text class="pa-6">
         <v-row>
           <v-col cols="12" md="6">
             <v-card variant="outlined">
-              <v-card-title>Preferencias Generales</v-card-title>
+              <v-card-title>{{ t('settings.generalPreferences') }}</v-card-title>
               <v-card-text>
                 <v-switch
                   v-model="settings.notifications"
-                  label="Activar Notificaciones"
+                  :label="t('settings.enableNotifications')"
                   color="primary"
                 ></v-switch>
 
                 <v-switch
                   v-model="settings.darkMode"
-                  label="Modo Oscuro"
+                  :label="t('settings.darkMode')"
                   color="primary"
                 ></v-switch>
 
                 <v-switch
                   v-model="settings.autoSave"
-                  label="Guardado Automático"
+                  :label="t('settings.autoSave')"
                   color="primary"
                 ></v-switch>
 
                 <v-select
-                  v-model="settings.language"
+                  v-model="selectedLanguage"
                   :items="languages"
-                  label="Idioma"
+                  item-title="label"
+                  item-value="value"
+                  :label="t('settings.language')"
                   variant="outlined"
                   class="mt-4"
                 ></v-select>
@@ -42,18 +44,18 @@
 
           <v-col cols="12" md="6">
             <v-card variant="outlined">
-              <v-card-title>Perfil de Usuario</v-card-title>
+              <v-card-title>{{ t('settings.userProfile') }}</v-card-title>
               <v-card-text>
                 <v-text-field
                   v-model="profile.name"
-                  label="Nombre"
+                  :label="t('settings.name')"
                   variant="outlined"
                   prepend-inner-icon="mdi-account"
                 ></v-text-field>
 
                 <v-text-field
                   v-model="profile.email"
-                  label="Correo Electrónico"
+                  :label="t('settings.email')"
                   variant="outlined"
                   prepend-inner-icon="mdi-email"
                   type="email"
@@ -61,7 +63,7 @@
 
                 <v-text-field
                   v-model="profile.phone"
-                  label="Teléfono"
+                  :label="t('settings.phone')"
                   variant="outlined"
                   prepend-inner-icon="mdi-phone"
                 ></v-text-field>
@@ -71,11 +73,11 @@
 
           <v-col cols="12">
             <v-card variant="outlined">
-              <v-card-title>Apariencia</v-card-title>
+              <v-card-title>{{ t('settings.appearance') }}</v-card-title>
               <v-card-text>
                 <v-slider
                   v-model="settings.fontSize"
-                  label="Tamaño de Fuente"
+                  :label="t('settings.fontSize')"
                   :min="12"
                   :max="24"
                   :step="1"
@@ -85,14 +87,14 @@
 
                 <v-radio-group v-model="settings.sidebarPosition" inline>
                   <template v-slot:label>
-                    <div>Posición del Sidebar</div>
+                    <div>{{ t('settings.sidebarPosition') }}</div>
                   </template>
-                  <v-radio label="Izquierda" value="left"></v-radio>
-                  <v-radio label="Derecha" value="right"></v-radio>
+                  <v-radio :label="t('settings.left')" value="left"></v-radio>
+                  <v-radio :label="t('settings.right')" value="right"></v-radio>
                 </v-radio-group>
 
                 <div class="mt-4">
-                  <p class="mb-2">Color Principal</p>
+                  <p class="mb-2">{{ t('settings.primaryColor') }}</p>
                   <v-chip-group v-model="settings.primaryColor">
                     <v-chip
                       v-for="color in colors"
@@ -112,11 +114,11 @@
           <v-col cols="12">
             <v-btn color="primary" size="large" class="mr-2">
               <v-icon left>mdi-content-save</v-icon>
-              Guardar Cambios
+              {{ t('common.saveChanges') }}
             </v-btn>
             <v-btn color="error" variant="outlined" size="large">
               <v-icon left>mdi-cancel</v-icon>
-              Cancelar
+              {{ t('common.cancel') }}
             </v-btn>
           </v-col>
         </v-row>
@@ -126,31 +128,47 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from '@/i18n'
 
 const settings = ref({
   notifications: true,
   darkMode: false,
   autoSave: true,
-  language: 'Español',
   fontSize: 16,
   sidebarPosition: 'left',
   primaryColor: 'blue',
 })
 
 const profile = ref({
-  name: 'Usuario Demo',
+  name: 'Usuario demo',
   email: 'usuario@ejemplo.com',
   phone: '+1234567890',
 })
 
-const languages = ref(['Español', 'English', 'Français', 'Deutsch', 'Italiano'])
+const { t, locale, setLocale } = useI18n()
 
-const colors = ref([
-  { name: 'Azul', value: 'blue' },
-  { name: 'Verde', value: 'green' },
-  { name: 'Rojo', value: 'red' },
-  { name: 'Púrpura', value: 'purple' },
-  { name: 'Naranja', value: 'orange' },
+const selectedLanguage = computed({
+  get: () => locale.value,
+  set: (value) => setLocale(value)
+})
+
+const languages = computed(() => [
+  { label: 'Español', value: 'es' },
+  { label: 'English', value: 'en' }
 ])
+
+const colors = computed(() => [
+  { name: t('settings.colorBlue'), value: 'blue' },
+  { name: t('settings.colorGreen'), value: 'green' },
+  { name: t('settings.colorRed'), value: 'red' },
+  { name: t('settings.colorPurple'), value: 'purple' },
+  { name: t('settings.colorOrange'), value: 'orange' }
+])
+
+watch(locale, () => {
+  if (profile.value.name === 'Usuario demo' || profile.value.name === 'Demo User') {
+    profile.value.name = t('settings.demoUser')
+  }
+}, { immediate: true })
 </script>

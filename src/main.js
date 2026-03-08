@@ -5,6 +5,7 @@ import vuetify from './plugins/vuetify'
 import { supabase } from './plugins/supabase'
 import { useAuth } from './composables/useAuth'
 import { startSessionMonitoring } from './utils/sessionManager'
+import { createI18nPlugin } from './i18n'
 import '@mdi/font/css/materialdesignicons.css'
 import './style.css'
 
@@ -18,6 +19,7 @@ const { initAuth } = useAuth()
 initAuth().then(() => {
   app.use(router)
   app.use(vuetify)
+  app.use(createI18nPlugin())
   app.mount('#app')
 
   // Iniciar monitoreo de sesión después de montar la app

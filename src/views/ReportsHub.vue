@@ -2,12 +2,12 @@
   <div>
     <!-- Header -->
     <div class="mb-5">
-      <div class="text-h5 font-weight-bold">Centro de Reportes</div>
+      <div class="text-h5 font-weight-bold">{{ t('reportsHub.title') }}</div>
       <div class="text-body-2 text-medium-emphasis">{{ todayLabel }}</div>
     </div>
 
     <!-- Accesos rápidos a reportes -->
-    <div class="text-subtitle-1 font-weight-bold mb-3">Ir a...</div>
+    <div class="text-subtitle-1 font-weight-bold mb-3">{{ t('reportsHub.goTo') }}</div>
     <v-row>
       <v-col v-for="report in reportCards" :key="report.route" cols="12" sm="6" md="4" lg="2-4">
         <v-card
@@ -35,17 +35,20 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const todayLabel = computed(() => {
   return new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 })
 
 const reportCards = [
-  { route: '/reports/ventas',      title: 'Ventas',      subtitle: 'Diarias · Productos · Categorías', icon: 'mdi-cash-register',         color: 'blue'   },
-  { route: '/reports/inventario',  title: 'Inventario',  subtitle: 'Stock · Alertas · Vencimientos',  icon: 'mdi-package-variant-closed', color: 'green'  },
-  { route: '/reports/produccion',  title: 'Producción',  subtitle: 'Órdenes · Costos · Componentes',  icon: 'mdi-factory',                color: 'purple' },
-  { route: '/reports/cajas',       title: 'Cajas',       subtitle: 'Sesiones · Cajeros · Diferencias',icon: 'mdi-cash-multiple',          color: 'orange' },
-  { route: '/reports/financiero',  title: 'Financiero',  subtitle: 'P&L · Márgenes · Flujo de caja',  icon: 'mdi-finance',                color: 'teal'   },
+  { route: '/reports/ventas',      title: t('reportsHub.salesTitle'),      subtitle: t('reportsHub.salesSubtitle'),      icon: 'mdi-cash-register',         color: 'blue'   },
+  { route: '/reports/inventario',  title: t('reportsHub.inventoryTitle'),  subtitle: t('reportsHub.inventorySubtitle'),  icon: 'mdi-package-variant-closed', color: 'green'  },
+  { route: '/reports/produccion',  title: t('reportsHub.productionTitle'), subtitle: t('reportsHub.productionSubtitle'), icon: 'mdi-factory',                color: 'purple' },
+  { route: '/reports/cajas',       title: t('reportsHub.cashTitle'),       subtitle: t('reportsHub.cashSubtitle'),       icon: 'mdi-cash-multiple',          color: 'orange' },
+  { route: '/reports/financiero',  title: t('reportsHub.financialTitle'),  subtitle: t('reportsHub.financialSubtitle'),  icon: 'mdi-finance',                color: 'teal'   },
 ]
 </script>
 

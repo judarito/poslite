@@ -44,7 +44,7 @@
                   <v-text-field v-model="settings.business_phone" label="Teléfono de contacto" variant="outlined" prepend-inner-icon="mdi-phone"></v-text-field>
                 </v-col>
                 <v-col cols="12">
-                  <v-text-field v-model="settings.business_address" label="Dirección" variant="outlined" prepend-inner-icon="mdi-map-marker"></v-text-field>
+                  <v-text-field v-model="settings.business_address" :label="t('common.address')" variant="outlined" prepend-inner-icon="mdi-map-marker"></v-text-field>
                 </v-col>
                 <v-col cols="12" sm="6">
                   <v-text-field v-model="settings.logo_url" label="URL del Logo" variant="outlined" prepend-inner-icon="mdi-image"></v-text-field>
@@ -433,7 +433,7 @@
                     </div>
                   </v-col>
                   <v-col cols="12">
-                    <v-text-field v-model="tenant.address" label="Dirección" variant="outlined"
+                    <v-text-field v-model="tenant.address" :label="t('common.address')" variant="outlined"
                       prepend-inner-icon="mdi-map-marker"
                       hint="Ej: Calle 68 # 95-30 Piso 2" persistent-hint></v-text-field>
                   </v-col>
@@ -648,6 +648,9 @@ import { useAICache } from '@/composables/useAICache'
 import { useTheme } from '@/composables/useTheme'
 import tenantSettingsService from '@/services/tenantSettings.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()

@@ -1,3 +1,5 @@
+import { getCurrentLocaleTag } from '@/i18n'
+
 /**
  * Utilidades de formateo compartidas para toda la aplicación.
  * Centraliza los formatters para evitar duplicación en cada vista.
@@ -6,7 +8,7 @@
  *   import { formatMoney, formatDate, formatDateTime } from '@/utils/formatters'
  */
 
-const DEFAULT_LOCALE   = 'es-CO'
+const DEFAULT_LOCALE   = () => getCurrentLocaleTag()
 const DEFAULT_CURRENCY = 'COP'
 
 /**
@@ -16,7 +18,7 @@ const DEFAULT_CURRENCY = 'COP'
  * @param {string} [currency]
  * @returns {string}  Ej: "$1.500.000"
  */
-export function formatMoney(value, locale = DEFAULT_LOCALE, currency = DEFAULT_CURRENCY) {
+export function formatMoney(value, locale = DEFAULT_LOCALE(), currency = DEFAULT_CURRENCY) {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
@@ -43,7 +45,7 @@ export function formatMoneyShort(value) {
  * @param {string} [locale]
  * @returns {string}  Ej: "15/02/2025"
  */
-export function formatDate(date, locale = DEFAULT_LOCALE) {
+export function formatDate(date, locale = DEFAULT_LOCALE()) {
   if (!date) return ''
   return new Date(date).toLocaleDateString(locale)
 }
@@ -54,7 +56,7 @@ export function formatDate(date, locale = DEFAULT_LOCALE) {
  * @param {string} [locale]
  * @returns {string}  Ej: "15/02/2025, 3:45 p. m."
  */
-export function formatDateTime(date, locale = DEFAULT_LOCALE) {
+export function formatDateTime(date, locale = DEFAULT_LOCALE()) {
   if (!date) return ''
   return new Date(date).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
 }
@@ -66,7 +68,7 @@ export function formatDateTime(date, locale = DEFAULT_LOCALE) {
  * @param {string} [locale]
  * @returns {string}
  */
-export function formatDateTimeFull(date, locale = DEFAULT_LOCALE) {
+export function formatDateTimeFull(date, locale = DEFAULT_LOCALE()) {
   if (!date) return ''
   return new Date(date).toLocaleString(locale)
 }

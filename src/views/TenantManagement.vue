@@ -121,7 +121,7 @@
                 <v-col cols="12">
                   <v-textarea
                     v-model="tenantData.address"
-                    label="Dirección"
+                    :label="t('common.address')"
                     variant="outlined"
                     density="comfortable"
                     rows="2"
@@ -334,7 +334,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="closeResultDialog">Cerrar</v-btn>
+          <v-btn color="primary" @click="closeResultDialog">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -353,6 +353,9 @@ import { useTenant } from '@/composables/useTenant'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useNotification } from '@/composables/useNotification'
 import tenantsService from '@/services/tenants.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId, currentTenant } = useTenant()
 const { canManageTenants, superAdminInfo } = useSuperAdmin()

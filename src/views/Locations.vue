@@ -1,7 +1,7 @@
 <template>
   <div>
     <ListView
-      title="Sedes"
+      :title="t('locations.title')"
       icon="mdi-store"
       :items="locations"
       :total-items="totalItems"
@@ -11,8 +11,8 @@
       title-field="name"
       avatar-icon="mdi-map-marker"
       avatar-color="primary"
-      empty-message="No hay sedes registradas"
-      create-button-text="Nueva Sede"
+      :empty-message="t('locations.empty')"
+      :create-button-text="t('locations.new')"
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="confirmDelete"
@@ -37,7 +37,7 @@
             variant="tonal"
             :prepend-icon="item.type === 'STORE' ? 'mdi-store' : 'mdi-warehouse'"
           >
-            {{ item.type === 'STORE' ? 'Tienda' : 'Bodega' }}
+            {{ item.type === 'STORE' ? t('locations.store') : t('locations.warehouse') }}
           </v-chip>
 
           <v-chip
@@ -45,7 +45,7 @@
             size="small"
             variant="flat"
           >
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            {{ item.is_active ? t('common.active') : t('common.inactive') }}
           </v-chip>
         </div>
       </template>
@@ -56,7 +56,7 @@
       <v-card>
         <v-card-title>
           <v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-          {{ isEditing ? 'Editar Sede' : 'Nueva Sede' }}
+          {{ isEditing ? t('locations.edit') : t('locations.new') }}
         </v-card-title>
 
         <v-card-text>
@@ -65,7 +65,7 @@
               <v-col cols="12" sm="6">
                 <v-text-field
                   v-model="formData.name"
-                  label="Nombre"
+                  :label="t('common.name')"
                   prepend-inner-icon="mdi-text"
                   variant="outlined"
                   :rules="[rules.required]"
@@ -75,13 +75,10 @@
               <v-col cols="12" sm="6">
                 <v-select
                   v-model="formData.type"
-                  label="Tipo"
+                  :label="t('common.type')"
                   prepend-inner-icon="mdi-format-list-bulleted-type"
                   variant="outlined"
-                  :items="[
-                    { title: 'Tienda', value: 'STORE' },
-                    { title: 'Bodega', value: 'WAREHOUSE' }
-                  ]"
+                  :items="locationTypes"
                   :rules="[rules.required]"
                 ></v-select>
               </v-col>
@@ -89,7 +86,7 @@
               <v-col cols="12">
                 <v-textarea
                   v-model="formData.address"
-                  label="Dirección"
+                  :label="t('common.address')"
                   prepend-inner-icon="mdi-map-marker"
                   variant="outlined"
                   rows="2"
@@ -100,7 +97,7 @@
               <v-col cols="12" sm="6">
                 <v-switch
                   v-model="formData.is_active"
-                  label="Activo"
+                  :label="t('common.active')"
                   color="success"
                   hide-details
                 ></v-switch>
@@ -111,13 +108,13 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog">Cancelar</v-btn>
+          <v-btn @click="closeDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             :loading="saving"
             @click="saveLocation"
           >
-            {{ isEditing ? 'Actualizar' : 'Crear' }}
+            {{ isEditing ? t('common.update') : t('common.create') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -128,24 +125,24 @@
       <v-card>
         <v-card-title class="text-h5">
           <v-icon start color="error">mdi-alert</v-icon>
-          Confirmar Eliminación
+          {{ t('common.confirmDelete') }}
         </v-card-title>
 
         <v-card-text>
-          ¿Está seguro que desea eliminar la sede
+          {{ t('locations.deleteQuestionPrefix') }}
           <strong>{{ itemToDelete?.name }}</strong>?
-          Esta acción no se puede deshacer.
+          {{ t('common.irreversibleAction') }}
         </v-card-text>
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="error"
             :loading="deleting"
             @click="deleteLocation"
           >
-            Eliminar
+            {{ t('common.delete') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -163,14 +160,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import locationsService from '@/services/locations.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
+const { t } = useI18n()
 
 const locations = ref([])
 const totalItems = ref(0)
@@ -195,8 +194,13 @@ const formData = ref({
   is_active: true
 })
 
+const locationTypes = computed(() => [
+  { title: t('locations.store'), value: 'STORE' },
+  { title: t('locations.warehouse'), value: 'WAREHOUSE' }
+])
+
 const rules = {
-  required: value => !!value || 'Campo requerido'
+  required: value => !!value || t('common.requiredField')
 }
 
 const loadLocations = async ({ page, pageSize, search, tenantId: tid }) => {
@@ -215,10 +219,10 @@ const loadLocations = async ({ page, pageSize, search, tenantId: tid }) => {
       locations.value = result.data
       totalItems.value = result.total
     } else {
-      showMessage('Error al cargar sedes', 'error')
+      showMessage(t('locations.loadError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al cargar sedes', 'error')
+    showMessage(t('locations.loadError'), 'error')
   } finally {
     loading.value = false
   }
@@ -254,7 +258,7 @@ const saveLocation = async () => {
   if (!valid) return
 
   if (!tenantId.value) {
-    showMessage('No se pudo obtener el tenant', 'error')
+    showMessage(t('common.tenantMissing'), 'error')
     return
   }
 
@@ -278,8 +282,8 @@ const saveLocation = async () => {
     if (result.success) {
       showMessage(
         isEditing.value
-          ? 'Sede actualizada'
-          : 'Sede creada',
+          ? t('locations.updated')
+          : t('locations.created'),
         'success'
       )
       closeDialog()
@@ -290,10 +294,10 @@ const saveLocation = async () => {
         tenantId: tenantId.value
       })
     } else {
-      showMessage(result.error || 'Error al guardar', 'error')
+      showMessage(result.error || t('common.saveError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al guardar sede', 'error')
+    showMessage(t('locations.saveSpecificError'), 'error')
   } finally {
     saving.value = false
   }
@@ -315,7 +319,7 @@ const deleteLocation = async () => {
     )
 
     if (result.success) {
-      showMessage('Sede eliminada', 'success')
+      showMessage(t('locations.deleted'), 'success')
       deleteDialog.value = false
       loadLocations({
         page: 1,
@@ -324,10 +328,10 @@ const deleteLocation = async () => {
         tenantId: tenantId.value
       })
     } else {
-      showMessage(result.error || 'Error al eliminar', 'error')
+      showMessage(result.error || t('common.deleteError'), 'error')
     }
   } catch (error) {
-    showMessage('Error al eliminar sede', 'error')
+    showMessage(t('locations.deleteSpecificError'), 'error')
   } finally {
     deleting.value = false
   }

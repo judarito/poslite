@@ -235,7 +235,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="paymentDialog = false">Cancelar</v-btn>
+          <v-btn @click="paymentDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="green" variant="flat" :loading="savingPayment" @click="confirmPayment">
             Confirmar Abono
           </v-btn>
@@ -299,7 +299,7 @@
             Registrar Abono
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="historyDialog = false">Cerrar</v-btn>
+          <v-btn @click="historyDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -339,7 +339,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="newAccountDialog = false">Cancelar</v-btn>
+          <v-btn @click="newAccountDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" variant="flat" :loading="savingNewAccount" @click="createNewAccount">
             Asignar Cupo
           </v-btn>
@@ -358,6 +358,9 @@ import { useAuth } from '@/composables/useAuth'
 import creditService from '@/services/credit.service'
 import customersService from '@/services/customers.service'
 import { formatMoney, formatMoneyShort, formatDateTime as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()

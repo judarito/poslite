@@ -47,7 +47,7 @@
                   :items="locations"
                   item-title="name"
                   item-value="location_id"
-                  label="Sede"
+                  :label="t('app.branch')"
                   variant="outlined"
                   density="compact"
                   clearable
@@ -347,8 +347,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" @click="saveBatch">Guardar</v-btn>
+          <v-btn @click="dialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" @click="saveBatch">{{ t('common.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -363,6 +363,9 @@ import batchesService from '@/services/batches.service'
 import locationsService from '@/services/locations.service'
 import productsService from '@/services/products.service'
 import ExpirationAlerts from '@/components/ExpirationAlerts.vue'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const tab = ref('batches')
 

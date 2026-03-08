@@ -16,7 +16,7 @@
         </span>
       </div>
       <template #append>
-        <v-btn size="small" variant="outlined" color="error" to="/cash-sessions">Ver cajas</v-btn>
+        <v-btn size="small" variant="outlined" color="error" to="/cash-sessions">{{ t('home.viewCashRegisters') }}</v-btn>
       </template>
     </v-alert>
 
@@ -31,18 +31,18 @@
     >
       <div class="text-body-2 mt-1">
         <span v-if="supplierPayablesOverdueCount > 0">
-          Vencidas: <strong>{{ supplierPayablesOverdueCount }}</strong>
+          {{ t('home.overdue') }}: <strong>{{ supplierPayablesOverdueCount }}</strong>
           ({{ formatMoney(supplierPayablesOverdueAmount) }})
         </span>
         <span v-if="supplierPayablesDueSoonCount > 0">
           <span v-if="supplierPayablesOverdueCount > 0"> • </span>
-          Por vencer (7 días): <strong>{{ supplierPayablesDueSoonCount }}</strong>
+          {{ t('home.dueSoon7Days') }}: <strong>{{ supplierPayablesDueSoonCount }}</strong>
           ({{ formatMoney(supplierPayablesDueSoonAmount) }})
         </span>
       </div>
       <template #append>
         <v-btn size="small" variant="outlined" :color="supplierPayablesOverdueCount > 0 ? 'error' : 'warning'" to="/purchases">
-          Ver compras
+          {{ t('app.viewPurchases') }}
         </v-btn>
       </template>
     </v-alert>
@@ -54,14 +54,14 @@
         <v-card variant="tonal" color="blue" class="kpi-home-card">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Ventas Hoy</span>
+              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.salesToday') }}</span>
               <v-avatar color="blue" size="32">
                 <v-icon color="white" size="16">mdi-calendar-today</v-icon>
               </v-avatar>
             </div>
             <div v-if="kpiLoading" class="text-h6 text-blue font-weight-bold">—</div>
             <div v-else class="text-h6 text-blue font-weight-bold">{{ formatMoney(kpis?.today?.total || 0) }}</div>
-            <div class="text-caption text-medium-emphasis mt-1">{{ kpis?.today?.count || 0 }} transacciones</div>
+            <div class="text-caption text-medium-emphasis mt-1">{{ kpis?.today?.count || 0 }} {{ t('home.transactions') }}</div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -71,7 +71,7 @@
         <v-card variant="tonal" color="green" class="kpi-home-card">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Este Mes</span>
+              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.thisMonth') }}</span>
               <v-avatar color="green" size="32">
                 <v-icon color="white" size="16">mdi-calendar-month</v-icon>
               </v-avatar>
@@ -79,14 +79,14 @@
             <div v-if="kpiLoading" class="text-h6 text-green font-weight-bold">—</div>
             <div v-else class="text-h6 text-green font-weight-bold">{{ formatMoney(kpis?.month?.total || 0) }}</div>
             <div class="d-flex align-center flex-wrap mt-1" style="gap:4px">
-              <span class="text-caption text-medium-emphasis">{{ kpis?.month?.count || 0 }} trans.</span>
+              <span class="text-caption text-medium-emphasis">{{ kpis?.month?.count || 0 }} {{ t('home.transShort') }}</span>
               <v-chip
                 v-if="kpis?.month?.vs_prev !== null && kpis?.month?.vs_prev !== undefined"
                 :color="parseFloat(kpis.month.vs_prev) >= 0 ? 'green' : 'red'"
                 size="x-small" variant="tonal"
               >
                 <v-icon start size="10">{{ parseFloat(kpis.month.vs_prev) >= 0 ? 'mdi-trending-up' : 'mdi-trending-down' }}</v-icon>
-                {{ Math.abs(kpis.month.vs_prev) }}% vs mes ant.
+                {{ Math.abs(kpis.month.vs_prev) }}% {{ t('home.vsPreviousMonth') }}
               </v-chip>
             </div>
           </v-card-text>
@@ -98,14 +98,14 @@
         <v-card variant="tonal" color="purple" class="kpi-home-card">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Este Año</span>
+              <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.thisYear') }}</span>
               <v-avatar color="purple" size="32">
                 <v-icon color="white" size="16">mdi-calendar-blank</v-icon>
               </v-avatar>
             </div>
             <div v-if="kpiLoading" class="text-h6 text-purple font-weight-bold">—</div>
             <div v-else class="text-h6 text-purple font-weight-bold">{{ formatMoney(kpis?.year?.total || 0) }}</div>
-            <div class="text-caption text-medium-emphasis mt-1">{{ kpis?.year?.count || 0 }} transacciones totales</div>
+            <div class="text-caption text-medium-emphasis mt-1">{{ kpis?.year?.count || 0 }} {{ t('home.totalTransactions') }}</div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -118,7 +118,7 @@
         <v-card>
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="blue" size="18">mdi-chart-line</v-icon>
-            Ventas diarias — últimos 30 días
+            {{ t('home.dailySalesLast30Days') }}
           </v-card-title>
           <v-card-text class="pa-1 pt-0">
             <div v-if="kpiLoading" class="d-flex align-center justify-center" style="height:200px">
@@ -132,7 +132,7 @@
               :series="trendSeries"
             ></apexchart>
             <div v-else class="d-flex align-center justify-center text-medium-emphasis text-caption" style="height:200px">
-              Sin datos
+              {{ t('home.noData') }}
             </div>
           </v-card-text>
         </v-card>
@@ -143,8 +143,8 @@
         <v-card height="100%">
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="teal" size="18">mdi-credit-card-multiple</v-icon>
-            Métodos de pago
-            <span class="text-caption font-weight-regular text-medium-emphasis ml-1">(mes)</span>
+            {{ t('home.paymentMethods') }}
+            <span class="text-caption font-weight-regular text-medium-emphasis ml-1">({{ t('home.month') }})</span>
           </v-card-title>
           <v-card-text class="pa-1 pt-0">
             <div v-if="kpiLoading" class="d-flex align-center justify-center" style="height:200px">
@@ -158,7 +158,7 @@
               :series="donutSeries"
             ></apexchart>
             <div v-else class="d-flex align-center justify-center text-medium-emphasis text-caption" style="height:200px">
-              Sin datos
+              {{ t('home.noData') }}
             </div>
           </v-card-text>
         </v-card>
@@ -171,10 +171,10 @@
         <v-card>
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="orange" size="18">mdi-trophy</v-icon>
-            Top productos del mes
+            {{ t('home.topProductsOfMonth') }}
             <v-spacer></v-spacer>
             <v-btn to="/reports/ventas" variant="text" color="blue" size="x-small" append-icon="mdi-arrow-right" class="text-caption">
-              Ver detalle
+              {{ t('home.viewDetail') }}
             </v-btn>
           </v-card-title>
           <v-card-text class="pa-1 pt-0">
@@ -189,7 +189,7 @@
               :series="barSeries"
             ></apexchart>
             <div v-else class="d-flex align-center justify-center text-medium-emphasis text-caption" style="height:160px">
-              Sin datos
+              {{ t('home.noData') }}
             </div>
           </v-card-text>
         </v-card>
@@ -242,6 +242,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
 import cashService from '@/services/cash.service'
@@ -251,6 +252,7 @@ import { formatMoney } from '@/utils/formatters'
 const apexchart = VueApexCharts
 
 const router = useRouter()
+const { t } = useI18n()
 const { loadPOSContext } = useCashSession()
 const { userProfile } = useAuth()
 const { tenantId } = useTenant()
@@ -389,58 +391,58 @@ onBeforeUnmount(() => {
 
 const cards = ref([
   {
-    title: 'Punto de Venta',
+    title: t('home.pos'),
     icon: 'mdi-point-of-sale',
     color: 'primary',
-    description: 'Registra ventas rápidamente',
+    description: t('home.posDescription'),
     route: '/pos',
     roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
-    title: 'Productos',
+    title: t('home.products'),
     icon: 'mdi-package-variant',
     color: 'success',
-    description: 'Administra tu catálogo de productos',
+    description: t('home.productsDescription'),
     route: '/products',
     roles: ['ADMINISTRADOR', 'GERENTE', 'VENDEDOR'] // NO cajeros
   },
   {
-    title: 'Ventas',
+    title: t('home.sales'),
     icon: 'mdi-cart',
     color: 'info',
-    description: 'Consulta historial de ventas',
+    description: t('home.salesDescription'),
     route: '/sales',
     roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
-    title: 'Plan Separe',
+    title: t('home.layaway'),
     icon: 'mdi-calendar-clock',
     color: 'blue',
-    description: 'Contratos de plan separe',
+    description: t('home.layawayDescription'),
     route: '/layaway',
     roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },
   {
-    title: 'Inventario',
+    title: t('home.inventory'),
     icon: 'mdi-warehouse',
     color: 'orange',
-    description: 'Control de stock y movimientos',
+    description: t('home.inventoryDescription'),
     route: '/inventory',
     roles: ['ADMINISTRADOR', 'GERENTE'] // NO cajeros
   },
   {
-    title: 'Compras',
+    title: t('home.purchases'),
     icon: 'mdi-cart-plus',
     color: 'teal',
-    description: 'Registro de compras a proveedores',
+    description: t('home.purchasesDescription'),
     route: '/purchases',
     roles: ['ADMINISTRADOR', 'GERENTE'] // NO cajeros
   },
   {
-    title: 'Reportes',
+    title: t('home.reports'),
     icon: 'mdi-chart-bar',
     color: 'purple',
-    description: 'Reportes y estadísticas',
+    description: t('home.reportsDescription'),
     route: '/reports',
     roles: ['ADMINISTRADOR', 'CAJERO', 'VENDEDOR', 'GERENTE'] // Todos
   },

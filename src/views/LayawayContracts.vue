@@ -288,7 +288,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeCreateDialog">Cancelar</v-btn>
+          <v-btn @click="closeCreateDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" :loading="creating" :disabled="formData.items.length === 0" @click="createContract">
             Crear Contrato
           </v-btn>
@@ -316,6 +316,9 @@ import cashService from '@/services/cash.service'
 import taxesService from '@/services/taxes.service'
 import { calculateDiscount } from '@/utils/discountCalculator'
 import { formatMoney, formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const { tenantId } = useTenant()

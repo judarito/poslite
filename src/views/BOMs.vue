@@ -25,7 +25,7 @@
             <v-select
               v-model="filters.type"
               :items="typeOptions"
-              label="Tipo"
+              :label="t('common.type')"
               variant="outlined"
               density="compact"
               clearable
@@ -193,7 +193,7 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="detailDialog = false">Cerrar</v-btn>
+          <v-btn color="primary" @click="detailDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -211,8 +211,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" variant="flat" @click="deleteBOM">Eliminar</v-btn>
+          <v-btn color="grey" variant="text" @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" variant="flat" @click="deleteBOM">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -234,6 +234,9 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
 import BOMEditor from '@/components/BOMEditor.vue'
 import manufacturingService from '@/services/manufacturing.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 

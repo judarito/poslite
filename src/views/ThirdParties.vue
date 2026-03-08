@@ -1,7 +1,7 @@
 <template>
   <div>
     <ListView
-      title="Terceros"
+      :title="t('thirdParties.title')"
       icon="mdi-account-multiple"
       :items="items"
       :total-items="totalItems"
@@ -11,8 +11,8 @@
       title-field="legal_name"
       avatar-icon="mdi-account"
       avatar-color="teal"
-      empty-message="No hay terceros registrados"
-      create-button-text="Nuevo Tercero"
+      :empty-message="t('thirdParties.empty')"
+      :create-button-text="t('thirdParties.new')"
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="confirmDelete"
@@ -20,21 +20,21 @@
       @search="load"
     >
       <template #subtitle="{ item }">
-        {{ [item.document_number ? item.document_number + (item.dv ? '-' + item.dv : '') : '', item.phone, item.email].filter(Boolean).join(' • ') || 'Sin datos de contacto' }}
+        {{ [item.document_number ? item.document_number + (item.dv ? '-' + item.dv : '') : '', item.phone, item.email].filter(Boolean).join(' • ') || t('thirdParties.noContactData') }}
       </template>
       <template #content="{ item }">
         <div class="mt-2 d-flex flex-wrap ga-2">
           <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            {{ item.is_active ? t('common.active') : t('common.inactive') }}
           </v-chip>
           <v-chip v-if="item.type === 'customer' || item.type === 'both'" size="small" variant="tonal" color="teal" prepend-icon="mdi-account">
-            Cliente
+            {{ t('app.customer') }}
           </v-chip>
           <v-chip v-if="item.type === 'supplier' || item.type === 'both'" size="small" variant="tonal" color="deep-orange" prepend-icon="mdi-truck">
-            Proveedor
+            {{ t('app.provider') }}
           </v-chip>
           <v-chip v-if="item.max_credit_amount" size="small" variant="tonal" color="warning" prepend-icon="mdi-credit-card-clock">
-            Cupo: {{ formatMoney(item.max_credit_amount) }}
+            {{ t('app.limit') }}: {{ formatMoney(item.max_credit_amount) }}
           </v-chip>
         </div>
       </template>
@@ -45,27 +45,27 @@
       <v-card>
         <v-card-title>
           <v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-          {{ isEditing ? 'Editar Tercero' : 'Nuevo Tercero' }}
+          {{ isEditing ? t('thirdParties.edit') : t('thirdParties.new') }}
         </v-card-title>
         <v-card-text>
           <ThirdPartyForm ref="thirdPartyFormRef" :key="dialog + String(formData.third_party_id)" :model="formData" @save="save" @cancel="closeDialog" />
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog">Cancelar</v-btn>
-          <v-btn color="primary" :loading="saving" @click="thirdPartyFormRef?.submit()">{{ isEditing ? 'Actualizar' : 'Crear' }}</v-btn>
+          <v-btn @click="closeDialog">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" :loading="saving" @click="thirdPartyFormRef?.submit()">{{ isEditing ? t('common.update') : t('common.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
-        <v-card-title><v-icon start color="error">mdi-alert</v-icon>Confirmar Eliminación</v-card-title>
-        <v-card-text>¿Eliminar el tercero <strong>{{ itemToDelete?.legal_name }}</strong>?</v-card-text>
+        <v-card-title><v-icon start color="error">mdi-alert</v-icon>{{ t('common.confirmDelete') }}</v-card-title>
+        <v-card-text>{{ t('thirdParties.deleteQuestion') }} <strong>{{ itemToDelete?.legal_name }}</strong>?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="deleting" @click="doDelete">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" :loading="deleting" @click="doDelete">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -78,6 +78,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ThirdPartyForm from '@/components/ThirdPartyForm.vue'
@@ -85,6 +86,7 @@ import { formatMoney } from '@/utils/formatters'
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()
+const { t } = useI18n()
 const items = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -113,7 +115,7 @@ async function load({ page = 1, pageSize = null, search = '' } = {}) {
     // totalItems not provided by service.list; keep simple
   } catch (err) {
     console.error('Error cargando terceros', err)
-    snackbarMessage.value = 'Error cargando terceros'
+    snackbarMessage.value = t('thirdParties.loadError')
     snackbarColor.value = 'error'
     snackbar.value = true
   } finally { loading.value = false }
@@ -138,10 +140,10 @@ async function save(payload) {
     const dataToSave = payload && Object.keys(payload).length ? payload : formData
     if (isEditing.value && dataToSave.third_party_id) {
       await thirdPartiesService.update(dataToSave.third_party_id, dataToSave)
-      snackbarMessage.value = 'Tercero actualizado'
+      snackbarMessage.value = t('thirdParties.updated')
     } else {
       await thirdPartiesService.create(dataToSave)
-      snackbarMessage.value = 'Tercero creado'
+      snackbarMessage.value = t('thirdParties.created')
     }
     snackbarColor.value = 'success'
     snackbar.value = true
@@ -149,7 +151,7 @@ async function save(payload) {
     await load()
   } catch (err) {
     console.error('Error guardando tercero', err)
-    snackbarMessage.value = 'Error guardando tercero'
+    snackbarMessage.value = t('thirdParties.saveError')
     snackbarColor.value = 'error'
     snackbar.value = true
   } finally { saving.value = false }
@@ -165,14 +167,14 @@ async function doDelete() {
   deleting.value = true
   try {
     await thirdPartiesService.remove(itemToDelete.value.third_party_id, itemToDelete.value.tenant_id)
-    snackbarMessage.value = 'Tercero eliminado'
+    snackbarMessage.value = t('thirdParties.deleted')
     snackbarColor.value = 'success'
     snackbar.value = true
     deleteDialog.value = false
     await load()
   } catch (err) {
     console.error('Error eliminando tercero', err)
-    snackbarMessage.value = 'Error eliminando tercero'
+    snackbarMessage.value = t('thirdParties.deleteError')
     snackbarColor.value = 'error'
     snackbar.value = true
   } finally { deleting.value = false }

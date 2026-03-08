@@ -1,7 +1,7 @@
 <template>
   <div>
     <ListView
-      title="Impuestos"
+      :title="t('taxes.title')"
       icon="mdi-percent"
       :items="taxes"
       :total-items="totalItems"
@@ -11,8 +11,8 @@
       title-field="name"
       avatar-icon="mdi-percent-circle"
       avatar-color="orange"
-      empty-message="No hay impuestos configurados"
-      create-button-text="Nuevo Impuesto"
+      :empty-message="t('taxes.empty')"
+      :create-button-text="t('taxes.new')"
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="confirmDelete"
@@ -20,12 +20,12 @@
       @search="loadTaxes"
     >
       <template #subtitle="{ item }">
-        Código: {{ item.code }} — Tasa: {{ (item.rate * 100).toFixed(2) }}%
+        {{ t('common.code') }}: {{ item.code }} — {{ t('taxes.rate') }}: {{ (item.rate * 100).toFixed(2) }}%
       </template>
       <template #content="{ item }">
         <div class="mt-2 d-flex flex-wrap ga-2">
           <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
-            {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            {{ item.is_active ? t('common.active') : t('common.inactive') }}
           </v-chip>
         </div>
       </template>
@@ -33,31 +33,31 @@
 
     <v-dialog v-model="dialog" max-width="500">
       <v-card>
-        <v-card-title><v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>{{ isEditing ? 'Editar Impuesto' : 'Nuevo Impuesto' }}</v-card-title>
+        <v-card-title><v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>{{ isEditing ? t('taxes.edit') : t('taxes.new') }}</v-card-title>
         <v-card-text>
           <v-form ref="form" @submit.prevent="save">
-            <v-text-field v-model="formData.code" label="Código" prepend-inner-icon="mdi-barcode" variant="outlined" :rules="[rules.required]" hint="Ej: IVA, INC" persistent-hint class="mb-2"></v-text-field>
-            <v-text-field v-model="formData.name" label="Nombre" prepend-inner-icon="mdi-text" variant="outlined" :rules="[rules.required]" class="mb-2"></v-text-field>
-            <v-text-field v-model.number="formData.rate" label="Tasa (decimal)" prepend-inner-icon="mdi-percent" variant="outlined" type="number" step="0.0001" :rules="[rules.required]" hint="Ej: 0.19 para 19%" persistent-hint class="mb-2"></v-text-field>
-            <v-switch v-model="formData.is_active" label="Activo" color="success" hide-details></v-switch>
+            <v-text-field v-model="formData.code" :label="t('common.code')" prepend-inner-icon="mdi-barcode" variant="outlined" :rules="[rules.required]" :hint="t('taxes.codeHint')" persistent-hint class="mb-2"></v-text-field>
+            <v-text-field v-model="formData.name" :label="t('common.name')" prepend-inner-icon="mdi-text" variant="outlined" :rules="[rules.required]" class="mb-2"></v-text-field>
+            <v-text-field v-model.number="formData.rate" :label="t('taxes.rateDecimal')" prepend-inner-icon="mdi-percent" variant="outlined" type="number" step="0.0001" :rules="[rules.required]" :hint="t('taxes.rateHint')" persistent-hint class="mb-2"></v-text-field>
+            <v-switch v-model="formData.is_active" :label="t('common.active')" color="success" hide-details></v-switch>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="saving" @click="save">{{ isEditing ? 'Actualizar' : 'Crear' }}</v-btn>
+          <v-btn @click="dialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" :loading="saving" @click="save">{{ isEditing ? t('common.update') : t('common.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
-        <v-card-title><v-icon start color="error">mdi-alert</v-icon>Confirmar Eliminación</v-card-title>
-        <v-card-text>¿Eliminar el impuesto <strong>{{ itemToDelete?.name }}</strong>?</v-card-text>
+        <v-card-title><v-icon start color="error">mdi-alert</v-icon>{{ t('common.confirmDelete') }}</v-card-title>
+        <v-card-text>{{ t('taxes.deleteQuestion') }} <strong>{{ itemToDelete?.name }}</strong>?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="deleting" @click="doDelete">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" :loading="deleting" @click="doDelete">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -70,11 +70,13 @@
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import taxesService from '@/services/taxes.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
+const { t } = useI18n()
 const taxes = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -90,7 +92,7 @@ const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
 const formData = ref({ tax_id: null, code: '', name: '', rate: 0.19, is_active: true })
-const rules = { required: v => (v !== '' && v !== null && v !== undefined) || 'Campo requerido' }
+const rules = { required: v => (v !== '' && v !== null && v !== undefined) || t('common.requiredField') }
 
 const loadTaxes = async ({ page, pageSize, search, tenantId: tid }) => {
   if (!tid) return
@@ -98,7 +100,7 @@ const loadTaxes = async ({ page, pageSize, search, tenantId: tid }) => {
   try {
     const r = await taxesService.getTaxes(tid, page, pageSize, search)
     if (r.success) { taxes.value = r.data; totalItems.value = r.total }
-    else showMsg('Error al cargar impuestos', 'error')
+    else showMsg(t('taxes.loadError'), 'error')
   } finally { loading.value = false }
 }
 
@@ -114,8 +116,8 @@ const save = async () => {
     const r = isEditing.value
       ? await taxesService.updateTax(tenantId.value, formData.value.tax_id, formData.value)
       : await taxesService.createTax(tenantId.value, formData.value)
-    if (r.success) { showMsg(isEditing.value ? 'Impuesto actualizado' : 'Impuesto creado'); dialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
-    else showMsg(r.error || 'Error al guardar', 'error')
+    if (r.success) { showMsg(isEditing.value ? t('taxes.updated') : t('taxes.created')); dialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
+    else showMsg(r.error || t('common.saveError'), 'error')
   } finally { saving.value = false }
 }
 
@@ -124,7 +126,7 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await taxesService.deleteTax(tenantId.value, itemToDelete.value.tax_id)
-    if (r.success) { showMsg('Impuesto eliminado'); deleteDialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(t('taxes.deleted')); deleteDialog.value = false; loadTaxes({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }

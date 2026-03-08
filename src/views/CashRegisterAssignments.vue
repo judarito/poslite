@@ -197,7 +197,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="assignDialog = false">Cancelar</v-btn>
+          <v-btn @click="assignDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" @click="saveAssignment" :loading="saving">Asignar</v-btn>
         </v-card-actions>
       </v-card>
@@ -216,6 +216,9 @@ import cashService from '@/services/cash.service'
 import locationsService from '@/services/locations.service'
 import { useNotification } from '@/composables/useNotification'
 import { formatDateTime as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()

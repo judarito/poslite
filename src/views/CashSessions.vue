@@ -48,7 +48,7 @@
         <!-- Botones en móvil - debajo del contenido -->
         <div v-if="item.status === 'OPEN'" class="d-flex d-sm-none flex-wrap ga-2 mt-2">
           <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
-          <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+          <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">{{ t('common.close') }}</v-btn>
           <v-btn v-if="isAdmin && isExpired(item)" size="small" color="deep-orange" variant="flat" prepend-icon="mdi-lock-alert" @click.stop="confirmForceClose(item)">Forzar cierre</v-btn>
         </div>
       </template>
@@ -56,7 +56,7 @@
         <!-- Botones en desktop - al lado derecho -->
         <div class="d-none d-sm-flex ga-1">
           <v-btn v-if="item.status === 'OPEN'" size="small" color="primary" variant="tonal" prepend-icon="mdi-swap-vertical" @click.stop="openMovementDialog(item)">Movimiento</v-btn>
-          <v-btn v-if="item.status === 'OPEN'" size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">Cerrar</v-btn>
+          <v-btn v-if="item.status === 'OPEN'" size="small" color="error" variant="tonal" prepend-icon="mdi-lock" @click.stop="openCloseDialog(item)">{{ t('common.close') }}</v-btn>
           <v-btn v-if="isAdmin && item.status === 'OPEN' && isExpired(item)" size="small" color="deep-orange" variant="flat" prepend-icon="mdi-lock-alert" @click.stop="confirmForceClose(item)">Forzar cierre</v-btn>
         </div>
       </template>
@@ -74,7 +74,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="sessionDialog = false">Cancelar</v-btn>
+          <v-btn @click="sessionDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="success" :loading="savingSession" @click="openSession">Abrir Caja</v-btn>
         </v-card-actions>
       </v-card>
@@ -232,7 +232,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog = false">Cancelar</v-btn>
+          <v-btn @click="closeDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="error" :loading="closingSession" @click="closeSession" prepend-icon="mdi-lock">Cerrar Caja</v-btn>
         </v-card-actions>
       </v-card>
@@ -259,7 +259,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="detailDialog = false">Cerrar</v-btn>
+          <v-btn @click="detailDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -274,7 +274,7 @@
             <strong>Sede:</strong> {{ selectedSessionForMovement.cash_register?.location?.name }}
           </v-alert>
           <v-form ref="movementForm">
-            <v-select v-model="movementData.type" label="Tipo" variant="outlined" :items="[{title:'Ingreso',value:'INCOME'},{title:'Gasto',value:'EXPENSE'}]" :rules="[rules.required]" class="mb-2"></v-select>
+            <v-select v-model="movementData.type" :label="t('common.type')" variant="outlined" :items="[{title:'Ingreso',value:'INCOME'},{title:'Gasto',value:'EXPENSE'}]" :rules="[rules.required]" class="mb-2"></v-select>
             <v-text-field v-model="movementData.category" label="Categoría" variant="outlined" hint="Ej: Gasto operativo, Compra insumos, Pago servicios" persistent-hint class="mb-3"></v-text-field>
             <v-text-field v-model.number="movementData.amount" label="Monto" prepend-inner-icon="mdi-cash" variant="outlined" type="number" :rules="[rules.required, rules.minAmount]" class="mb-2"></v-text-field>
             <v-textarea v-model="movementData.note" label="Nota / Descripción" variant="outlined" rows="3"></v-textarea>
@@ -282,8 +282,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="movementDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="savingMovement" @click="saveMovement">Guardar</v-btn>
+          <v-btn @click="movementDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" :loading="savingMovement" @click="saveMovement">{{ t('common.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -308,7 +308,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="forceCloseDialogVisible = false">Cancelar</v-btn>
+          <v-btn @click="forceCloseDialogVisible = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="deep-orange" variant="flat" :loading="forcingClose" prepend-icon="mdi-lock-alert" @click="doForceClose">
             Forzar cierre
           </v-btn>
@@ -329,6 +329,9 @@ import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize, cashSessionMaxHours, loadSettings } = useTenantSettings()

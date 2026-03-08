@@ -20,7 +20,7 @@
               :items="locations"
               item-title="name"
               item-value="location_id"
-              label="Sede"
+              :label="t('app.branch')"
               variant="outlined"
               density="compact"
               hide-details
@@ -132,7 +132,7 @@
               :items="locations"
               item-title="name"
               item-value="location_id"
-              label="Sede"
+              :label="t('app.branch')"
               variant="outlined"
               density="compact"
               hide-details
@@ -256,8 +256,8 @@
             <v-icon start color="teal">mdi-history</v-icon>
             Kardex de Movimientos
             <v-spacer></v-spacer>
-            <v-select v-model="kardexLocationFilter" :items="locations" item-title="name" item-value="location_id" label="Sede" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
-            <v-select v-model="kardexTypeFilter" :items="moveTypes" item-title="label" item-value="value" label="Tipo" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
+            <v-select v-model="kardexLocationFilter" :items="locations" item-title="name" item-value="location_id" :label="t('app.branch')" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
+            <v-select v-model="kardexTypeFilter" :items="moveTypes" item-title="label" item-value="value" :label="t('common.type')" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
           </v-card-title>
 
           <!-- Desktop: Table -->
@@ -488,7 +488,7 @@
             Actualizar
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="pendingTransfersDialog = false">Cerrar</v-btn>
+          <v-btn @click="pendingTransfersDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -505,6 +505,9 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()

@@ -10,12 +10,12 @@
       border="start"
     >
       <v-alert-title>Configuración gestionada por Superadmin</v-alert-title>
-      Los roles, permisos y menús son definidos globalmente por el Superadministrador del sistema.
-      Esta vista es <strong>solo lectura</strong>.
+      {{ t('roles.superadminManagedLine1') }}
+      {{ t('roles.superadminManagedLine2') }} <strong>{{ t('roles.readOnly') }}</strong>.
     </v-alert>
 
     <ListView
-      title="Roles y Permisos"
+      :title="t('roles.title')"
       icon="mdi-shield-account"
       :items="roles"
       :total-items="totalItems"
@@ -25,8 +25,8 @@
       title-field="name"
       avatar-icon="mdi-account-key"
       avatar-color="red-darken-1"
-      empty-message="No hay roles configurados"
-      :create-button-text="isSuperAdmin ? 'Nuevo Rol' : undefined"
+      :empty-message="t('roles.empty')"
+      :create-button-text="isSuperAdmin ? t('roles.new') : undefined"
       :hide-actions="!isSuperAdmin"
       @create="isSuperAdmin ? openCreateDialog() : undefined"
       @edit="isSuperAdmin ? openEditDialog($event) : undefined"
@@ -35,20 +35,20 @@
       @search="loadRoles"
     >
       <template #subtitle="{ item }">
-        {{ item.role_permissions?.length || 0 }} permiso(s) asignado(s)
+        {{ item.role_permissions?.length || 0 }} {{ t('roles.permissionsAssigned') }}
       </template>
     </ListView>
 
     <!-- Dialog Crear/Editar Rol -->
     <v-dialog v-model="dialog" max-width="600" scrollable>
       <v-card>
-        <v-card-title><v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>{{ isEditing ? 'Editar Rol' : 'Nuevo Rol' }}</v-card-title>
+        <v-card-title><v-icon start>{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>{{ isEditing ? t('roles.edit') : t('roles.new') }}</v-card-title>
         <v-card-text>
           <v-form ref="form" @submit.prevent="save">
-            <v-text-field v-model="formData.name" label="Nombre del rol" prepend-inner-icon="mdi-account-key" variant="outlined" :rules="[rules.required]" class="mb-4"></v-text-field>
+            <v-text-field v-model="formData.name" :label="t('roles.roleName')" prepend-inner-icon="mdi-account-key" variant="outlined" :rules="[rules.required]" class="mb-4"></v-text-field>
 
             <!-- Permisos -->
-            <div v-if="isEditing" class="text-subtitle-1 font-weight-bold mb-2">Permisos</div>
+            <div v-if="isEditing" class="text-subtitle-1 font-weight-bold mb-2">{{ t('roles.permissions') }}</div>
             <div v-if="isEditing">
               <div v-for="group in permissionGroups" :key="group.name" class="mb-3">
                 <div class="text-subtitle-2 text-grey-darken-1 mb-1">{{ group.name }}</div>
@@ -63,25 +63,25 @@
                 ></v-checkbox>
               </div>
             </div>
-            <div v-if="!isEditing" class="text-body-2 text-grey">Guarde el rol para asignar permisos.</div>
+            <div v-if="!isEditing" class="text-body-2 text-grey">{{ t('roles.saveToAssignPermissions') }}</div>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="dialog = false">Cancelar</v-btn>
-          <v-btn color="primary" :loading="saving" @click="save">{{ isEditing ? 'Guardar' : 'Crear' }}</v-btn>
+          <v-btn @click="dialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="primary" :loading="saving" @click="save">{{ isEditing ? t('common.save') : t('common.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
-        <v-card-title><v-icon start color="error">mdi-alert</v-icon>Confirmar Eliminación</v-card-title>
-        <v-card-text>¿Eliminar el rol <strong>{{ itemToDelete?.name }}</strong>?</v-card-text>
+        <v-card-title><v-icon start color="error">mdi-alert</v-icon>{{ t('common.confirmDelete') }}</v-card-title>
+        <v-card-text>{{ t('roles.deleteQuestion') }} <strong>{{ itemToDelete?.name }}</strong>?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="deleting" @click="doDelete">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" :loading="deleting" @click="doDelete">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -95,12 +95,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import rolesService from '@/services/roles.service'
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
 const { isSuperAdmin } = useSuperAdmin()
+const { t } = useI18n()
 const roles = ref([])
 const totalItems = ref(0)
 const loading = ref(false)
@@ -117,12 +119,12 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 const formData = ref({ role_id: null, name: '' })
-const rules = { required: v => !!v || 'Campo requerido' }
+const rules = { required: v => !!v || t('common.requiredField') }
 
 const permissionGroups = computed(() => {
   const groups = {}
   allPermissions.value.forEach(p => {
-    const module = p.code.split('.')[0] || 'GENERAL'
+    const module = p.code.split('.')[0] || t('roles.generalModule')
     if (!groups[module]) groups[module] = []
     groups[module].push(p)
   })
@@ -135,7 +137,7 @@ const loadRoles = async ({ page, pageSize, search, tenantId: tid }) => {
   try {
     const r = await rolesService.getRoles(tid, page, pageSize, search)
     if (r.success) { roles.value = r.data; totalItems.value = r.total }
-    else showMsg('Error al cargar roles', 'error')
+    else showMsg(t('roles.loadError'), 'error')
   } finally { loading.value = false }
 }
 
@@ -177,8 +179,8 @@ const save = async () => {
     } else {
       r = await rolesService.createRole(tenantId.value, formData.value)
     }
-    if (r.success) { showMsg(isEditing.value ? 'Rol actualizado' : 'Rol creado'); dialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
-    else showMsg(r.error || 'Error al guardar', 'error')
+    if (r.success) { showMsg(isEditing.value ? t('roles.updated') : t('roles.created')); dialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
+    else showMsg(r.error || t('common.saveError'), 'error')
   } finally { saving.value = false }
 }
 
@@ -187,7 +189,7 @@ const doDelete = async () => {
   deleting.value = true
   try {
     const r = await rolesService.deleteRole(tenantId.value, itemToDelete.value.role_id)
-    if (r.success) { showMsg('Rol eliminado'); deleteDialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
+    if (r.success) { showMsg(t('roles.deleted')); deleteDialog.value = false; loadRoles({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value }) }
     else showMsg(r.error, 'error')
   } finally { deleting.value = false }
 }

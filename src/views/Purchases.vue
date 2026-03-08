@@ -94,7 +94,7 @@
               :items="locations"
               item-title="name"
               item-value="location_id"
-              label="Sede"
+              :label="t('app.branch')"
               prepend-inner-icon="mdi-store"
               variant="outlined"
               density="compact"
@@ -139,7 +139,7 @@
 
       <!-- Subtitulo -->
       <template #subtitle="{ item }">
-        {{ formatDate(item.purchased_at) }} • {{ item.purchased_by_name }} • {{ item.location_name }}
+        {{ formatDate(item.purchased_at) }} ï¿½ {{ item.purchased_by_name }} ï¿½ {{ item.location_name }}
       </template>
 
       <!-- Contenido -->
@@ -208,7 +208,7 @@
                 size="small"
                 @click="toggleSelectAllSupplierPayables(!allSupplierPayablesSelected)"
               >
-                {{ allSupplierPayablesSelected ? 'Limpiar selección' : 'Seleccionar todas' }}
+                {{ allSupplierPayablesSelected ? 'Limpiar selecciï¿½n' : 'Seleccionar todas' }}
               </v-btn>
               <v-chip color="warning" variant="tonal" class="mr-2">
                 Abiertas: {{ supplierPayablesOpenCount }}
@@ -254,7 +254,7 @@
               </div>
             </template>
             <template #subtitle="{ item }">
-              {{ item.location_name || 'Sin sede' }} • Factura: {{ item.invoice_number || 'Sin numero' }}
+              {{ item.location_name || 'Sin sede' }} ï¿½ Factura: {{ item.invoice_number || 'Sin numero' }}
             </template>
             <template #content="{ item }">
               <div class="mt-2 d-flex flex-wrap ga-2">
@@ -276,7 +276,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="supplierPayablesDialog = false">Cerrar</v-btn>
+          <v-btn @click="supplierPayablesDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -289,7 +289,7 @@
         </v-card-title>
         <v-card-text class="pa-4">
           <v-alert type="info" variant="tonal" class="mb-3">
-            Se registrará un abono por el saldo total de cada cuenta seleccionada.
+            Se registrarï¿½ un abono por el saldo total de cada cuenta seleccionada.
           </v-alert>
 
           <v-row dense>
@@ -305,7 +305,7 @@
 
           <v-text-field
             v-model="bulkSupplierPaymentForm.payment_method"
-            label="Método de pago"
+            label="Mï¿½todo de pago"
             variant="outlined"
             density="compact"
             prepend-inner-icon="mdi-credit-card-outline"
@@ -322,7 +322,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="bulkSupplierPaymentDialog = false" :disabled="savingBulkSupplierPayment">Cancelar</v-btn>
+          <v-btn @click="bulkSupplierPaymentDialog = false" :disabled="savingBulkSupplierPayment">{{ t('common.cancel') }}</v-btn>
           <v-btn color="success" @click="confirmBulkSupplierPayment" :loading="savingBulkSupplierPayment">
             Confirmar pago masivo
           </v-btn>
@@ -469,7 +469,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="suggestionsDialog = false">Cerrar</v-btn>
+          <v-btn @click="suggestionsDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -748,7 +748,7 @@
             Actualizar AnÃ¡lisis
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="aiAnalysisDialog = false">Cerrar</v-btn>
+          <v-btn @click="aiAnalysisDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -769,7 +769,7 @@
                   :items="locations"
                   item-title="name"
                   item-value="location_id"
-                  label="Sede"
+                  :label="t('app.branch')"
                   prepend-inner-icon="mdi-store"
                   variant="outlined"
                   :rules="[rules.required]"
@@ -931,7 +931,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="dialog = false">Cancelar</v-btn>
+          <v-btn @click="dialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="indigo" variant="tonal" :loading="savingDraft" @click="savePurchaseOrder" :disabled="purchaseData.lines.length === 0">Guardar como OC</v-btn>
           <v-btn color="primary" :loading="saving" @click="savePurchase" :disabled="purchaseData.lines.length === 0">Guardar Compra</v-btn>
         </v-card-actions>
@@ -1034,7 +1034,7 @@
             Actualizar
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="purchaseOrdersDialog = false">Cerrar</v-btn>
+          <v-btn @click="purchaseOrdersDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1090,7 +1090,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeReceiveConfirm">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeReceiveConfirm">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             prepend-icon="mdi-check-circle"
@@ -1244,7 +1244,7 @@
                             <span class="text-body-2">{{ formatDate(pay.created_at) }}</span>
                             <span class="text-body-2 font-weight-bold">{{ formatMoney(pay.amount) }}</span>
                           </div>
-                          <div class="text-caption">{{ pay.payment_method || 'Sin metodo' }} {{ pay.note ? '• ' + pay.note : '' }}</div>
+                          <div class="text-caption">{{ pay.payment_method || 'Sin metodo' }} {{ pay.note ? 'ï¿½ ' + pay.note : '' }}</div>
                         </v-card-text>
                       </v-card>
                     </v-col>
@@ -1335,7 +1335,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="detailDialog = false">Cerrar</v-btn>
+          <v-btn @click="detailDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1394,7 +1394,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeReturnDialog">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeReturnDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn color="warning" :loading="returningPurchase" prepend-icon="mdi-check" @click="confirmPurchaseReturn">
             Registrar devolucion
           </v-btn>
@@ -1437,7 +1437,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="createPayableDialog = false">Cancelar</v-btn>
+          <v-btn variant="text" @click="createPayableDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="deep-orange" :loading="savingPayable" prepend-icon="mdi-check" @click="confirmCreatePayable">
             Crear
           </v-btn>
@@ -1485,7 +1485,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn variant="text" @click="supplierPaymentDialog = false">Cancelar</v-btn>
+          <v-btn variant="text" @click="supplierPaymentDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="deep-orange" :loading="savingSupplierPayment" prepend-icon="mdi-check" @click="confirmSupplierPayment">
             Registrar
           </v-btn>
@@ -1508,6 +1508,9 @@ import batchesService from '@/services/batches.service'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ListView from '@/components/ListView.vue'
 import { formatMoney, formatDateTime as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { isMobile } = useDisplay()
 const { tenantId } = useTenant()
@@ -1947,7 +1950,7 @@ const confirmBulkSupplierPayment = async () => {
   if (!tenantId.value || !userProfile.value?.user_id) return
   const rows = selectedSupplierPayablesRows.value
   if (rows.length === 0) {
-    showMsg('No hay cuentas válidas para pagar', 'warning')
+    showMsg('No hay cuentas vï¿½lidas para pagar', 'warning')
     return
   }
   savingBulkSupplierPayment.value = true

@@ -1,7 +1,7 @@
 <template>
   <div class="fill-width">
     <ListView
-      title="Unidades de Medida"
+      :title="t('units.title')"
       icon="mdi-ruler"
       avatar-color="cyan"
       :items="units"
@@ -12,12 +12,12 @@
       @create="openCreateDialog"
       @edit="openEditDialog"
       @delete="confirmDelete"
-      create-text="Nueva Unidad"
+      :create-text="t('units.new')"
     >
       <template #filters>
         <v-text-field
           v-model="searchQuery"
-          label="Buscar por código o nombre"
+          :label="t('units.searchByCodeOrName')"
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
           density="compact"
@@ -32,10 +32,10 @@
         <div class="d-flex align-center flex-wrap gap-2">
           <v-chip size="small" variant="flat" :color="item.is_system ? 'blue' : 'green'">
             <v-icon start size="small">{{ item.is_system ? 'mdi-cog' : 'mdi-account' }}</v-icon>
-            {{ item.is_system ? 'Sistema' : 'Personalizada' }}
+            {{ item.is_system ? t('units.system') : t('units.custom') }}
           </v-chip>
           <v-chip size="small" variant="outlined">
-            Código: <strong class="ml-1">{{ item.code }}</strong>
+            {{ t('common.code') }}: <strong class="ml-1">{{ item.code }}</strong>
           </v-chip>
           <v-chip v-if="item.dian_code" size="small" variant="outlined" color="purple">
             DIAN: <strong class="ml-1">{{ item.dian_code }}</strong>
@@ -67,7 +67,7 @@
           color="error"
           @click="confirmDelete(item)"
         ></v-btn>
-        <v-tooltip v-if="item.is_system" text="Unidad del sistema (no editable)" location="top">
+        <v-tooltip v-if="item.is_system" :text="t('units.systemNotEditable')" location="top">
           <template #activator="{ props }">
             <v-icon v-bind="props" color="blue-grey" size="small">mdi-lock</v-icon>
           </template>
@@ -82,15 +82,15 @@
           <v-icon start :color="isEditing ? 'primary' : 'success'">
             {{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}
           </v-icon>
-          {{ isEditing ? 'Editar Unidad de Medida' : 'Nueva Unidad de Medida' }}
+          {{ isEditing ? t('units.edit') : t('units.new') }}
         </v-card-title>
 
         <v-card-text>
           <v-form ref="unitForm" @submit.prevent="saveUnit">
             <v-text-field
               v-model="formData.code"
-              label="Código *"
-              hint="Código interno corto (ej: KG, UND, MT)"
+              :label="t('units.codeRequired')"
+              :hint="t('units.codeHint')"
               variant="outlined"
               :rules="[rules.required, rules.maxLength(20)]"
               counter="20"
@@ -99,8 +99,8 @@
 
             <v-text-field
               v-model="formData.dian_code"
-              label="Código DIAN"
-              hint="Código oficial DIAN para facturación electrónica"
+              :label="t('units.dianCode')"
+              :hint="t('units.dianCodeHint')"
               variant="outlined"
               :rules="[rules.maxLength(20)]"
               counter="20"
@@ -109,8 +109,8 @@
 
             <v-text-field
               v-model="formData.name"
-              label="Nombre *"
-              hint="Nombre descriptivo (ej: Kilogramo, Unidad, Metro)"
+              :label="t('units.nameRequired')"
+              :hint="t('units.nameHint')"
               variant="outlined"
               :rules="[rules.required, rules.maxLength(100)]"
               counter="100"
@@ -118,8 +118,8 @@
 
             <v-textarea
               v-model="formData.description"
-              label="Descripción"
-              hint="Información adicional sobre la unidad"
+              :label="t('units.description')"
+              :hint="t('units.descriptionHint')"
               variant="outlined"
               rows="3"
               :rules="[rules.maxLength(500)]"
@@ -128,7 +128,7 @@
 
             <v-switch
               v-model="formData.is_active"
-              label="Unidad activa"
+              :label="t('units.activeUnit')"
               color="success"
               hide-details
               class="mb-2"
@@ -136,15 +136,15 @@
           </v-form>
 
           <v-alert type="info" variant="tonal" class="mt-4" density="compact">
-            <strong>Códigos DIAN comunes:</strong><br>
+            <strong>{{ t('units.commonDianCodes') }}:</strong><br>
             • 94 = Unidad • 28 = Kilogramo • GRM = Gramo • LTR = Litro • MTR = Metro<br>
-            Consulta la <a href="https://www.dian.gov.co" target="_blank">resolución 000042/2020 DIAN</a> para más códigos.
+            {{ t('units.checkResolution') }} <a href="https://www.dian.gov.co" target="_blank">resolución 000042/2020 DIAN</a> {{ t('units.forMoreCodes') }}.
           </v-alert>
         </v-card-text>
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="formDialog = false" :disabled="saving">Cancelar</v-btn>
+          <v-btn text @click="formDialog = false" :disabled="saving">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="primary"
             variant="flat"
@@ -152,7 +152,7 @@
             :loading="saving"
             prepend-icon="mdi-content-save"
           >
-            Guardar
+            {{ t('common.save') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -163,30 +163,30 @@
       <v-card>
         <v-card-title class="d-flex align-center text-error">
           <v-icon start color="error">mdi-alert-circle</v-icon>
-          Confirmar Eliminación
+          {{ t('common.confirmDelete') }}
         </v-card-title>
 
         <v-card-text>
-          <p>¿Estás seguro de eliminar la unidad <strong>{{ unitToDelete?.name }}</strong> ({{ unitToDelete?.code }})?</p>
+          <p>{{ t('units.deleteQuestion') }} <strong>{{ unitToDelete?.name }}</strong> ({{ unitToDelete?.code }})?</p>
           
           <v-alert v-if="usageInfo && usageInfo.total > 0" type="error" variant="tonal" class="mt-4">
-            <strong>⚠️ Esta unidad está en uso:</strong>
+            <strong>⚠️ {{ t('units.inUse') }}:</strong>
             <ul class="ml-4 mt-2">
               <li v-if="usageInfo.products > 0">{{ usageInfo.products }} producto(s)</li>
               <li v-if="usageInfo.variants > 0">{{ usageInfo.variants }} variante(s)</li>
               <li v-if="usageInfo.bom_components > 0">{{ usageInfo.bom_components }} componente(s) BOM</li>
             </ul>
-            <p class="mt-2">No se puede eliminar hasta que dejes de usarla.</p>
+            <p class="mt-2">{{ t('units.cannotDeleteInUse') }}</p>
           </v-alert>
 
           <v-alert v-else-if="!checkingUsage" type="warning" variant="tonal" class="mt-4">
-            Esta acción no se puede deshacer.
+            {{ t('common.irreversibleAction') }}
           </v-alert>
         </v-card-text>
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="deleteDialog = false" :disabled="deleting">Cancelar</v-btn>
+          <v-btn text @click="deleteDialog = false" :disabled="deleting">{{ t('common.cancel') }}</v-btn>
           <v-btn
             color="error"
             variant="flat"
@@ -195,7 +195,7 @@
             :disabled="usageInfo && usageInfo.total > 0"
             prepend-icon="mdi-delete"
           >
-            Eliminar
+            {{ t('common.delete') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -212,10 +212,12 @@
 import { ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
 
 const { tenantId } = useTenant()
+const { t } = useI18n()
 
 // Estado principal
 const units = ref([])
@@ -254,8 +256,8 @@ const snackbarColor = ref('success')
 
 // Reglas de validación
 const rules = {
-  required: v => !!v || 'Campo requerido',
-  maxLength: max => v => (v && v.length <= max) || `Máximo ${max} caracteres`
+  required: v => !!v || t('common.requiredField'),
+  maxLength: max => v => (v && v.length <= max) || t('units.maxChars', { max })
 }
 
 // Cargar unidades
@@ -274,11 +276,11 @@ const loadUnits = async (params) => {
       units.value = result.data
       totalItems.value = result.total
     } else {
-      showMsg('Error al cargar unidades: ' + result.error, 'error')
+      showMsg(`${t('units.loadError')}: ${result.error}`, 'error')
     }
   } catch (error) {
     console.error('Error loadUnits:', error)
-    showMsg('Error al cargar unidades', 'error')
+    showMsg(t('units.loadError'), 'error')
   } finally {
     loading.value = false
   }
@@ -311,7 +313,7 @@ const openCreateDialog = () => {
 // Abrir dialog editar
 const openEditDialog = (unit) => {
   if (unit.is_system) {
-    showMsg('No puedes editar unidades del sistema', 'warning')
+    showMsg(t('units.systemNotEditableAction'), 'warning')
     return
   }
   
@@ -347,15 +349,15 @@ const saveUnit = async () => {
     }
 
     if (result.success) {
-      showMsg(isEditing.value ? 'Unidad actualizada' : 'Unidad creada', 'success')
+      showMsg(isEditing.value ? t('units.updated') : t('units.created'), 'success')
       formDialog.value = false
       await loadUnits()
     } else {
-      showMsg('Error: ' + result.error, 'error')
+      showMsg(`Error: ${result.error}`, 'error')
     }
   } catch (error) {
     console.error('Error saveUnit:', error)
-    showMsg('Error al guardar unidad', 'error')
+    showMsg(t('units.saveError'), 'error')
   } finally {
     saving.value = false
   }
@@ -364,7 +366,7 @@ const saveUnit = async () => {
 // Confirmar eliminación
 const confirmDelete = async (unit) => {
   if (unit.is_system) {
-    showMsg('No puedes eliminar unidades del sistema', 'warning')
+    showMsg(t('units.systemNotDeletableAction'), 'warning')
     return
   }
 
@@ -398,17 +400,17 @@ const deleteUnit = async () => {
     )
 
     if (result.success) {
-      showMsg('Unidad eliminada', 'success')
+      showMsg(t('units.deleted'), 'success')
       deleteDialog.value = false
       unitToDelete.value = null
       usageInfo.value = null
       await loadUnits()
     } else {
-      showMsg('Error: ' + result.error, 'error')
+      showMsg(`Error: ${result.error}`, 'error')
     }
   } catch (error) {
     console.error('Error deleteUnit:', error)
-    showMsg('Error al eliminar unidad', 'error')
+    showMsg(t('units.deleteError'), 'error')
   } finally {
     deleting.value = false
   }

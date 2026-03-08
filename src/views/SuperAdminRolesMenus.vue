@@ -298,7 +298,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="roleDialog = false">Cancelar</v-btn>
+          <v-btn @click="roleDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="deep-purple" variant="elevated" :loading="savingRole"
             @click="saveRole">
             Crear en todos los tenants
@@ -362,9 +362,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="menuDialog = false">Cancelar</v-btn>
+          <v-btn @click="menuDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="deep-purple" variant="elevated" :loading="savingMenu"
-            @click="saveMenuItem">Guardar</v-btn>
+            @click="saveMenuItem">{{ t('common.save') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -379,6 +379,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import superAdminRolesService from '@/services/superAdminRoles.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 // ============================================================
 // STATE

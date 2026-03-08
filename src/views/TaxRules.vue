@@ -228,7 +228,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog">Cancelar</v-btn>
+          <v-btn @click="closeDialog">{{ t('common.cancel') }}</v-btn>
           <v-btn color="primary" :loading="saving" @click="save">
             {{ isEditing ? 'Actualizar' : 'Crear' }}
           </v-btn>
@@ -243,8 +243,8 @@
         <v-card-text>¿Eliminar esta regla de impuesto? Esta acción no se puede deshacer.</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="deleting" @click="deleteItem">Eliminar</v-btn>
+          <v-btn @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn color="error" :loading="deleting" @click="deleteItem">{{ t('common.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -263,6 +263,9 @@ import taxesService from '@/services/taxes.service'
 import categoriesService from '@/services/categories.service'
 import productsService from '@/services/products.service'
 import supabaseService from '@/services/supabase.service'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()

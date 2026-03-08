@@ -41,7 +41,7 @@
                   :items="locations"
                   item-title="name"
                   item-value="location_id"
-                  label="Sede"
+                  :label="t('app.branch')"
                   variant="outlined"
                   density="compact"
                   hide-details
@@ -308,7 +308,7 @@
             Imprimir Factura
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="detailDialog = false">Cerrar</v-btn>
+          <v-btn @click="detailDialog = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -488,7 +488,7 @@
         </v-card-text>
         <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
-          <v-btn @click="returnDialog = false">Cancelar</v-btn>
+          <v-btn @click="returnDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="warning" :loading="processingReturn" @click="processReturn">Procesar Devolución</v-btn>
         </v-card-actions>
       </v-card>
@@ -501,7 +501,7 @@
         <v-card-text>¿Anular la venta <strong>#{{ saleToVoid?.sale_number }}</strong> por {{ formatMoney(saleToVoid?.total) }}?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="voidDialog = false">Cancelar</v-btn>
+          <v-btn @click="voidDialog = false">{{ t('common.cancel') }}</v-btn>
           <v-btn color="error" :loading="voiding" @click="doVoidSale">Anular</v-btn>
         </v-card-actions>
       </v-card>
@@ -524,6 +524,9 @@ import paymentMethodsService from '@/services/paymentMethods.service'
 import supabaseService from '@/services/supabase.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
