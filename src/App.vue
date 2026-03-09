@@ -13,7 +13,7 @@
         ></v-app-bar-nav-icon>
 
         <v-toolbar-title class="app-brand">
-          <img src="/branding/ofirone-mark.png" alt="OfirOne" class="app-brand__logo">
+          <img src="/branding/logo-login-text-mini.png" alt="OfirOne" class="app-brand__logo-full">
           <span class="app-brand__name">OfirOne</span>
         </v-toolbar-title>
 
@@ -1268,27 +1268,39 @@ onUnmounted(() => {
 
 .app-brand {
   line-height: 1;
+  margin-inline-start: 0 !important;
 }
 
 .app-brand :deep(.v-toolbar-title__placeholder) {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 2px;
 }
 
-.app-brand__logo {
-  width: 30px;
-  height: 30px;
+.app-brand__logo-full {
+  width: 58px;
+  height: 50px;
   object-fit: contain;
+  object-position: center;
   display: block;
-  align-self: center;
-  transform: translateY(-3px);
 }
 
 .app-brand__name {
   font-weight: 700;
   letter-spacing: 0.2px;
   line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .app-brand__logo-full {
+    width: 52px;
+    height: 44px;
+  }
+
+  .app-brand__name {
+    font-size: 1.05rem;
+  }
 }
 
 .user-avatar {

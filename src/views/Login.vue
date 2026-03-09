@@ -97,11 +97,11 @@
 
                 <template v-else>
                   <div class="form-header">
-                    <div class="form-logo">
+                    <div class="form-logo form-logo--composite">
                       <img
-                        src="/branding/ofirone-mark.png"
+                        src="/branding/logo-login-text-mini.png"
                         alt="OfirOne"
-                        class="form-logo-image"
+                        class="form-logo-composite-image"
                       >
                     </div>
                     <div>
@@ -504,9 +504,25 @@ onMounted(async () => {
 }
 
 .form-logo-image {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
+}
+
+.form-logo--composite {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.form-logo-composite-image {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  display: block;
 }
 
 .form-title {
@@ -620,6 +636,11 @@ onMounted(async () => {
 
   .form-title {
     font-size: 24px;
+  }
+
+  .form-logo-composite-image {
+    width: 64px;
+    height: 64px;
   }
 }
 
