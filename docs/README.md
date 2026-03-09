@@ -1,6 +1,6 @@
 # Documentación del Sistema
 
-Este directorio contiene la documentación del sistema POS Lite.
+Este directorio contiene la documentación del sistema OfirOne.
 
 ## 📘 Manual de Usuario
 

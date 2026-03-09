@@ -35,7 +35,7 @@ export function usePrint() {
     const content = `
       <div style="width: 300px; font-family: 'Courier New', monospace; font-size: 12px; padding: 10px;">
         <div style="text-align: center; margin-bottom: 10px;">
-          <h2 style="margin: 0; font-size: 16px;">${tenant?.name || 'POSLite'}</h2>
+          <h2 style="margin: 0; font-size: 16px;">${tenant?.name || 'OfirOne'}</h2>
           <div>${tenant?.tax_id || ''}</div>
           <div>${tenant?.address || ''}</div>
           <div>${tenant?.phone || ''}</div>
@@ -143,7 +143,7 @@ export function usePrint() {
     const content = `
       <div style="width: 300px; font-family: 'Courier New', monospace; font-size: 12px; padding: 10px;">
         <div style="text-align: center; margin-bottom: 10px;">
-          <h2 style="margin: 0; font-size: 16px;">${tenant?.name || 'POSLite'}</h2>
+          <h2 style="margin: 0; font-size: 16px;">${tenant?.name || 'OfirOne'}</h2>
           <div>${tenant?.tax_id || ''}</div>
           <div>${tenant?.address || ''}</div>
           <div>${tenant?.phone || ''}</div>
@@ -240,7 +240,7 @@ export function usePrint() {
       // Encabezado
       doc.setFontSize(18)
       doc.setFont(undefined, 'bold')
-      doc.text(tenant?.name || 'POSLite', 105, 20, { align: 'center' })
+      doc.text(tenant?.name || 'OfirOne', 105, 20, { align: 'center' })
       
       doc.setFontSize(10)
       doc.setFont(undefined, 'normal')
@@ -382,7 +382,7 @@ export function usePrint() {
 
       // Pie de página
       doc.setFontSize(8)
-      doc.text('POSLite - Sistema de Punto de Venta', 105, 285, { align: 'center' })
+      doc.text('OfirOne - Sistema de Punto de Venta', 105, 285, { align: 'center' })
 
       // Abrir en nueva ventana para imprimir o descargar
       doc.autoPrint()

@@ -12,7 +12,10 @@
           @click="drawer = !drawer"
         ></v-app-bar-nav-icon>
 
-        <v-toolbar-title>POSLite</v-toolbar-title>
+        <v-toolbar-title class="app-brand">
+          <img src="/branding/ofirone-mark.png" alt="OfirOne" class="app-brand__logo">
+          <span class="app-brand__name">OfirOne</span>
+        </v-toolbar-title>
 
         <v-spacer></v-spacer>
 
@@ -39,6 +42,23 @@
           </v-list>
         </v-menu>
 
+        <v-switch
+          v-if="user"
+          v-model="darkThemeEnabled"
+          hide-details
+          density="compact"
+          inset
+          color="secondary"
+          class="theme-switch mr-2"
+        >
+          <template #prepend>
+            <v-icon size="16">mdi-white-balance-sunny</v-icon>
+          </template>
+          <template #append>
+            <v-icon size="16">mdi-weather-night</v-icon>
+          </template>
+        </v-switch>
+
         <v-btn v-if="userProfile || tenantId" icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
@@ -62,10 +82,15 @@
         app
       >
         <v-list-item
-          prepend-avatar="https://randomuser.me/api/portraits/men/85.jpg"
           :title="userProfile?.full_name || user?.email || t('app.user')"
           :subtitle="(canManageTenants && !userProfile) ? t('app.superAdmin') : (userProfile?.tenants?.name || t('app.noCompany'))"
-        ></v-list-item>
+        >
+          <template #prepend>
+            <v-avatar size="38" class="user-avatar mr-3" color="primary" variant="tonal">
+              <v-icon size="24">mdi-account-circle</v-icon>
+            </v-avatar>
+          </template>
+        </v-list-item>
 
         <v-divider></v-divider>
 
@@ -135,7 +160,7 @@
 
       <v-footer app class="text-center" :class="isDark ? 'bg-grey-darken-4' : 'bg-grey-lighten-4'" elevation="2">
         <v-col class="text-center" cols="12">
-          {{ new Date().getFullYear() }} — <strong>POSLite</strong>
+          {{ new Date().getFullYear() }} — <strong>OfirOne</strong>
         </v-col>
       </v-footer>
 
@@ -939,9 +964,9 @@ const router = useRouter()
 const route = useRoute()
 const { signOut, user, userProfile, hasPermission, hasAnyPermission } = useAuth()
 const { tenantId, clearTenant } = useTenant()
-const { theme, locale: tenantLocale, loadSettings } = useTenantSettings()
+const { locale: tenantLocale, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
-const { isDark, setTheme } = useTheme()
+const { isDark, setTheme, ensureThemeForUser, syncThemeFromTenant } = useTheme()
 const { canManageTenants } = useSuperAdmin()
 const { mobile: isMobile } = useDisplay()
 const { t, setLocale, locale } = useI18n()
@@ -953,6 +978,13 @@ const languageOptions = computed(() => [
 
 const currentLanguageLabel = computed(() => {
   return locale.value === 'en' ? 'EN' : 'ES'
+})
+
+const darkThemeEnabled = computed({
+  get: () => isDark.value,
+  set: (enabled) => {
+    setTheme(enabled ? 'dark' : 'light', user.value?.id || null)
+  }
 })
 
 const drawer = ref(true)
@@ -1168,15 +1200,19 @@ onMounted(async () => {
   window.addEventListener('resize', handleResize)
   handleResize()
   
-  // Cargar configuración del tenant y aplicar tema
+  // Cargar configuración del tenant y aplicar locale
   if (tenantId.value) {
     await loadSettings()
     if (tenantLocale.value) {
       setLocale(tenantLocale.value)
     }
-    if (theme.value) {
-      setTheme(theme.value)
-    }
+  }
+
+  // Tema por usuario: localStorage primero; fallback tenant_settings solo si no hay cache.
+  if (tenantId.value) {
+    await syncThemeFromTenant(tenantId.value, user.value?.id || null)
+  } else {
+    await ensureThemeForUser({ authUserId: user.value?.id || null })
   }
 
   // Cargar menús dinámicos si hay usuario con perfil (tenant user)
@@ -1188,30 +1224,30 @@ onMounted(async () => {
 // Recargar menús dinámicos cuando el usuario inicia sesión o cambia de tenant
 watch(
   () => user.value?.id,
-  (newUserId) => {
+  async (newUserId) => {
     if (newUserId && userProfile.value) {
       loadDynamicMenus(newUserId)
     } else {
       dynamicMenuTree.value = null  // Limpiar al cerrar sesión
+    }
+    if (tenantId.value) {
+      await syncThemeFromTenant(tenantId.value, newUserId || null)
+    } else {
+      await ensureThemeForUser({ authUserId: newUserId || null })
     }
   }
 )
 
 watch(
   () => tenantId.value,
-  (newTenantId) => {
+  async (newTenantId) => {
     if (newTenantId && user.value?.id) {
       loadDynamicMenus(user.value.id)  // Recargar menús al cambiar tenant
+      await loadSettings(true)
+      await syncThemeFromTenant(newTenantId, user.value?.id || null)
     }
   }
 )
-
-// Aplicar tema cuando cambie la configuración
-watch(theme, (newTheme) => {
-  if (newTheme && ['light', 'dark', 'auto'].includes(newTheme)) {
-    setTheme(newTheme)
-  }
-})
 
 watch(tenantLocale, (newLocale) => {
   if (newLocale) {
@@ -1228,5 +1264,50 @@ onUnmounted(() => {
 <style scoped>
 .v-navigation-drawer {
   z-index: 1000;
+}
+
+.app-brand {
+  line-height: 1;
+}
+
+.app-brand :deep(.v-toolbar-title__placeholder) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-brand__logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
+  align-self: center;
+  transform: translateY(-3px);
+}
+
+.app-brand__name {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+
+.user-avatar {
+  background: transparent;
+}
+
+.theme-switch {
+  margin-left: 4px;
+}
+
+.theme-switch :deep(.v-selection-control) {
+  min-height: 34px;
+}
+
+.theme-switch :deep(.v-selection-control__wrapper) {
+  margin: 0 4px;
+}
+
+.theme-switch :deep(.v-icon) {
+  color: rgba(255, 255, 255, 0.92);
 }
 </style>

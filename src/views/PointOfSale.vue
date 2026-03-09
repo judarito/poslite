@@ -280,6 +280,65 @@
 
           <v-divider></v-divider>
 
+          <!-- Ventas en espera -->
+          <v-card-text class="pa-2">
+            <div class="d-flex flex-column flex-sm-row ga-2 align-stretch align-sm-center justify-space-between mb-2">
+              <div class="text-subtitle-2">Ventas en espera</div>
+              <v-btn
+                color="success"
+                variant="tonal"
+                size="small"
+                prepend-icon="mdi-pause-circle-outline"
+                :disabled="cart.length === 0"
+                @click="saveSaleOnHold"
+              >
+                Guardar en espera
+              </v-btn>
+            </div>
+
+            <div v-if="heldSales.length === 0" class="text-caption text-medium-emphasis">
+              No hay ventas en espera.
+            </div>
+
+            <div v-else class="d-flex flex-column ga-2">
+              <v-card
+                v-for="held in heldSales"
+                :key="held.id"
+                variant="outlined"
+                class="held-sale-card"
+              >
+                <v-card-text class="pa-2">
+                  <div class="text-body-2 font-weight-bold">
+                    {{ getHeldSaleCustomerLabel(held) }} · {{ getHeldSaleItemsCount(held) }} item(s)
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2">
+                    {{ formatHeldSaleDate(held.createdAt) }}
+                  </div>
+                  <div class="d-flex flex-wrap ga-2">
+                    <v-btn
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      @click="resumeHeldSale(held.id)"
+                    >
+                      Retomar
+                    </v-btn>
+                    <v-btn
+                      color="error"
+                      size="small"
+                      variant="tonal"
+                      @click="removeHeldSale(held.id)"
+                    >
+                      Quitar
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </div>
+          </v-card-text>
+
+          <v-divider></v-divider>
+
           <!-- Botón Descuento Global (solo admin) -->
           <v-card-text v-if="isAdmin && cart.length > 0" class="pa-2 pb-0">
             <div class="d-flex gap-1">
@@ -501,7 +560,9 @@ import { useI18n } from '@/i18n'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
-const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, cashSessionMaxHours, loadSettings } = useTenantSettings()
+const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, cashSessionMaxHours } = useTenantSettings()
+const POS_HOLD_SALES_STORAGE_PREFIX = 'ofirone_pos_hold_sales'
+const MAX_HOLD_SALES = 20
 
 const searchTerm = ref('')
 const searchResults = ref([])
@@ -513,6 +574,7 @@ const customerCreditInfo = ref(null)
 const chatOrderText = ref('')
 const processingChatOrder = ref(false)
 const chatOrderSummary = ref(null)
+const heldSales = ref([])
 
 // Cargar info de crédito cuando cambie el cliente
 watch(selectedCustomer, async (customer) => {
@@ -568,6 +630,11 @@ const searchingProduct = ref(false)
 // Verificar si el usuario es administrador
 const isAdmin = computed(() => {
   return userProfile.value?.roles?.some(role => role.name === 'ADMINISTRADOR') || false
+})
+
+const holdSalesStorageKey = computed(() => {
+  if (!tenantId.value || !userProfile.value?.user_id) return null
+  return `${POS_HOLD_SALES_STORAGE_PREFIX}:${tenantId.value}:${userProfile.value.user_id}`
 })
 
 const totals = computed(() => {
@@ -981,6 +1048,115 @@ const setQuickAmount = (index, amount) => {
 const addPayment = () => { payments.value.push({ method: paymentMethods.value[0]?.code || '', amount: remaining.value }) }
 const removePayment = (i) => { payments.value.splice(i, 1) }
 
+const readHeldSalesFromStorage = () => {
+  if (typeof window === 'undefined') {
+    heldSales.value = []
+    return
+  }
+  const key = holdSalesStorageKey.value
+  if (!key) {
+    heldSales.value = []
+    return
+  }
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) {
+      heldSales.value = []
+      return
+    }
+    const parsed = JSON.parse(raw)
+    heldSales.value = Array.isArray(parsed) ? parsed : []
+  } catch {
+    heldSales.value = []
+  }
+}
+
+const persistHeldSales = () => {
+  if (typeof window === 'undefined') return
+  const key = holdSalesStorageKey.value
+  if (!key) return
+  localStorage.setItem(key, JSON.stringify(heldSales.value))
+}
+
+const formatHeldSaleDate = (isoValue) => {
+  if (!isoValue) return ''
+  const date = new Date(isoValue)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date)
+}
+
+const getHeldSaleCustomerLabel = (held) => {
+  return held?.customer?.full_name || 'Consumidor final'
+}
+
+const getHeldSaleItemsCount = (held) => {
+  if (typeof held?.itemsCount === 'number') return held.itemsCount
+  return (held?.cart || []).reduce((sum, line) => sum + (Number(line?.quantity) || 0), 0)
+}
+
+const saveSaleOnHold = () => {
+  if (cart.value.length === 0) return
+
+  const snapshot = {
+    id: `hold_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+    customer: selectedCustomer.value ? { ...selectedCustomer.value } : null,
+    thirdParty: selectedThirdParty.value ? { ...selectedThirdParty.value } : null,
+    cart: cart.value.map(line => ({ ...line })),
+    payments: payments.value.map(payment => ({
+      method: payment.method,
+      amount: Number(payment.amount) || 0
+    })),
+    saleNote: saleNote.value || '',
+    itemsCount: cart.value.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0)
+  }
+
+  const nextHeldSales = [snapshot, ...heldSales.value]
+  heldSales.value = nextHeldSales.slice(0, MAX_HOLD_SALES)
+  persistHeldSales()
+  clearSale()
+  showMsg('Venta guardada en espera', 'success')
+}
+
+const removeHeldSale = (heldSaleId) => {
+  heldSales.value = heldSales.value.filter(held => held.id !== heldSaleId)
+  persistHeldSales()
+  showMsg('Venta en espera eliminada', 'info')
+}
+
+const resumeHeldSale = async (heldSaleId) => {
+  const held = heldSales.value.find(item => item.id === heldSaleId)
+  if (!held) return
+
+  if (cart.value.length > 0) {
+    const confirmReplace = window.confirm('Hay una venta en curso. ¿Deseas reemplazarla con la venta en espera?')
+    if (!confirmReplace) return
+  }
+
+  cart.value = (held.cart || []).map(line => ({ ...line }))
+  selectedCustomer.value = held.customer ? { ...held.customer } : null
+  selectedThirdParty.value = held.thirdParty ? { ...held.thirdParty } : null
+  payments.value = (held.payments && held.payments.length)
+    ? held.payments.map(payment => ({ method: payment.method, amount: Number(payment.amount) || 0 }))
+    : [{ method: paymentMethods.value[0]?.code || '', amount: 0 }]
+  saleNote.value = held.saleNote || ''
+  chatOrderText.value = ''
+  chatOrderSummary.value = null
+
+  heldSales.value = heldSales.value.filter(item => item.id !== heldSaleId)
+  persistHeldSales()
+
+  await recalculate()
+  showMsg('Venta en espera cargada', 'success')
+}
+
+watch(holdSalesStorageKey, () => {
+  readHeldSalesFromStorage()
+}, { immediate: true })
+
 // Procesar venta
 const processSale = async () => {
   if (cart.value.length === 0 || remaining.value > 0) return
@@ -1190,14 +1366,14 @@ const handleKeyboardShortcuts = (e) => {
     e.preventDefault()
     const amounts = [1000, 2000, 5000, 10000, 20000, 50000, 100000]
     const idx = parseInt(e.key) - 1
-    setQuickAmount(amounts[idx])
+    setQuickAmount(0, amounts[idx])
     return
   }
 
   // Ctrl+E: Monto exacto
   if (e.ctrlKey && e.key.toLowerCase() === 'e') {
     e.preventDefault()
-    setQuickAmount(totals.value.total)
+    setQuickAmount(0, totals.value.total)
     return
   }
 }
@@ -1212,6 +1388,10 @@ const handleKeyboardShortcuts = (e) => {
   cursor: pointer;
 }
 
+.held-sale-card {
+  border-radius: 10px;
+}
+
 /* Total sticky en desktop */
 @media (min-width: 960px) {
   .totals-sticky {
@@ -1220,6 +1400,12 @@ const handleKeyboardShortcuts = (e) => {
     z-index: 10;
     background: rgb(var(--v-theme-surface));
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+}
+
+@media (max-width: 600px) {
+  .held-sale-card :deep(.v-btn) {
+    flex: 1;
   }
 }
 </style>

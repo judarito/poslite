@@ -1,9 +1,9 @@
 <template>
   <div>
     <v-card>
-      <v-card-title class="text-h4 bg-primary pa-4">
-        <v-icon start color="white" size="large">mdi-information</v-icon>
-        <span class="text-white">Acerca de POSLite</span>
+      <v-card-title class="text-h4 bg-primary pa-4 d-flex align-center">
+        <img src="/branding/ofirone-mark.png" alt="OfirOne" class="about-title-logo">
+        <span class="text-white">Acerca de OfirOne</span>
       </v-card-title>
       <v-card-text class="pa-6">
         <v-row>
@@ -18,7 +18,7 @@
                 <v-list density="compact">
                   <v-list-item>
                     <v-list-item-title class="font-weight-bold">Aplicación</v-list-item-title>
-                    <v-list-item-subtitle>POSLite - Sistema de Punto de Venta</v-list-item-subtitle>
+                    <v-list-item-subtitle>OfirOne - Sistema de Punto de Venta</v-list-item-subtitle>
                   </v-list-item>
                   <v-list-item>
                     <v-list-item-title class="font-weight-bold">Versión</v-list-item-title>
@@ -175,7 +175,7 @@
                 <v-icon start>mdi-information</v-icon>
                 Sistema Multi-Tenant
               </v-alert-title>
-              POSLite es un sistema de punto de venta moderno con soporte multi-tenant, 
+              OfirOne es un sistema de punto de venta moderno con soporte multi-tenant, 
               seguridad por filas (RLS), gestión de inventario en múltiples sedes, 
               sistema de impuestos configurable, reglas de precios dinámicas y mucho más.
             </v-alert>
@@ -306,3 +306,12 @@ onMounted(() => {
   loadStats()
 })
 </script>
+
+<style scoped>
+.about-title-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  margin-right: 12px;
+}
+</style>

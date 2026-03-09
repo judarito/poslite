@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="home-root" :class="{ 'home-dark': isDark }">
     <!-- Alerta: sesiones de caja con más de 24h abiertas -->
     <v-alert
       v-if="expiredSessions.length > 0"
@@ -126,6 +126,7 @@
             </div>
             <apexchart
               v-else-if="dailySeries.length"
+              :key="`trend-${chartThemeMode}`"
               type="area"
               height="200"
               :options="trendChartOptions"
@@ -152,6 +153,7 @@
             </div>
             <apexchart
               v-else-if="paymentMethods.length"
+              :key="`donut-${chartThemeMode}`"
               type="donut"
               height="200"
               :options="donutChartOptions"
@@ -183,6 +185,7 @@
             </div>
             <apexchart
               v-else-if="topProducts.length"
+              :key="`bar-${chartThemeMode}`"
               type="bar"
               height="180"
               :options="barChartOptions"
@@ -282,55 +285,76 @@ const supplierPayablesAlertTitle = computed(() => {
   return `${supplierPayablesDueSoonCount.value} CxP de proveedores por vencer`
 })
 
+const chartThemeMode = computed(() => isDark.value ? 'dark' : 'light')
+const chartTextColor = computed(() => isDark.value ? '#E5E7EB' : '#334155')
+const chartGridColor = computed(() => isDark.value ? '#3F3F46' : '#E2E8F0')
+
 // Trend chart
 const trendSeries = computed(() => [{
   name: 'Ventas',
   data: dailySeries.value.map(d => ({ x: d.date, y: Math.round(d.total) }))
 }])
 const trendChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, sparkline: { enabled: false }, animations: { enabled: false } },
-  theme: { mode: isDark.value ? 'dark' : 'light' },
+  chart: {
+    toolbar: { show: false },
+    sparkline: { enabled: false },
+    animations: { enabled: false },
+    background: 'transparent',
+    foreColor: chartTextColor.value
+  },
+  theme: { mode: chartThemeMode.value },
   dataLabels: { enabled: false },
   stroke: { curve: 'smooth', width: 2 },
   fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.03 } },
   colors: ['#1565C0'],
   xaxis: {
     type: 'category', tickAmount: 8,
-    labels: { rotate: -30, style: { fontSize: '10px' }, formatter: v => { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return `${d.getDate()}/${d.getMonth() + 1}` } }
+    labels: { rotate: -30, style: { fontSize: '10px', colors: chartTextColor.value }, formatter: v => { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return `${d.getDate()}/${d.getMonth() + 1}` } }
   },
-  yaxis: { labels: { style: { fontSize: '10px' }, formatter: v => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v}` } },
-  tooltip: { theme: isDark.value ? 'dark' : 'light', y: { formatter: v => formatMoney(v) } },
-  grid: { borderColor: isDark.value ? '#444' : '#f0f0f0', padding: { left: 4, right: 4 } }
+  yaxis: { labels: { style: { fontSize: '10px', colors: chartTextColor.value }, formatter: v => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v}` } },
+  tooltip: { theme: chartThemeMode.value, y: { formatter: v => formatMoney(v) } },
+  grid: { borderColor: chartGridColor.value, padding: { left: 4, right: 4 } }
 }))
 
 // Donut chart
 const methodLabels = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia', NEQUI: 'Nequi', DAVIPLATA: 'Daviplata', OTHER: 'Otro' }
 const donutSeries  = computed(() => paymentMethods.value.map(p => Math.round(p.total)))
 const donutChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, animations: { enabled: false } },
-  theme: { mode: isDark.value ? 'dark' : 'light' },
+  chart: {
+    toolbar: { show: false },
+    animations: { enabled: false },
+    background: 'transparent',
+    foreColor: chartTextColor.value
+  },
+  theme: { mode: chartThemeMode.value },
   labels: paymentMethods.value.map(p => methodLabels[p.method] || p.method),
   colors: ['#00897B', '#1565C0', '#F57C00', '#7B1FA2', '#C62828', '#546E7A'],
   dataLabels: { enabled: true, style: { fontSize: '10px' }, formatter: v => `${v.toFixed(1)}%` },
-  legend: { position: 'bottom', fontSize: '10px' },
-  tooltip: { theme: isDark.value ? 'dark' : 'light', y: { formatter: v => formatMoney(v) } },
-  plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: 'Total', fontSize: '11px', formatter: () => formatMoney(donutSeries.value.reduce((a, b) => a + b, 0)) } } } } }
+  legend: { position: 'bottom', fontSize: '10px', labels: { colors: chartTextColor.value } },
+  tooltip: { theme: chartThemeMode.value, y: { formatter: v => formatMoney(v) } },
+  plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: 'Total', color: chartTextColor.value, fontSize: '11px', formatter: () => formatMoney(donutSeries.value.reduce((a, b) => a + b, 0)) } } } } }
 }))
 
 // Bar chart
 const barSeries = computed(() => [{ name: 'Ingresos', data: topProducts.value.map(p => Math.round(p.revenue)) }])
 const barChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, animations: { enabled: false } },
-  theme: { mode: isDark.value ? 'dark' : 'light' },
+  chart: {
+    toolbar: { show: false },
+    animations: { enabled: false },
+    background: 'transparent',
+    foreColor: chartTextColor.value
+  },
+  theme: { mode: chartThemeMode.value },
   plotOptions: { bar: { horizontal: true, barHeight: '55%', borderRadius: 3 } },
   colors: ['#E65100'],
   dataLabels: { enabled: true, style: { fontSize: '10px' }, formatter: v => formatMoney(v) },
   xaxis: {
     categories: topProducts.value.map(p => p.name.length > 30 ? p.name.substring(0, 28) + '…' : p.name),
-    labels: { style: { fontSize: '10px' }, formatter: v => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v}` }
+    labels: { style: { fontSize: '10px', colors: chartTextColor.value }, formatter: v => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v}` }
   },
-  tooltip: { theme: isDark.value ? 'dark' : 'light', y: { formatter: v => formatMoney(v) } },
-  grid: { borderColor: isDark.value ? '#444' : '#f0f0f0', padding: { left: 4, right: 8 } }
+  yaxis: { labels: { style: { colors: chartTextColor.value } } },
+  tooltip: { theme: chartThemeMode.value, y: { formatter: v => formatMoney(v) } },
+  grid: { borderColor: chartGridColor.value, padding: { left: 4, right: 8 } }
 }))
 
 async function loadKPIs() {
@@ -466,6 +490,26 @@ const navigateTo = (route) => {
   }
 }
 </script>
+
+<style scoped>
+.home-root.home-dark :deep(.apexcharts-canvas),
+.home-root.home-dark :deep(.apexcharts-svg),
+.home-root.home-dark :deep(.apexcharts-inner) {
+  background: transparent !important;
+}
+
+.home-root.home-dark :deep(.apexcharts-text),
+.home-root.home-dark :deep(.apexcharts-legend-text),
+.home-root.home-dark :deep(.apexcharts-xaxis-label),
+.home-root.home-dark :deep(.apexcharts-yaxis-label) {
+  fill: #e5e7eb !important;
+  color: #e5e7eb !important;
+}
+
+.home-root.home-dark :deep(.apexcharts-gridline) {
+  stroke: #3f3f46 !important;
+}
+</style>
 
 <style scoped>
 .kpi-home-card {

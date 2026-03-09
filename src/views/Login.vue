@@ -10,6 +10,11 @@
             <v-sheet class="login-shell" rounded="xl" elevation="0">
               <div class="brand-panel d-none d-md-flex">
                 <div class="brand-inner">
+                  <img
+                    src="/branding/logo-login.png"
+                    alt="OfirOne"
+                    class="brand-logo"
+                  >
                   <div class="brand-kicker">{{ t('login.kicker') }}</div>
                   <h1 class="brand-title">{{ t('login.brandTitle') }}</h1>
                   <p class="brand-copy">
@@ -52,9 +57,8 @@
                       :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
                       :type="showPassword ? 'text' : 'password'"
                       variant="outlined"
-                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
                       required
-                      class="mb-2"
+                      class="mb-2 login-input"
                       @click:append-inner="showPassword = !showPassword"
                     ></v-text-field>
 
@@ -64,9 +68,8 @@
                       prepend-inner-icon="mdi-lock-check-outline"
                       :type="showPassword ? 'text' : 'password'"
                       variant="outlined"
-                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
                       required
-                      class="mb-3"
+                      class="mb-3 login-input"
                     ></v-text-field>
 
                     <v-btn
@@ -95,7 +98,11 @@
                 <template v-else>
                   <div class="form-header">
                     <div class="form-logo">
-                      <v-icon size="26">mdi-storefront-outline</v-icon>
+                      <img
+                        src="/branding/ofirone-mark.png"
+                        alt="OfirOne"
+                        class="form-logo-image"
+                      >
                     </div>
                     <div>
                       <h2 class="form-title">{{ t('login.signInTitle') }}</h2>
@@ -109,11 +116,10 @@
                       :label="t('login.email')"
                       prepend-inner-icon="mdi-email-outline"
                       variant="outlined"
-                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
                       type="email"
                       :rules="[rules.required, rules.email]"
                       required
-                      class="mb-2"
+                      class="mb-2 login-input"
                     ></v-text-field>
 
                     <v-text-field
@@ -123,10 +129,9 @@
                       :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
                       :type="showPassword ? 'text' : 'password'"
                       variant="outlined"
-                      :bg-color="isDark ? 'grey-darken-3' : 'white'"
                       :rules="[rules.required]"
                       required
-                      class="mb-2"
+                      class="mb-2 login-input"
                       @click:append-inner="showPassword = !showPassword"
                     ></v-text-field>
 
@@ -192,8 +197,8 @@
               :label="t('login.email')"
               prepend-inner-icon="mdi-email-outline"
               variant="outlined"
-              :bg-color="isDark ? 'grey-darken-3' : 'white'"
               type="email"
+              class="login-input"
               required
             ></v-text-field>
 
@@ -234,7 +239,7 @@ import { useI18n } from '@/i18n'
 const router = useRouter()
 const { signIn, resetPassword, updatePassword, loading } = useAuth()
 const { saveTenant } = useTenant()
-const { syncThemeFromTenant, isDark } = useTheme()
+const { syncThemeFromTenant, ensureThemeForUser, isDark } = useTheme()
 const { t } = useI18n()
 
 const showPassword = ref(false)
@@ -282,7 +287,7 @@ const handleLogin = async () => {
         currency_code: result.tenant.currency_code
       })
 
-      await syncThemeFromTenant(result.tenant.tenant_id)
+      await syncThemeFromTenant(result.tenant.tenant_id, result.data?.user?.id || null)
     }
 
     router.push('/')
@@ -342,7 +347,8 @@ const handleUpdatePassword = async () => {
   }, 1200)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureThemeForUser({ authUserId: null })
   const hash = (window.location.hash || '').toLowerCase()
   const search = (window.location.search || '').toLowerCase()
   recoveryMode.value =
@@ -362,9 +368,10 @@ onMounted(() => {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 10% 15%, rgba(17, 85, 204, 0.18), transparent 30%),
-    radial-gradient(circle at 90% 90%, rgba(11, 143, 172, 0.18), transparent 30%),
-    linear-gradient(135deg, #f4f7fb 0%, #ebf2fb 100%);
+    radial-gradient(circle at 10% 15%, rgba(10, 79, 211, 0.2), transparent 30%),
+    radial-gradient(circle at 88% 12%, rgba(245, 158, 11, 0.2), transparent 32%),
+    radial-gradient(circle at 88% 88%, rgba(22, 163, 74, 0.18), transparent 32%),
+    linear-gradient(135deg, #f3f8ff 0%, #ecf6ff 48%, #eef9f2 100%);
 }
 
 .login-page :deep(.v-container) {
@@ -387,7 +394,7 @@ onMounted(() => {
   height: 260px;
   top: -80px;
   right: -80px;
-  background: #1462d8;
+  background: #0a4fd3;
 }
 
 .orb-b {
@@ -395,7 +402,7 @@ onMounted(() => {
   height: 300px;
   bottom: -110px;
   left: -80px;
-  background: #0f9f9a;
+  background: #14a04a;
 }
 
 .login-shell {
@@ -410,7 +417,7 @@ onMounted(() => {
 }
 
 .brand-panel {
-  background: linear-gradient(165deg, #0f4cc2 0%, #0b74b6 52%, #169184 100%);
+  background: linear-gradient(160deg, #0a45b8 0%, #0a65d1 42%, #11a44a 100%);
   color: #fff;
   display: flex;
   justify-content: center;
@@ -419,6 +426,14 @@ onMounted(() => {
 
 .brand-inner {
   max-width: 420px;
+}
+
+.brand-logo {
+  width: 220px;
+  max-width: 100%;
+  display: block;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 14px 24px rgba(8, 35, 95, 0.35));
 }
 
 .brand-kicker {
@@ -483,9 +498,15 @@ onMounted(() => {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  color: #0f4cc2;
-  background: linear-gradient(145deg, rgba(15, 76, 194, 0.13), rgba(16, 159, 154, 0.13));
-  border: 1px solid rgba(15, 76, 194, 0.15);
+  color: #0a4fd3;
+  background: linear-gradient(145deg, rgba(10, 79, 211, 0.13), rgba(22, 163, 74, 0.13));
+  border: 1px solid rgba(10, 79, 211, 0.18);
+}
+
+.form-logo-image {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .form-title {
@@ -501,6 +522,50 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.login-root :deep(.login-input .v-field) {
+  background-color: rgba(var(--v-theme-surface), 0.94);
+}
+
+.login-root :deep(.login-input .v-label) {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+}
+
+.login-root :deep(.login-input .v-field--focused .v-label),
+.login-root :deep(.login-input .v-field--active .v-label),
+.login-root :deep(.login-input .v-label.v-field-label--floating) {
+  color: rgb(var(--v-theme-primary));
+}
+
+.login-root :deep(.login-input .v-field__outline) {
+  color: rgba(var(--v-theme-on-surface), 0.28);
+}
+
+.login-root :deep(.login-input .v-field--focused .v-field__outline) {
+  color: rgb(var(--v-theme-primary));
+}
+
+.login-root :deep(.login-input input) {
+  color: rgb(var(--v-theme-on-surface));
+  caret-color: rgb(var(--v-theme-on-surface));
+}
+
+.login-root :deep(.login-input .v-field__input) {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+/* Normaliza autofill para que no rompa dark/light y evita fondo amarillo del navegador */
+.login-root :deep(.login-input input:-webkit-autofill),
+.login-root :deep(.login-input input:-webkit-autofill:hover),
+.login-root :deep(.login-input input:-webkit-autofill:focus),
+.login-root :deep(.login-input textarea:-webkit-autofill),
+.login-root :deep(.login-input textarea:-webkit-autofill:hover),
+.login-root :deep(.login-input textarea:-webkit-autofill:focus) {
+  -webkit-text-fill-color: rgb(var(--v-theme-on-surface)) !important;
+  caret-color: rgb(var(--v-theme-on-surface)) !important;
+  box-shadow: 0 0 0 1000px rgba(var(--v-theme-surface), 0.96) inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
 .form-actions-row {
   display: flex;
   justify-content: space-between;
@@ -512,7 +577,7 @@ onMounted(() => {
   min-height: 48px;
   font-weight: 700;
   letter-spacing: 0.2px;
-  box-shadow: 0 12px 24px rgba(15, 76, 194, 0.25);
+  box-shadow: 0 12px 24px rgba(10, 79, 211, 0.26);
 }
 
 .login-link-btn {
@@ -522,9 +587,10 @@ onMounted(() => {
 
 .login-root.login-dark .login-page {
   background:
-    radial-gradient(circle at 10% 15%, rgba(17, 85, 204, 0.24), transparent 30%),
-    radial-gradient(circle at 90% 90%, rgba(11, 143, 172, 0.2), transparent 30%),
-    linear-gradient(135deg, #0f1522 0%, #101a2c 100%);
+    radial-gradient(circle at 10% 15%, rgba(29, 78, 216, 0.26), transparent 32%),
+    radial-gradient(circle at 90% 88%, rgba(34, 197, 94, 0.2), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(245, 158, 11, 0.2), transparent 30%),
+    linear-gradient(135deg, #0d1424 0%, #111f37 100%);
 }
 
 .login-root.login-dark .login-shell {
@@ -535,6 +601,10 @@ onMounted(() => {
 .login-root.login-dark .brand-chip {
   background: rgba(255, 255, 255, 0.13) !important;
   color: #ffffff !important;
+}
+
+.login-root.login-dark :deep(.login-input .v-field) {
+  background-color: rgba(20, 29, 45, 0.88);
 }
 
 @media (max-width: 960px) {

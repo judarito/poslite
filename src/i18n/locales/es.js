@@ -362,7 +362,7 @@ export default {
     reportsDescription: 'Reportes y estadísticas'
   },
   login: {
-    kicker: 'POSLITE CORE',
+    kicker: 'OFIRONE CORE',
     brandTitle: 'Control real de ventas e inventario',
     brandCopy: 'Opera más rápido, con reglas de negocio sólidas y decisiones apoyadas por IA.',
     tenantSecurity: 'Seguridad por tenant',
