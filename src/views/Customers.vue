@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="ofir-page customers-page">
     <ListView
       :title="t('customers.title')"
       icon="mdi-account-group"
@@ -204,3 +204,13 @@ onMounted(async () => {
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 </script>
+
+<style scoped>
+.customers-page :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.customers-page :deep(.v-card-title) {
+  font-weight: 700;
+}
+</style>

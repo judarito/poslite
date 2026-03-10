@@ -1,11 +1,32 @@
 <template>
-  <div class="home-root" :class="{ 'home-dark': isDark }">
+  <div class="home-root ofir-home" :class="isDark ? 'ofir-home--dark' : 'ofir-home--light'">
+    <v-row class="ofir-home__hero mb-3" align="center">
+      <v-col cols="12" md="8">
+        <div class="ofir-home__eyebrow">OfirOne Dashboard</div>
+        <h1 class="ofir-home__title">Escritorio</h1>
+        <p class="ofir-home__subtitle">
+          {{ userProfile?.tenants?.name || 'Control central de ventas, inventario y alertas' }}
+        </p>
+      </v-col>
+      <v-col cols="12" md="4" class="d-flex justify-md-end">
+        <v-btn
+          class="ofir-home__cta"
+          color="secondary"
+          prepend-icon="mdi-plus"
+          size="large"
+          to="/pos"
+        >
+          Nueva Venta
+        </v-btn>
+      </v-col>
+    </v-row>
+
     <!-- Alerta: sesiones de caja con más de 24h abiertas -->
     <v-alert
       v-if="expiredSessions.length > 0"
       type="error"
       variant="tonal"
-      class="mb-4"
+      class="mb-4 ofir-alert"
       prepend-icon="mdi-clock-alert"
       :title="`${expiredSessions.length} caja${expiredSessions.length > 1 ? 's' : ''} con sesión abierta por más de 24 horas`"
     >
@@ -25,7 +46,7 @@
       v-if="canViewSupplierPayables && (supplierPayablesOverdueCount > 0 || supplierPayablesDueSoonCount > 0)"
       :type="supplierPayablesOverdueCount > 0 ? 'error' : 'warning'"
       variant="tonal"
-      class="mb-4"
+      class="mb-4 ofir-alert"
       prepend-icon="mdi-file-alert"
       :title="supplierPayablesAlertTitle"
     >
@@ -51,7 +72,7 @@
     <v-row class="mb-1">
       <!-- Ventas Hoy -->
       <v-col cols="12" sm="4">
-        <v-card variant="tonal" color="blue" class="kpi-home-card">
+        <v-card variant="tonal" color="blue" class="kpi-home-card ofir-panel ofir-kpi">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.salesToday') }}</span>
@@ -68,7 +89,7 @@
 
       <!-- Ventas Este Mes -->
       <v-col cols="12" sm="4">
-        <v-card variant="tonal" color="green" class="kpi-home-card">
+        <v-card variant="tonal" color="green" class="kpi-home-card ofir-panel ofir-kpi">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.thisMonth') }}</span>
@@ -95,7 +116,7 @@
 
       <!-- Ventas Este Año -->
       <v-col cols="12" sm="4">
-        <v-card variant="tonal" color="purple" class="kpi-home-card">
+        <v-card variant="tonal" color="purple" class="kpi-home-card ofir-panel ofir-kpi">
           <v-card-text class="pa-4">
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">{{ t('home.thisYear') }}</span>
@@ -115,7 +136,7 @@
     <v-row class="mb-1">
       <!-- Tendencia 30 días -->
       <v-col cols="12" md="8">
-        <v-card>
+        <v-card class="ofir-panel">
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="blue" size="18">mdi-chart-line</v-icon>
             {{ t('home.dailySalesLast30Days') }}
@@ -141,7 +162,7 @@
 
       <!-- Métodos de pago -->
       <v-col cols="12" md="4">
-        <v-card height="100%">
+        <v-card height="100%" class="ofir-panel">
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="teal" size="18">mdi-credit-card-multiple</v-icon>
             {{ t('home.paymentMethods') }}
@@ -170,7 +191,7 @@
     <!-- Top productos del mes -->
     <v-row class="mb-1">
       <v-col cols="12">
-        <v-card>
+        <v-card class="ofir-panel">
           <v-card-title class="text-body-2 font-weight-bold pa-3 pb-0 d-flex align-center">
             <v-icon start color="orange" size="18">mdi-trophy</v-icon>
             {{ t('home.topProductsOfMonth') }}
@@ -215,18 +236,20 @@
         sm="6"
         md="4"
       >
-        <v-card elevation="2" hover @click="navigateTo(card.route)" style="cursor: pointer;">
-          <v-card-title class="d-flex align-center">
-            <v-icon :color="card.color" size="large" class="mr-2">
-              {{ card.icon }}
-            </v-icon>
-            {{ card.title }}
+        <v-card class="ofir-panel ofir-shortcut-card" elevation="2" hover @click="navigateTo(card.route)" style="cursor: pointer;">
+          <v-card-title class="d-flex flex-column align-center text-center pt-4">
+            <v-avatar :color="card.color" variant="tonal" size="54" class="mb-2">
+              <v-icon color="white" size="28">
+                {{ card.icon }}
+              </v-icon>
+            </v-avatar>
+            <span>{{ card.title }}</span>
           </v-card-title>
-          <v-card-text>
+          <v-card-text class="text-center pt-2">
             {{ card.description }}
           </v-card-text>
-          <v-card-actions>
-            <v-btn :color="card.color" variant="text" @click.stop="navigateTo(card.route)">
+          <v-card-actions class="justify-center pb-4">
+            <v-btn :color="card.color" variant="tonal" @click.stop="navigateTo(card.route)">
               Ir
             </v-btn>
           </v-card-actions>
@@ -492,31 +515,168 @@ const navigateTo = (route) => {
 </script>
 
 <style scoped>
-.home-root.home-dark :deep(.apexcharts-canvas),
-.home-root.home-dark :deep(.apexcharts-svg),
-.home-root.home-dark :deep(.apexcharts-inner) {
+.ofir-home {
+  --ofir-green: #78d64b;
+  --ofir-blue: #2c62f6;
+}
+
+.ofir-home__hero {
+  border-bottom: 1px solid transparent;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+}
+
+.ofir-home--dark .ofir-home__hero {
+  border-bottom-color: rgba(109, 141, 255, 0.22);
+}
+
+.ofir-home--light .ofir-home__hero {
+  border-bottom-color: rgba(44, 98, 246, 0.14);
+}
+
+.ofir-home__eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  opacity: 0.72;
+  margin-bottom: 2px;
+}
+
+.ofir-home__title {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+}
+
+.ofir-home__subtitle {
+  margin-top: 6px;
+  margin-bottom: 0;
+  opacity: 0.82;
+}
+
+.ofir-home--dark .ofir-home__eyebrow,
+.ofir-home--dark .ofir-home__subtitle {
+  color: #9fb4ed;
+}
+
+.ofir-home--dark .ofir-home__title {
+  color: #eff5ff;
+}
+
+.ofir-home--light .ofir-home__eyebrow,
+.ofir-home--light .ofir-home__subtitle {
+  color: #4e628b;
+}
+
+.ofir-home--light .ofir-home__title {
+  color: #1f3661;
+}
+
+.ofir-home__cta {
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(77, 189, 66, 0.25);
+}
+
+.ofir-alert {
+  border-radius: 14px;
+  border: 1px solid transparent;
+}
+
+.ofir-home--dark .ofir-alert {
+  border-color: rgba(111, 136, 201, 0.24);
+}
+
+.ofir-home--light .ofir-alert {
+  border-color: rgba(38, 95, 204, 0.2);
+}
+
+.ofir-panel {
+  border-radius: 18px;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ofir-home--dark .ofir-panel {
+  background: linear-gradient(145deg, rgba(15, 24, 48, 0.88), rgba(12, 19, 38, 0.9)) !important;
+  border-color: rgba(111, 136, 201, 0.22);
+  box-shadow: 0 10px 24px rgba(1, 4, 11, 0.42);
+}
+
+.ofir-home--light .ofir-panel {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(244, 249, 255, 0.95)) !important;
+  border-color: rgba(44, 98, 246, 0.16);
+  box-shadow: 0 10px 20px rgba(45, 84, 165, 0.1);
+}
+
+.kpi-home-card {
+  border-radius: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ofir-kpi {
+  min-height: 130px;
+}
+
+.kpi-home-card:hover {
+  transform: translateY(-4px);
+}
+
+.ofir-shortcut-card {
+  overflow: hidden;
+}
+
+.ofir-shortcut-card :deep(.v-card-title) {
+  font-weight: 700;
+}
+
+.ofir-shortcut-card :deep(.v-icon) {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.ofir-home--dark :deep(.apexcharts-canvas),
+.ofir-home--dark :deep(.apexcharts-svg),
+.ofir-home--dark :deep(.apexcharts-inner) {
   background: transparent !important;
 }
 
-.home-root.home-dark :deep(.apexcharts-text),
-.home-root.home-dark :deep(.apexcharts-legend-text),
-.home-root.home-dark :deep(.apexcharts-xaxis-label),
-.home-root.home-dark :deep(.apexcharts-yaxis-label) {
-  fill: #e5e7eb !important;
-  color: #e5e7eb !important;
+.ofir-home--dark :deep(.apexcharts-text),
+.ofir-home--dark :deep(.apexcharts-legend-text),
+.ofir-home--dark :deep(.apexcharts-xaxis-label),
+.ofir-home--dark :deep(.apexcharts-yaxis-label) {
+  fill: #dbe6ff !important;
+  color: #dbe6ff !important;
 }
 
-.home-root.home-dark :deep(.apexcharts-gridline) {
-  stroke: #3f3f46 !important;
+.ofir-home--dark :deep(.apexcharts-gridline) {
+  stroke: #2f3f65 !important;
 }
-</style>
 
-<style scoped>
-.kpi-home-card {
-  border-radius: 12px;
-  transition: transform 0.15s;
+.ofir-home--light :deep(.apexcharts-gridline) {
+  stroke: #cfdaee !important;
 }
-.kpi-home-card:hover {
-  transform: translateY(-2px);
+
+.ofir-home--light :deep(.apexcharts-text),
+.ofir-home--light :deep(.apexcharts-legend-text),
+.ofir-home--light :deep(.apexcharts-xaxis-label),
+.ofir-home--light :deep(.apexcharts-yaxis-label) {
+  fill: #2f466d !important;
+  color: #2f466d !important;
+}
+
+@media (max-width: 960px) {
+  .ofir-home__hero {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .ofir-home__title {
+    font-size: 2rem;
+  }
+
+  .ofir-home__cta {
+    width: 100%;
+  }
 }
 </style>

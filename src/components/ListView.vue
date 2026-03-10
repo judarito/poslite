@@ -1,8 +1,8 @@
 <template>
-  <div class="list-view">
+  <div class="list-view ofir-list-view">
     <!-- Toolbar con acciones -->
-    <v-card flat>
-      <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
+    <v-card flat class="ofir-list-view__card">
+      <v-card-title class="ofir-list-view__title d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
         <div class="d-flex align-center mb-2 mb-sm-0">
           <v-icon :icon="icon" class="mr-2"></v-icon>
           <span class="text-h6">{{ title }}</span>
@@ -19,7 +19,7 @@
           prepend-inner-icon="mdi-magnify"
           single-line
           hide-details
-          class="mb-2 mb-sm-0 mr-sm-2"
+          class="ofir-list-view__search mb-2 mb-sm-0 mr-sm-2"
           style="max-width: 100%; width: 100%;"
           :style="{ 'max-width': $vuetify.display.smAndUp ? '300px' : '100%' }"
           @update:model-value="debouncedSearch"
@@ -28,6 +28,7 @@
         <!-- Botón crear -->
         <v-btn
           v-if="showCreateButton"
+          class="ofir-list-view__create-btn"
           color="primary"
           prepend-icon="mdi-plus"
           :block="$vuetify.display.xs"
@@ -37,20 +38,28 @@
         </v-btn>
       </v-card-title>
 
-      <v-divider></v-divider>
+      <v-divider class="ofir-list-view__divider"></v-divider>
+
+      <v-card-text v-if="$slots.filters" class="ofir-list-view__filters py-3">
+        <slot name="filters"></slot>
+      </v-card-text>
+
+      <v-divider v-if="$slots.filters" class="ofir-list-view__divider"></v-divider>
 
       <!-- Loading -->
       <v-progress-linear
         v-if="loading"
         indeterminate
         color="primary"
+        class="ofir-list-view__loading"
       ></v-progress-linear>
 
       <!-- Lista -->
-      <v-list v-if="!loading && items.length > 0" lines="two">
+      <v-list v-if="!loading && items.length > 0" lines="two" class="ofir-list-view__list">
         <template v-for="(item, index) in items" :key="item[itemKey]">
           <v-list-item
             @click="$emit('item-click', item)"
+            class="ofir-list-view__item"
             :class="{ 'cursor-pointer': clickable }"
           >
             <!-- Avatar/Icono -->
@@ -104,20 +113,20 @@
             </template>
           </v-list-item>
 
-          <v-divider v-if="index < items.length - 1"></v-divider>
+          <v-divider v-if="index < items.length - 1" class="ofir-list-view__item-divider"></v-divider>
         </template>
       </v-list>
 
       <!-- Sin datos -->
       <v-card-text v-if="!loading && items.length === 0">
-        <v-alert type="info" variant="tonal" class="text-center">
+        <v-alert type="info" variant="tonal" class="text-center ofir-list-view__empty-alert">
           <v-icon size="48" class="mb-2">{{ emptyIcon }}</v-icon>
           <div>{{ emptyMessage }}</div>
         </v-alert>
       </v-card-text>
 
       <!-- Paginación -->
-      <v-card-actions v-if="totalPages > 1" class="justify-center pa-2">
+      <v-card-actions v-if="totalPages > 1" class="justify-center pa-2 ofir-list-view__pagination">
         <v-pagination
           v-model="currentPage"
           :length="totalPages"
@@ -128,7 +137,7 @@
       </v-card-actions>
 
       <!-- Info de paginación -->
-      <v-card-text v-if="items.length > 0" class="text-center text-caption pa-2">
+      <v-card-text v-if="items.length > 0" class="text-center text-caption pa-2 ofir-list-view__meta">
         Mostrando {{ startIndex + 1 }} - {{ endIndex }} de {{ totalItems }} registros
       </v-card-text>
     </v-card>
@@ -224,11 +233,100 @@ onMounted(() => {
   width: 100%;
 }
 
+.ofir-list-view__card {
+  border-radius: 18px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.22);
+  background: linear-gradient(
+    145deg,
+    rgba(var(--v-theme-surface), 0.98),
+    rgba(var(--v-theme-background), 0.92)
+  );
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(20, 29, 51, 0.12);
+}
+
+:global(.ofir-shell--dark) .ofir-list-view__card {
+  border-color: rgba(96, 134, 255, 0.24);
+  background: linear-gradient(145deg, rgba(14, 23, 46, 0.92), rgba(9, 17, 34, 0.95)) !important;
+  box-shadow: 0 14px 28px rgba(3, 8, 20, 0.36);
+}
+
+:global(.ofir-shell--light) .ofir-list-view__card {
+  border-color: rgba(40, 88, 211, 0.18);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(242, 248, 255, 0.95)) !important;
+}
+
+.ofir-list-view__title {
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.16);
+  gap: 8px;
+}
+
+.ofir-list-view__search :deep(.v-field),
+.ofir-list-view__filters :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.ofir-list-view__create-btn {
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.ofir-list-view__divider {
+  opacity: 0.55;
+}
+
+.ofir-list-view__list {
+  background: transparent !important;
+}
+
+.ofir-list-view__item {
+  border-radius: 12px;
+  margin: 4px 8px;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease;
+}
+
+:global(.ofir-shell--dark) .ofir-list-view__item {
+  background: linear-gradient(120deg, rgba(14, 23, 46, 0.62), rgba(10, 18, 35, 0.44));
+  border-color: rgba(95, 133, 255, 0.14);
+}
+
+:global(.ofir-shell--light) .ofir-list-view__item {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(41, 88, 212, 0.1);
+}
+
+.ofir-list-view__item-divider {
+  margin: 0 12px;
+}
+
+.ofir-list-view__empty-alert {
+  border-radius: 14px;
+}
+
+.ofir-list-view__pagination {
+  border-top: 1px solid rgba(var(--v-theme-primary), 0.14);
+}
+
+.ofir-list-view__meta {
+  opacity: 0.82;
+}
+
 .cursor-pointer {
   cursor: pointer;
 }
 
 .cursor-pointer:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(var(--v-theme-primary), 0.08);
+}
+
+:global(.ofir-shell--dark) .cursor-pointer:hover {
+  background: linear-gradient(120deg, rgba(40, 69, 146, 0.4), rgba(20, 35, 73, 0.34));
+}
+
+@media (max-width: 600px) {
+  .ofir-list-view__item {
+    margin: 2px 6px;
+  }
 }
 </style>

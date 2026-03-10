@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div class="ofir-page purchases-page">
     <!-- Botones de acciones - Responsive -->
-    <v-row dense class="mb-3">
+    <v-row dense class="mb-3 purchases-actions">
       <v-col cols="12" sm="auto">
         <v-btn 
           color="primary" 
@@ -160,13 +160,13 @@
 
     <!-- Dialog CxP proveedores -->
     <v-dialog v-model="supplierPayablesDialog" max-width="1200" scrollable>
-      <v-card>
-        <v-card-title class="bg-deep-orange">
+      <v-card class="purchase-modal supplier-payables-dialog">
+        <v-card-title class="purchase-modal__header purchase-modal__header--orange supplier-payables-header">
           <v-icon start color="white">mdi-file-document-multiple</v-icon>
           <span class="text-white">Cuentas por Pagar a Proveedores</span>
         </v-card-title>
         <v-card-text class="pa-4">
-          <v-row dense class="mb-3">
+          <v-row dense class="mb-3 supplier-payables-filters">
             <v-col cols="12" md="4">
               <v-select
                 v-model="supplierPayablesStatusFilter"
@@ -282,8 +282,8 @@
     </v-dialog>
 
     <v-dialog v-model="bulkSupplierPaymentDialog" max-width="620">
-      <v-card>
-        <v-card-title class="bg-success">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--success">
           <v-icon start color="white">mdi-cash-multiple</v-icon>
           <span class="text-white">Pago masivo de CxP</span>
         </v-card-title>
@@ -332,8 +332,8 @@
 
     <!-- Dialog Sugerencias Inteligentes -->
     <v-dialog v-model="suggestionsDialog" max-width="1200" scrollable>
-      <v-card>
-        <v-card-title class="bg-purple">
+      <v-card class="purchase-modal purchase-suggestions-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--purple">
           <v-icon start color="white">mdi-lightbulb-on</v-icon>
           <span class="text-white">Sugerencias Inteligentes de Compra</span>
         </v-card-title>
@@ -354,7 +354,7 @@
               <v-alert v-if="suggestions.filter(s => s.priority === 1).length === 0" type="success" variant="tonal" class="mb-4">
                 ¡Excelente! No hay productos con prioridad crítica
               </v-alert>
-              <v-card v-for="item in suggestions.filter(s => s.priority === 1)" :key="item.variant_id" variant="outlined" class="mb-2">
+              <v-card v-for="item in suggestions.filter(s => s.priority === 1)" :key="item.variant_id" variant="outlined" class="mb-2 purchase-suggestion-item">
                 <v-card-text>
                   <v-row align="center">
                     <v-col cols="12" md="5">
@@ -385,7 +385,7 @@
               <v-alert v-if="suggestions.filter(s => s.priority === 2).length === 0" type="success" variant="tonal" class="mb-4">
                 No hay productos con prioridad alta
               </v-alert>
-              <v-card v-for="item in suggestions.filter(s => s.priority === 2)" :key="item.variant_id" variant="outlined" class="mb-2">
+              <v-card v-for="item in suggestions.filter(s => s.priority === 2)" :key="item.variant_id" variant="outlined" class="mb-2 purchase-suggestion-item">
                 <v-card-text>
                   <v-row align="center">
                     <v-col cols="12" md="5">
@@ -416,7 +416,7 @@
               <v-alert v-if="suggestions.filter(s => s.priority === 3).length === 0" type="info" variant="tonal" class="mb-4">
                 No hay productos con prioridad media
               </v-alert>
-              <v-card v-for="item in suggestions.filter(s => s.priority === 3)" :key="item.variant_id" variant="outlined" class="mb-2">
+              <v-card v-for="item in suggestions.filter(s => s.priority === 3)" :key="item.variant_id" variant="outlined" class="mb-2 purchase-suggestion-item">
                 <v-card-text>
                   <v-row align="center">
                     <v-col cols="12" md="5">
@@ -443,7 +443,7 @@
           </v-window>
 
           <!-- Resumen total -->
-          <v-card v-if="suggestions.length > 0" color="purple" variant="tonal" class="mt-4">
+          <v-card v-if="suggestions.length > 0" color="purple" variant="tonal" class="mt-4 purchase-suggestions-summary">
             <v-card-text>
               <v-row>
                 <v-col cols="12" md="3">
@@ -476,8 +476,8 @@
 
     <!-- Dialog Análisis IA Avanzado -->
     <v-dialog v-model="aiAnalysisDialog" max-width="1400" scrollable>
-      <v-card>
-        <v-card-title class="bg-deep-purple d-flex align-center">
+      <v-card class="purchase-modal purchase-ai-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--deep-purple d-flex align-center">
           <v-icon start color="white">mdi-robot</v-icon>
           <span class="text-white">Análisis IA Avanzado - DeepSeek</span>
           <v-spacer></v-spacer>
@@ -515,12 +515,12 @@
           <!-- AI Analysis Results -->
           <div v-if="aiAnalysis && !loadingAIAnalysis">
             <!-- Resumen Ejecutivo -->
-            <v-card color="deep-purple" variant="tonal" class="mb-4">
+            <v-card color="deep-purple" variant="tonal" class="mb-4 purchase-ai-executive">
               <v-card-title>📊 Resumen Ejecutivo</v-card-title>
               <v-card-text>
                 <v-row>
                   <v-col cols="12" md="3">
-                    <v-card variant="elevated">
+                    <v-card variant="elevated" class="purchase-ai-kpi">
                       <v-card-text class="text-center">
                         <div class="text-h3 text-error">{{ aiAnalysis.executive_summary.critical_products_count }}</div>
                         <div class="text-caption">Productos Críticos</div>
@@ -528,7 +528,7 @@
                     </v-card>
                   </v-col>
                   <v-col cols="12" md="3">
-                    <v-card variant="elevated">
+                    <v-card variant="elevated" class="purchase-ai-kpi">
                       <v-card-text class="text-center">
                         <div class="text-h3 text-success">{{ aiAnalysis.executive_summary.high_confidence_count }}</div>
                         <div class="text-caption">Alta Confianza IA</div>
@@ -536,7 +536,7 @@
                     </v-card>
                   </v-col>
                   <v-col cols="12" md="3">
-                    <v-card variant="elevated">
+                    <v-card variant="elevated" class="purchase-ai-kpi">
                       <v-card-text class="text-center">
                         <div class="text-h3 text-primary">{{ formatMoney(aiAnalysis.executive_summary.total_investment) }}</div>
                         <div class="text-caption">Inversión Estimada</div>
@@ -544,7 +544,7 @@
                     </v-card>
                   </v-col>
                   <v-col cols="12" md="3">
-                    <v-card variant="elevated" color="purple">
+                    <v-card variant="elevated" color="purple" class="purchase-ai-kpi purchase-ai-kpi--highlight">
                       <v-card-text class="text-center text-white">
                         <v-icon size="large">mdi-lightbulb-on</v-icon>
                         <div class="text-caption mt-2">Recomendación Principal</div>
@@ -559,7 +559,7 @@
             </v-card>
 
             <!-- Insights Estratégicos -->
-            <v-card v-if="aiAnalysis.insights && aiAnalysis.insights.length > 0" class="mb-4">
+            <v-card v-if="aiAnalysis.insights && aiAnalysis.insights.length > 0" class="mb-4 purchase-ai-section">
               <v-card-title>💡 Insights Estratégicos</v-card-title>
               <v-card-text>
                 <v-expansion-panels>
@@ -589,7 +589,7 @@
             </v-card>
 
             <!-- Advertencias -->
-            <v-card v-if="aiAnalysis.warnings && aiAnalysis.warnings.length > 0" class="mb-4">
+            <v-card v-if="aiAnalysis.warnings && aiAnalysis.warnings.length > 0" class="mb-4 purchase-ai-section">
               <v-card-title>⚠️ Advertencias Importantes</v-card-title>
               <v-card-text>
                 <v-alert
@@ -605,7 +605,7 @@
             </v-card>
 
             <!-- Consejos de Optimización -->
-            <v-card v-if="aiAnalysis.optimization_tips && aiAnalysis.optimization_tips.length > 0" class="mb-4">
+            <v-card v-if="aiAnalysis.optimization_tips && aiAnalysis.optimization_tips.length > 0" class="mb-4 purchase-ai-section">
               <v-card-title>🎯 Consejos de Optimización</v-card-title>
               <v-card-text>
                 <v-list>
@@ -625,7 +625,7 @@
             </v-card>
 
             <!-- Sugerencias Mejoradas con IA -->
-            <v-card>
+            <v-card class="purchase-ai-section">
               <v-card-title>🤖 Sugerencias Mejoradas con IA</v-card-title>
               <v-card-text>
                 <v-tabs v-model="aiSuggestionsTab" color="deep-purple">
@@ -644,7 +644,7 @@
                       v-for="item in aiAnalysis.suggestions.filter(s => s.has_ai_analysis).slice(0, 20)"
                       :key="item.variant_id"
                       variant="outlined"
-                      class="mb-2"
+                      class="mb-2 purchase-ai-suggestion-item"
                     >
                       <v-card-text>
                         <v-row align="center">
@@ -687,7 +687,7 @@
                       v-for="item in aiAnalysis.suggestions.filter(s => s.ai_priority === 1 || s.priority === 1)"
                       :key="item.variant_id"
                       variant="outlined"
-                      class="mb-2 border-error"
+                      class="mb-2 border-error purchase-ai-suggestion-item"
                     >
                       <v-card-text>
                         <v-row align="center">
@@ -715,7 +715,7 @@
                       v-for="item in aiAnalysis.suggestions.filter(s => (s.ai_confidence || 0) > 0.8)"
                       :key="item.variant_id"
                       variant="outlined"
-                      class="mb-2"
+                      class="mb-2 purchase-ai-suggestion-item"
                     >
                       <v-card-text>
                         <v-row align="center">
@@ -755,8 +755,8 @@
 
     <!-- Dialog Nueva Compra -->
     <v-dialog v-model="dialog" max-width="800" scrollable>
-      <v-card>
-        <v-card-title>
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header">
           <v-icon start>mdi-cart-plus</v-icon>
           Nueva Compra
         </v-card-title>
@@ -828,7 +828,7 @@
                       variant="outlined"
                       density="compact"
                       :rules="[rules.required]"
-                      @update:model-value="onVariantSelected(i, line.variant_id)"
+                      @update:model-value="value => onVariantSelected(i, value)"
                       @update:search="searchVariants"
                     >
                       <template #item="{ props, item }">
@@ -940,8 +940,8 @@
 
     <!-- Dialog OC Pendientes -->
     <v-dialog v-model="purchaseOrdersDialog" max-width="1100" scrollable>
-      <v-card>
-        <v-card-title class="bg-indigo">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--indigo">
           <v-icon start color="white">mdi-clipboard-list</v-icon>
           <span class="text-white">Ordenes de Compra Pendientes</span>
         </v-card-title>
@@ -1040,8 +1040,8 @@
     </v-dialog>
 
     <v-dialog v-model="receiveConfirmDialog" max-width="460">
-      <v-card>
-        <v-card-title>
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--warning-soft">
           <v-icon start color="warning">mdi-alert</v-icon>
           Confirmar recepcion
         </v-card-title>
@@ -1105,8 +1105,8 @@
 
     <!-- Dialog Detalle de Compra -->
     <v-dialog v-model="detailDialog" max-width="900" scrollable>
-      <v-card>
-        <v-card-title class="bg-teal">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--teal">
           <v-icon start color="white">mdi-truck-delivery</v-icon>
           <span class="text-white">Detalle de Compra</span>
         </v-card-title>
@@ -1341,8 +1341,8 @@
     </v-dialog>
 
     <v-dialog v-model="returnDialog" max-width="760" scrollable>
-      <v-card>
-        <v-card-title class="bg-warning">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--warning">
           <v-icon start color="white">mdi-undo</v-icon>
           <span class="text-white">Devolucion a proveedor</span>
         </v-card-title>
@@ -1403,8 +1403,8 @@
     </v-dialog>
 
     <v-dialog v-model="createPayableDialog" max-width="520">
-      <v-card>
-        <v-card-title class="bg-deep-orange">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--orange">
           <v-icon start color="white">mdi-file-document-plus</v-icon>
           <span class="text-white">Crear cuenta por pagar</span>
         </v-card-title>
@@ -1446,8 +1446,8 @@
     </v-dialog>
 
     <v-dialog v-model="supplierPaymentDialog" max-width="520">
-      <v-card>
-        <v-card-title class="bg-deep-orange">
+      <v-card class="purchase-modal">
+        <v-card-title class="purchase-modal__header purchase-modal__header--orange">
           <v-icon start color="white">mdi-cash-plus</v-icon>
           <span class="text-white">Registrar abono proveedor</span>
         </v-card-title>
@@ -1670,6 +1670,117 @@ const rules = {
   positive: v => v > 0 || 'Debe ser mayor a 0'
 }
 
+const createPurchaseLine = (payload = {}) => ({
+  variant_id: payload.variant_id || null,
+  qty: Number(payload.qty ?? 1),
+  unit_cost: Number(payload.unit_cost ?? 0),
+  requires_expiration: !!payload.requires_expiration,
+  batch_number: payload.batch_number || '',
+  expiration_date: payload.expiration_date || null,
+  physical_location: payload.physical_location || ''
+})
+
+const resolveRequiresExpiration = (variantRow) => (
+  variantRow?.requires_expiration !== null && variantRow?.requires_expiration !== undefined
+    ? !!variantRow?.requires_expiration
+    : !!variantRow?.product_id?.requires_expiration
+)
+
+const normalizeDateInput = (value) => {
+  if (!value) return null
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10)
+  }
+
+  const raw = String(value).trim()
+  if (!raw) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10)
+}
+
+const formatVariantLabel = (variantRow, fallbackId) => {
+  if (!variantRow) return `variante ${fallbackId}`
+  const productName = variantRow.product_id?.name || 'Producto'
+  const variantName = variantRow.variant_name ? ` - ${variantRow.variant_name}` : ''
+  const sku = variantRow.sku ? ` (${variantRow.sku})` : ''
+  return `${productName}${variantName}${sku}`
+}
+
+const loadVariantMetadata = async (variantIds = []) => {
+  const uniqueVariantIds = [...new Set((variantIds || []).filter(Boolean))]
+  if (!tenantId.value || uniqueVariantIds.length === 0) {
+    return { success: true, byVariant: new Map() }
+  }
+
+  try {
+    const { data, error } = await supabaseService.client
+      .from('product_variants')
+      .select(`
+        variant_id,
+        sku,
+        variant_name,
+        requires_expiration,
+        product_id!inner(name, requires_expiration)
+      `)
+      .eq('tenant_id', tenantId.value)
+      .in('variant_id', uniqueVariantIds)
+
+    if (error) throw error
+
+    const byVariant = new Map((data || []).map((row) => ([
+      row.variant_id,
+      {
+        ...row,
+        resolved_requires_expiration: resolveRequiresExpiration(row),
+        label: formatVariantLabel(row, row.variant_id)
+      }
+    ])))
+
+    return { success: true, byVariant }
+  } catch (error) {
+    return { success: false, error: error.message, byVariant: new Map() }
+  }
+}
+
+const validateExpirationRequirements = async (lines, { qtyField = 'qty', contextLabel = 'guardar' } = {}) => {
+  const result = await loadVariantMetadata(lines.map(line => line.variant_id))
+  if (!result.success) {
+    showMsg(`No se pudo validar vencimientos: ${result.error}`, 'error')
+    return false
+  }
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
+    const qty = Number(line?.[qtyField] || 0)
+    const metadata = result.byVariant.get(line?.variant_id)
+    const requiresExpiration = metadata?.resolved_requires_expiration ?? !!line?.requires_expiration
+
+    line.requires_expiration = requiresExpiration
+
+    if (!requiresExpiration) continue
+
+    const normalizedDate = normalizeDateInput(line?.expiration_date)
+    if (line) line.expiration_date = normalizedDate
+
+    if (!normalizedDate) {
+      const lineLabel = metadata?.label || `variante ${line?.variant_id || 'sin id'}`
+      showMsg(`Linea ${index + 1}: ${lineLabel} requiere fecha de vencimiento para ${contextLabel}`, 'error')
+      return false
+    }
+
+    if (qty <= 0) {
+      showMsg(`Linea ${index + 1}: cantidad inválida para ${contextLabel}`, 'error')
+      return false
+    }
+  }
+
+  return true
+}
+
 const payableStatusLabel = (status) => ({
   OPEN: 'Abierta',
   PARTIAL: 'Parcial',
@@ -1721,11 +1832,11 @@ const addSuggestionToCart = (item) => {
     existing.unit_cost = item.unit_cost
     showMsg(`Actualizado: ${item.product_name}`, 'info')
   } else {
-    purchaseData.value.lines.push({
+    purchaseData.value.lines.push(createPurchaseLine({
       variant_id: item.variant_id,
       qty: item.suggested_order_qty,
       unit_cost: item.unit_cost
-    })
+    }))
     showMsg(`Agregado: ${item.product_name}`, 'success')
   }
 }
@@ -1734,7 +1845,7 @@ const createPurchaseFromSuggestions = () => {
   // Transferir todas las sugerencias al formulario de compra
   suggestionsDialog.value = false
   dialog.value = true
-  purchaseData.value.lines = suggestions.value.map(s => ({
+  purchaseData.value.lines = suggestions.value.map(s => createPurchaseLine({
     variant_id: s.variant_id,
     qty: s.suggested_order_qty,
     unit_cost: s.unit_cost
@@ -1795,11 +1906,11 @@ const addAISuggestionToCart = (item) => {
     existing.unit_cost = item.unit_cost
     showMsg(`Actualizado con sugerencia IA: ${item.product_name}`, 'info')
   } else {
-    purchaseData.value.lines.push({
+    purchaseData.value.lines.push(createPurchaseLine({
       variant_id: item.variant_id,
       qty: qty,
       unit_cost: item.unit_cost
-    })
+    }))
     showMsg(`Agregado con sugerencia IA: ${item.product_name}`, 'success')
   }
   
@@ -2316,7 +2427,7 @@ const loadInitialVariants = async () => {
       variants.value = data.map(v => ({
         ...v,
         // Resolver requires_expiration con jerarquía: variant sobreescribe producto si no es null
-        requires_expiration: v.requires_expiration !== null ? v.requires_expiration : (v.product_id?.requires_expiration || false),
+        requires_expiration: resolveRequiresExpiration(v),
         _displayName: `${v.product_id.name}${v.variant_name ? ' - ' + v.variant_name : ''} (${v.sku})`
       }))
     }
@@ -2371,7 +2482,7 @@ const searchVariants = async (searchTerm) => {
       variants.value = filtered.map(v => ({
         ...v,
         // Resolver requires_expiration con jerarquía: variant sobreescribe producto si no es null
-        requires_expiration: v.requires_expiration !== null ? v.requires_expiration : (v.product_id?.requires_expiration || false),
+        requires_expiration: resolveRequiresExpiration(v),
         _displayName: `${v.product_id.name}${v.variant_name ? ' - ' + v.variant_name : ''} (${v.sku})`
       }))
     }
@@ -2394,15 +2505,7 @@ const openCreateDialog = async () => {
 }
 
 const addLine = () => {
-  purchaseData.value.lines.push({
-    variant_id: null,
-    qty: 1,
-    unit_cost: 0,
-    requires_expiration: false,
-    batch_number: '',
-    expiration_date: null,
-    physical_location: ''
-  })
+  purchaseData.value.lines.push(createPurchaseLine())
 }
 
 const removeLine = (index) => {
@@ -2411,17 +2514,26 @@ const removeLine = (index) => {
 
 // Detectar si el producto seleccionado requiere vencimiento
 const onVariantSelected = (lineIndex, variantId) => {
-  if (!variantId) return
+  const line = purchaseData.value.lines[lineIndex]
+  if (!line) return
+
+  if (!variantId) {
+    line.requires_expiration = false
+    line.batch_number = ''
+    line.expiration_date = null
+    line.physical_location = ''
+    return
+  }
   
   const variant = variants.value.find(v => v.variant_id === variantId)
   if (variant) {
-    purchaseData.value.lines[lineIndex].requires_expiration = variant.requires_expiration || false
+    line.requires_expiration = !!variant.requires_expiration
     
     // Limpiar campos de lote si no requiere vencimiento
     if (!variant.requires_expiration) {
-      purchaseData.value.lines[lineIndex].batch_number = ''
-      purchaseData.value.lines[lineIndex].expiration_date = null
-      purchaseData.value.lines[lineIndex].physical_location = ''
+      line.batch_number = ''
+      line.expiration_date = null
+      line.physical_location = ''
     }
   }
 }
@@ -2453,7 +2565,7 @@ const buildFormattedLines = () => {
     qty: Number(line.qty),
     unit_cost: Number(line.unit_cost),
     batch_number: line.batch_number || null,
-    expiration_date: line.expiration_date || null,
+    expiration_date: normalizeDateInput(line.expiration_date),
     physical_location: line.physical_location || null
   }))
 }
@@ -2472,9 +2584,16 @@ const savePurchase = async () => {
     return
   }
 
+  const validExpirationData = await validateExpirationRequirements(
+    purchaseData.value.lines,
+    { qtyField: 'qty', contextLabel: 'guardar la compra' }
+  )
+  if (!validExpirationData) return
+
   saving.value = true
+  let formattedLines = []
   try {
-    const formattedLines = buildFormattedLines()
+    formattedLines = buildFormattedLines()
 
     const { error } = await supabaseService.client.rpc('sp_create_purchase', {
       p_tenant: tenantId.value,
@@ -2491,6 +2610,18 @@ const savePurchase = async () => {
     dialog.value = false
     await loadPurchases()
   } catch (error) {
+    const errorMessage = String(error?.message || '')
+    const missingExpirationMatch = errorMessage.match(/variante\s+([0-9a-f-]{36})\s+requiere fecha de vencimiento/i)
+    if (missingExpirationMatch) {
+      const variantId = missingExpirationMatch[1]
+      const line = formattedLines.find(item => item.variant_id === variantId)
+      if (line) {
+        showMsg(
+          `Error lote: variante ${variantId.slice(0, 8)} enviada con expiration_date=${line.expiration_date || 'NULL'}`,
+          'error'
+        )
+      }
+    }
     showMsg('Error al guardar compra: ' + error.message, 'error')
   } finally {
     saving.value = false
@@ -2510,6 +2641,12 @@ const savePurchaseOrder = async () => {
     showMsg('Error: Usuario no identificado', 'error')
     return
   }
+
+  const validExpirationData = await validateExpirationRequirements(
+    purchaseData.value.lines,
+    { qtyField: 'qty', contextLabel: 'guardar la orden de compra' }
+  )
+  if (!validExpirationData) return
 
   savingDraft.value = true
   try {
@@ -2610,6 +2747,12 @@ const confirmReceivePurchaseOrder = async () => {
     }
   }
 
+  const validExpirationData = await validateExpirationRequirements(
+    selectedLines,
+    { qtyField: 'qty_to_receive', contextLabel: 'recibir la OC' }
+  )
+  if (!validExpirationData) return
+
   receivingPurchaseOrderId.value = order.purchase_order_id
   try {
     const result = await purchasesService.receivePurchaseOrderPartial({
@@ -2641,20 +2784,132 @@ const showMsg = (msg, color = 'success') => {
 }
 </script>
 
+<style scoped>
+.purchases-actions :deep(.v-btn) {
+  border-radius: 12px;
+  font-weight: 700;
+}
 
+.purchases-actions :deep(.v-btn__content) {
+  white-space: normal;
+  line-height: 1.15;
+}
 
+.purchases-page :deep(.v-field) {
+  border-radius: 12px;
+}
 
+.purchases-page :deep(.v-card-title) {
+  font-weight: 700;
+}
 
+.supplier-payables-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+}
 
+.supplier-payables-header {
+  letter-spacing: 0.2px;
+}
 
+.supplier-payables-filters {
+  align-items: center;
+}
 
+.purchase-modal {
+  border-radius: 18px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
+  background: linear-gradient(
+    145deg,
+    rgba(var(--v-theme-surface), 0.98),
+    rgba(var(--v-theme-background), 0.94)
+  ) !important;
+  box-shadow: 0 20px 36px rgba(17, 26, 43, 0.18);
+  overflow: hidden;
+}
 
+.purchase-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding-inline: 16px;
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.2);
+  background: linear-gradient(120deg, rgba(31, 82, 196, 0.92), rgba(26, 55, 126, 0.88));
+  color: #f8fbff;
+}
 
+.purchase-modal__header--orange {
+  background: linear-gradient(120deg, rgba(255, 101, 43, 0.95), rgba(228, 82, 19, 0.9));
+}
 
+.purchase-modal__header--success {
+  background: linear-gradient(120deg, rgba(43, 167, 98, 0.95), rgba(27, 130, 75, 0.9));
+}
 
+.purchase-modal__header--purple {
+  background: linear-gradient(120deg, rgba(160, 47, 202, 0.94), rgba(123, 39, 182, 0.9));
+}
 
+.purchase-modal__header--deep-purple {
+  background: linear-gradient(120deg, rgba(110, 63, 208, 0.94), rgba(77, 42, 167, 0.9));
+}
 
+.purchase-modal__header--indigo {
+  background: linear-gradient(120deg, rgba(80, 94, 225, 0.94), rgba(55, 66, 178, 0.9));
+}
 
+.purchase-modal__header--teal {
+  background: linear-gradient(120deg, rgba(24, 160, 146, 0.94), rgba(15, 118, 114, 0.9));
+}
+
+.purchase-modal__header--warning {
+  background: linear-gradient(120deg, rgba(249, 146, 35, 0.95), rgba(231, 111, 22, 0.9));
+}
+
+.purchase-modal__header--warning-soft {
+  background: linear-gradient(120deg, rgba(255, 243, 220, 0.95), rgba(255, 231, 189, 0.92));
+  color: rgba(83, 55, 12, 0.95);
+}
+
+.purchase-modal :deep(.v-card-text) {
+  padding-top: 14px;
+}
+
+.purchase-modal :deep(.v-btn) {
+  border-radius: 11px;
+  font-weight: 700;
+}
+
+.purchase-suggestion-item {
+  border-color: rgba(var(--v-theme-primary), 0.2) !important;
+}
+
+.purchase-suggestions-summary {
+  border: 1px solid rgba(151, 78, 204, 0.22);
+}
+
+.purchase-ai-executive {
+  border: 1px solid rgba(106, 76, 205, 0.24);
+}
+
+.purchase-ai-kpi {
+  border: 1px solid rgba(var(--v-theme-primary), 0.14);
+  border-radius: 14px;
+}
+
+.purchase-ai-kpi--highlight {
+  border-color: rgba(165, 77, 214, 0.36);
+}
+
+.purchase-ai-section {
+  border: 1px solid rgba(var(--v-theme-primary), 0.16);
+}
+
+.purchase-ai-suggestion-item {
+  border-color: rgba(var(--v-theme-primary), 0.2) !important;
+}
+</style>
 
 
 

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="ofir-page products-page">
     <!-- Tabs para separar productos y componentes -->
     <v-tabs v-model="currentTab" class="mb-3" color="primary">
       <v-tab value="products">
@@ -12,7 +12,7 @@
       </v-tab>
     </v-tabs>
 
-    <div class="d-flex justify-end mb-3">
+    <div class="d-flex justify-end mb-3 products-toolbar">
       <v-btn
         color="success"
         prepend-icon="mdi-microsoft-excel"
@@ -1278,3 +1278,18 @@ watch(currentTab, () => {
   }
 })
 </script>
+
+<style scoped>
+.products-toolbar :deep(.v-btn) {
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.products-page :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.products-page :deep(.v-dialog .v-card-title) {
+  font-weight: 700;
+}
+</style>

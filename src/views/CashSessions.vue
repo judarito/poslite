@@ -81,20 +81,20 @@
     </v-dialog>
 
     <!-- Dialog Cerrar Caja -->
-    <v-dialog v-model="closeDialog" max-width="700" scrollable>
-      <v-card>
-        <v-card-title><v-icon start color="error">mdi-lock</v-icon>Cerrar Sesión de Caja</v-card-title>
-        <v-card-text v-if="closeSummary">
+    <v-dialog v-model="closeDialog" max-width="700" scrollable class="cash-close-dialog">
+      <v-card class="cash-close-modal">
+        <v-card-title class="cash-close-modal__header"><v-icon start color="error">mdi-lock</v-icon>Cerrar Sesión de Caja</v-card-title>
+        <v-card-text v-if="closeSummary" class="cash-close-modal__body">
           <!-- Información de la sesión -->
-          <v-alert type="info" variant="tonal" class="mb-3">
+          <v-alert type="info" variant="tonal" class="mb-3 cash-close-modal__session-info">
             <strong>Caja:</strong> {{ selectedSession?.cash_register?.name }}<br>
             <strong>Abierta:</strong> {{ formatDate(selectedSession?.opened_at) }}<br>
             <strong>Por:</strong> {{ selectedSession?.opened_by_user?.full_name }}
           </v-alert>
 
           <!-- Resumen de ventas -->
-          <v-card variant="outlined" class="mb-3">
-            <v-card-title class="text-subtitle-1 bg-blue-lighten-5">
+          <v-card variant="outlined" class="mb-3 cash-close-section cash-close-section--sales">
+            <v-card-title class="text-subtitle-1 cash-close-section__title">
               <v-icon start>mdi-receipt</v-icon>Resumen de Ventas
             </v-card-title>
             <v-card-text>
@@ -112,8 +112,8 @@
           </v-card>
 
           <!-- Abonos Plan Separe -->
-          <v-card v-if="closeSummary.layaway_count > 0" variant="outlined" class="mb-3">
-            <v-card-title class="text-subtitle-1 bg-indigo-lighten-5">
+          <v-card v-if="closeSummary.layaway_count > 0" variant="outlined" class="mb-3 cash-close-section cash-close-section--layaway">
+            <v-card-title class="text-subtitle-1 cash-close-section__title">
               <v-icon start>mdi-calendar-clock</v-icon>Abonos Plan Separe
             </v-card-title>
             <v-card-text>
@@ -131,12 +131,12 @@
           </v-card>
 
           <!-- Resumen de pagos por método -->
-          <v-card variant="outlined" class="mb-3">
-            <v-card-title class="text-subtitle-1 bg-green-lighten-5">
+          <v-card variant="outlined" class="mb-3 cash-close-section cash-close-section--payments">
+            <v-card-title class="text-subtitle-1 cash-close-section__title">
               <v-icon start>mdi-credit-card</v-icon>Pagos por Método
             </v-card-title>
             <v-card-text>
-              <v-table density="compact">
+              <v-table density="compact" class="cash-close-table">
                 <tbody>
                   <tr v-for="pm in closeSummary.payments_by_method" :key="pm.code">
                     <td>{{ pm.name }}</td>
@@ -151,8 +151,8 @@
           </v-card>
 
           <!-- Movimientos de caja -->
-          <v-card variant="outlined" class="mb-3">
-            <v-card-title class="text-subtitle-1 bg-orange-lighten-5">
+          <v-card variant="outlined" class="mb-3 cash-close-section cash-close-section--movements">
+            <v-card-title class="text-subtitle-1 cash-close-section__title">
               <v-icon start>mdi-swap-vertical</v-icon>Movimientos de Caja
             </v-card-title>
             <v-card-text>
@@ -170,12 +170,12 @@
           </v-card>
 
           <!-- Arqueo de caja -->
-          <v-card variant="outlined" class="mb-3">
-            <v-card-title class="text-subtitle-1 bg-purple-lighten-5">
+          <v-card variant="outlined" class="mb-3 cash-close-section cash-close-section--counting">
+            <v-card-title class="text-subtitle-1 cash-close-section__title">
               <v-icon start>mdi-calculator</v-icon>Arqueo de Caja
             </v-card-title>
             <v-card-text>
-              <v-table density="compact" class="mb-3">
+              <v-table density="compact" class="mb-3 cash-close-table">
                 <tbody>
                   <tr>
                     <td>Monto de apertura</td>
@@ -197,7 +197,7 @@
                     <td>Gastos</td>
                     <td class="text-right text-error">- {{ formatMoney(closeSummary.expense_total) }}</td>
                   </tr>
-                  <tr class="bg-grey-lighten-3">
+                  <tr class="cash-close-expected-row">
                     <td class="font-weight-bold">Efectivo Esperado</td>
                     <td class="text-right font-weight-bold">{{ formatMoney(closeSummary.expected_cash) }}</td>
                   </tr>
@@ -213,12 +213,12 @@
                   variant="outlined" 
                   type="number" 
                   :rules="[rules.required, rules.positive]"
-                  class="mb-2"
+                  class="mb-2 cash-close-input"
                 ></v-text-field>
               </v-form>
 
               <!-- Diferencia calculada -->
-              <v-alert v-if="closeData.closing_amount_counted !== null" :type="difference === 0 ? 'success' : (difference > 0 ? 'warning' : 'error')" variant="tonal">
+              <v-alert v-if="closeData.closing_amount_counted !== null" :type="difference === 0 ? 'success' : (difference > 0 ? 'warning' : 'error')" variant="tonal" class="cash-close-difference">
                 <div class="d-flex justify-space-between align-center">
                   <span class="font-weight-bold">Diferencia:</span>
                   <span class="text-h6">{{ formatMoney(difference) }}</span>
@@ -230,10 +230,10 @@
             </v-card-text>
           </v-card>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="cash-close-modal__actions">
           <v-spacer></v-spacer>
-          <v-btn @click="closeDialog = false">{{ t('common.cancel') }}</v-btn>
-          <v-btn color="error" :loading="closingSession" @click="closeSession" prepend-icon="mdi-lock">Cerrar Caja</v-btn>
+          <v-btn class="cash-close-modal__cancel" @click="closeDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn class="cash-close-modal__confirm" color="error" :loading="closingSession" @click="closeSession" prepend-icon="mdi-lock">Cerrar Caja</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -604,3 +604,122 @@ onMounted(async () => {
   await loadSettings()
 })
 </script>
+
+<style scoped>
+.cash-close-modal {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
+  background: linear-gradient(145deg, rgba(14, 23, 45, 0.96), rgba(8, 15, 30, 0.96)) !important;
+  box-shadow: 0 20px 38px rgba(6, 12, 28, 0.34);
+}
+
+.cash-close-modal__header {
+  min-height: 60px;
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.22);
+  background: linear-gradient(120deg, rgba(236, 86, 74, 0.93), rgba(196, 54, 42, 0.9));
+  color: #fff5f4;
+  letter-spacing: 0.2px;
+}
+
+.cash-close-modal__body {
+  padding: 16px !important;
+}
+
+.cash-close-modal__session-info {
+  border-radius: 14px;
+  border: 1px solid rgba(120, 164, 255, 0.26);
+}
+
+.cash-close-section {
+  --cash-section-accent: 77, 129, 255;
+  border-radius: 14px;
+  border-color: rgba(var(--cash-section-accent), 0.26) !important;
+  background: linear-gradient(145deg, rgba(14, 23, 44, 0.62), rgba(10, 18, 35, 0.52));
+  overflow: hidden;
+}
+
+.cash-close-section__title {
+  min-height: 50px;
+  border-bottom: 1px solid rgba(var(--cash-section-accent), 0.24);
+  background: linear-gradient(120deg, rgba(var(--cash-section-accent), 0.22), rgba(var(--cash-section-accent), 0.08));
+}
+
+.cash-close-section--sales {
+  --cash-section-accent: 58, 127, 255;
+}
+
+.cash-close-section--layaway {
+  --cash-section-accent: 108, 99, 255;
+}
+
+.cash-close-section--payments {
+  --cash-section-accent: 53, 171, 95;
+}
+
+.cash-close-section--movements {
+  --cash-section-accent: 244, 146, 52;
+}
+
+.cash-close-section--counting {
+  --cash-section-accent: 166, 98, 235;
+}
+
+.cash-close-table {
+  background: transparent !important;
+}
+
+.cash-close-table :deep(td) {
+  border-bottom-color: rgba(var(--v-theme-primary), 0.14) !important;
+}
+
+.cash-close-expected-row {
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.93), rgba(238, 245, 255, 0.9));
+  color: #111827;
+}
+
+.cash-close-input :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.cash-close-difference {
+  border-radius: 12px;
+}
+
+.cash-close-modal__actions {
+  border-top: 1px solid rgba(var(--v-theme-primary), 0.18);
+  padding: 14px 16px !important;
+  gap: 10px;
+}
+
+.cash-close-modal__cancel,
+.cash-close-modal__confirm {
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.25px;
+}
+
+:global(.ofir-shell--light) .cash-close-modal {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 255, 0.96)) !important;
+  border-color: rgba(39, 92, 219, 0.16);
+  box-shadow: 0 18px 30px rgba(22, 42, 85, 0.16);
+}
+
+:global(.ofir-shell--light) .cash-close-section {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(246, 251, 255, 0.88));
+}
+
+:global(.ofir-shell--light) .cash-close-expected-row {
+  background: linear-gradient(100deg, rgba(236, 246, 255, 0.92), rgba(224, 240, 255, 0.9));
+}
+
+@media (max-width: 600px) {
+  .cash-close-modal__body {
+    padding: 12px !important;
+  }
+
+  .cash-close-modal__actions {
+    padding: 12px !important;
+  }
+}
+</style>

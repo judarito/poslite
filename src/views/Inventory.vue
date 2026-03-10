@@ -1,5 +1,5 @@
 <template>
-  <div class="fill-width">
+  <div class="fill-width ofir-page inventory-page">
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="stock">Stock Actual</v-tab>
       <v-tab value="components">Insumos</v-tab>
@@ -10,114 +10,69 @@
     <v-window v-model="tab" class="fill-width">
       <!-- STOCK ACTUAL -->
       <v-window-item value="stock">
-        <v-card flat class="fill-width">
-          <v-card-title class="d-flex align-center">
-            <v-icon start color="blue">mdi-package-variant</v-icon>
-            Stock por Sede
-            <v-spacer></v-spacer>
-            <v-select
-              v-model="stockLocationFilter"
-              :items="locations"
-              item-title="name"
-              item-value="location_id"
-              :label="t('app.branch')"
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-              style="max-width: 250px;"
-              @update:model-value="loadStock"
-            ></v-select>
-          </v-card-title>
+        <ListView
+          title="Stock por Sede"
+          icon="mdi-package-variant"
+          :items="stockItems"
+          :total-items="stockTotal"
+          :loading="loadingStock"
+          :page-size="stockPageSize"
+          item-key="_list_key"
+          title-field="_list_key"
+          avatar-icon="mdi-warehouse"
+          avatar-color="blue"
+          empty-message="Sin registros de stock"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          :searchable="false"
+          :clickable="false"
+          @load-page="loadStockPage"
+        >
+          <template #filters>
+            <v-row dense>
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="stockLocationFilter"
+                  :items="locations"
+                  item-title="name"
+                  item-value="location_id"
+                  :label="t('app.branch')"
+                  prepend-inner-icon="mdi-store"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  clearable
+                  @update:model-value="loadStock"
+                ></v-select>
+              </v-col>
+            </v-row>
+          </template>
 
-          <!-- Desktop: Table -->
-          <v-table density="comfortable" class="d-none d-sm-table w-100">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>SKU</th>
-                <th>Sede</th>
-                <th class="text-right">Stock</th>
-                <th class="text-right">Mínimo</th>
-                <th class="text-right">Costo</th>
-                <th class="text-right">Valor Total</th>
-                <th class="text-center">Alerta</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in stockItems" :key="`${item.location_id}-${item.variant_id}`">
-                <td>
-                  <div class="text-body-2">{{ item.variant?.product?.name }}</div>
-                  <div class="text-caption text-grey">{{ item.variant?.variant_name || '' }}</div>
-                </td>
-                <td>{{ item.variant?.sku }}</td>
-                <td>{{ item.location?.name }}</td>
-                <td class="text-right">
-                  <v-chip :color="getStockColor(item)" size="small">
-                    {{ item.on_hand }}
-                  </v-chip>
-                </td>
-                <td class="text-right">
-                  <span class="text-body-2">{{ item.variant?.min_stock || 0 }}</span>
-                </td>
-                <td class="text-right">{{ formatMoney(item.variant?.cost) }}</td>
-                <td class="text-right">{{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</td>
-                <td class="text-center">
-                  <v-icon v-if="getAlertLevel(item) === 'OUT_OF_STOCK'" color="error" size="small">mdi-alert-circle</v-icon>
-                  <v-icon v-else-if="getAlertLevel(item) === 'LOW_STOCK'" color="warning" size="small">mdi-alert</v-icon>
-                  <v-icon v-else color="success" size="small">mdi-check-circle</v-icon>
-                </td>
-              </tr>
-              <tr v-if="stockItems.length === 0">
-                <td colspan="8" class="text-center text-grey pa-4">Sin registros de stock</td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <!-- Mobile: Cards -->
-          <div class="d-sm-none pa-2">
-            <v-card v-for="item in stockItems" :key="`${item.location_id}-${item.variant_id}`" variant="outlined" class="mb-2" :color="getAlertLevel(item) === 'OUT_OF_STOCK' ? 'error' : getAlertLevel(item) === 'LOW_STOCK' ? 'warning' : ''" :variant="getAlertLevel(item) !== 'OK' ? 'tonal' : 'outlined'">
-              <v-card-text>
-                <div class="d-flex align-center mb-2">
-                  <div class="flex-grow-1" style="min-width: 0;">
-                    <div class="text-body-2 font-weight-bold">{{ item.variant?.product?.name }}</div>
-                    <div class="text-caption text-grey">{{ item.variant?.variant_name || '' }}</div>
-                    <div class="text-caption text-grey mt-1">SKU: {{ item.variant?.sku }}</div>
-                  </div>
-                  <v-chip :color="getStockColor(item)" size="small" class="ml-2 flex-shrink-0">
-                    {{ item.on_hand }}
-                  </v-chip>
-                </div>
-                <v-divider class="my-2"></v-divider>
-                <div class="d-flex justify-space-between text-caption">
-                  <span class="text-grey">Sede:</span>
-                  <span>{{ item.location?.name }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mt-1">
-                  <span class="text-grey">Stock Mínimo:</span>
-                  <span class="font-weight-bold">{{ item.variant?.min_stock || 0 }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mt-1">
-                  <span class="text-grey">Costo:</span>
-                  <span>{{ formatMoney(item.variant?.cost) }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mt-1">
-                  <span class="text-grey">Valor Total:</span>
-                  <span class="font-weight-bold">{{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</span>
-                </div>
-                <v-alert v-if="getAlertLevel(item) !== 'OK'" :type="getAlertLevel(item) === 'OUT_OF_STOCK' ? 'error' : 'warning'" density="compact" class="mt-2" variant="tonal">
-                  {{ getAlertMessage(item) }}
-                </v-alert>
-              </v-card-text>
-            </v-card>
-            <div v-if="stockItems.length === 0" class="text-center text-grey pa-4">Sin registros de stock</div>
-          </div>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-pagination v-model="stockPage" :length="Math.ceil(stockTotal / stockPageSize)" @update:model-value="loadStock" size="small"></v-pagination>
-          </v-card-actions>
-        </v-card>
+          <template #title="{ item }">
+            {{ item.variant?.product?.name || 'Producto' }}{{ item.variant?.variant_name ? ` - ${item.variant.variant_name}` : '' }}
+          </template>
+          <template #subtitle="{ item }">
+            SKU: {{ item.variant?.sku || 'Sin SKU' }} • {{ item.location?.name || 'Sin sede' }}
+          </template>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip :color="getStockColor(item)" size="small" variant="flat">
+                Stock: {{ item.on_hand }}
+              </v-chip>
+              <v-chip size="small" variant="tonal">Min: {{ item.variant?.min_stock || 0 }}</v-chip>
+              <v-chip size="small" variant="tonal" color="primary">Costo: {{ formatMoney(item.variant?.cost) }}</v-chip>
+              <v-chip size="small" variant="tonal" color="success">Valor: {{ formatMoney(item.on_hand * (item.variant?.cost || 0)) }}</v-chip>
+              <v-chip
+                size="small"
+                :color="getAlertLevel(item) === 'OUT_OF_STOCK' ? 'error' : getAlertLevel(item) === 'LOW_STOCK' ? 'warning' : 'success'"
+                variant="tonal"
+              >
+                {{ getAlertMessage(item) || 'Stock OK' }}
+              </v-chip>
+            </div>
+          </template>
+        </ListView>
       </v-window-item>
 
       <!-- INSUMOS -->
@@ -251,99 +206,88 @@
 
       <!-- KARDEX -->
       <v-window-item value="kardex">
-        <v-card flat class="fill-width">
-          <v-card-title class="d-flex align-center flex-wrap ga-2">
-            <v-icon start color="teal">mdi-history</v-icon>
-            Kardex de Movimientos
-            <v-spacer></v-spacer>
-            <v-select v-model="kardexLocationFilter" :items="locations" item-title="name" item-value="location_id" :label="t('app.branch')" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
-            <v-select v-model="kardexTypeFilter" :items="moveTypes" item-title="label" item-value="value" :label="t('common.type')" variant="outlined" density="compact" hide-details clearable style="max-width: 200px;" @update:model-value="loadKardex"></v-select>
-          </v-card-title>
+        <ListView
+          title="Kardex de Movimientos"
+          icon="mdi-history"
+          :items="kardexItems"
+          :total-items="kardexTotal"
+          :loading="loadingKardex"
+          :page-size="kardexPageSize"
+          item-key="_list_key"
+          title-field="_list_key"
+          avatar-icon="mdi-swap-horizontal-bold"
+          avatar-color="teal"
+          empty-message="Sin movimientos"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          :searchable="false"
+          :clickable="false"
+          @load-page="loadKardexPage"
+        >
+          <template #filters>
+            <v-row dense>
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="kardexLocationFilter"
+                  :items="locations"
+                  item-title="name"
+                  item-value="location_id"
+                  :label="t('app.branch')"
+                  prepend-inner-icon="mdi-store"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  clearable
+                  @update:model-value="loadKardex"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="kardexTypeFilter"
+                  :items="moveTypes"
+                  item-title="label"
+                  item-value="value"
+                  :label="t('common.type')"
+                  prepend-inner-icon="mdi-tune-vertical"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  clearable
+                  @update:model-value="loadKardex"
+                ></v-select>
+              </v-col>
+            </v-row>
+          </template>
 
-          <!-- Desktop: Table -->
-          <v-table density="comfortable" class="d-none d-sm-table w-100">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Producto</th>
-                <th>Tipo</th>
-                <th>Sede</th>
-                <th class="text-right">Cantidad</th>
-                <th class="text-right">Costo Unit.</th>
-                <th>Origen</th>
-                <th>Usuario</th>
-                <th>Nota</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="move in kardexItems" :key="move.inventory_move_id">
-                <td class="text-caption">{{ formatDate(move.created_at) }}</td>
-                <td>
-                  <div class="text-body-2">{{ move.variant?.product?.name }}</div>
-                  <div class="text-caption text-grey">{{ move.variant?.sku }} {{ move.variant?.variant_name || '' }}</div>
-                </td>
-                <td><v-chip :color="moveTypeColor(move.move_type)" size="x-small" variant="flat">{{ moveTypeLabel(move.move_type) }}</v-chip></td>
-                <td>{{ move.location?.name }} {{ move.to_location ? '→ ' + move.to_location.name : '' }}</td>
-                <td class="text-right font-weight-bold" :class="isIncoming(move.move_type) ? 'text-success' : 'text-error'">
-                  {{ isIncoming(move.move_type) ? '+' : '-' }}{{ move.quantity }}
-                </td>
-                <td class="text-right">{{ formatMoney(move.unit_cost) }}</td>
-                <td class="text-caption">{{ move.source }}</td>
-                <td class="text-caption">{{ move.created_by_user?.full_name || '' }}</td>
-                <td class="text-caption">{{ move.note || '' }}</td>
-              </tr>
-              <tr v-if="kardexItems.length === 0">
-                <td colspan="9" class="text-center text-grey pa-4">Sin movimientos</td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <!-- Mobile: Cards -->
-          <div class="d-sm-none pa-2">
-            <v-card v-for="move in kardexItems" :key="move.inventory_move_id" variant="outlined" class="mb-2">
-              <v-card-text>
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <span class="text-caption text-grey">{{ formatDate(move.created_at) }}</span>
-                  <v-chip :color="moveTypeColor(move.move_type)" size="x-small" variant="flat">{{ moveTypeLabel(move.move_type) }}</v-chip>
-                </div>
-                <div class="text-body-2 font-weight-bold">{{ move.variant?.product?.name }}</div>
-                <div class="text-caption text-grey mb-2">{{ move.variant?.sku }} {{ move.variant?.variant_name || '' }}</div>
-                <v-divider class="my-2"></v-divider>
-                <div class="d-flex justify-space-between text-caption mb-1">
-                  <span class="text-grey">Sede:</span>
-                  <span>{{ move.location?.name }} {{ move.to_location ? '→ ' + move.to_location.name : '' }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mb-1">
-                  <span class="text-grey">Cantidad:</span>
-                  <span class="font-weight-bold" :class="isIncoming(move.move_type) ? 'text-success' : 'text-error'">
-                    {{ isIncoming(move.move_type) ? '+' : '-' }}{{ move.quantity }}
-                  </span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mb-1">
-                  <span class="text-grey">Costo Unit.:</span>
-                  <span>{{ formatMoney(move.unit_cost) }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mb-1" v-if="move.source">
-                  <span class="text-grey">Origen:</span>
-                  <span>{{ move.source }}</span>
-                </div>
-                <div class="d-flex justify-space-between text-caption mb-1" v-if="move.created_by_user?.full_name">
-                  <span class="text-grey">Usuario:</span>
-                  <span>{{ move.created_by_user.full_name }}</span>
-                </div>
-                <div class="text-caption text-grey mt-1" v-if="move.note">
-                  <em>{{ move.note }}</em>
-                </div>
-              </v-card-text>
-            </v-card>
-            <div v-if="kardexItems.length === 0" class="text-center text-grey pa-4">Sin movimientos</div>
-          </div>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-pagination v-model="kardexPage" :length="Math.ceil(kardexTotal / kardexPageSize)" @update:model-value="loadKardex" size="small"></v-pagination>
-          </v-card-actions>
-        </v-card>
+          <template #title="{ item }">
+            {{ item.variant?.product?.name || 'Movimiento de inventario' }}{{ item.variant?.variant_name ? ` - ${item.variant.variant_name}` : '' }}
+          </template>
+          <template #subtitle="{ item }">
+            {{ formatDate(item.created_at) }} • SKU: {{ item.variant?.sku || 'Sin SKU' }}
+          </template>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip size="small" :color="moveTypeColor(item.move_type)" variant="flat">
+                {{ moveTypeLabel(item.move_type) }}
+              </v-chip>
+              <v-chip
+                size="small"
+                :color="isIncoming(item.move_type) ? 'success' : 'error'"
+                variant="tonal"
+              >
+                Cantidad: {{ isIncoming(item.move_type) ? '+' : '-' }}{{ item.quantity }}
+              </v-chip>
+              <v-chip size="small" variant="tonal">Sede: {{ item.location?.name || '-' }}{{ item.to_location ? ` -> ${item.to_location.name}` : '' }}</v-chip>
+              <v-chip size="small" variant="tonal" color="primary">Costo: {{ formatMoney(item.unit_cost) }}</v-chip>
+              <v-chip v-if="item.source" size="small" variant="tonal">Origen: {{ item.source }}</v-chip>
+              <v-chip v-if="item.created_by_user?.full_name" size="small" variant="tonal">Usuario: {{ item.created_by_user.full_name }}</v-chip>
+            </div>
+            <div v-if="item.note" class="mt-1 text-caption text-medium-emphasis">
+              {{ item.note }}
+            </div>
+          </template>
+        </ListView>
       </v-window-item>
 
       <!-- OPERACIONES -->
@@ -506,6 +450,7 @@ import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
+import ListView from '@/components/ListView.vue'
 
 const { t } = useI18n()
 
@@ -522,6 +467,7 @@ const stockTotal = ref(0)
 const stockPage = ref(1)
 const stockPageSize = computed(() => defaultPageSize.value)
 const stockLocationFilter = ref(null)
+const loadingStock = ref(false)
 
 // Kardex
 const kardexItems = ref([])
@@ -530,6 +476,7 @@ const kardexPage = ref(1)
 const kardexPageSize = computed(() => defaultPageSize.value)
 const kardexLocationFilter = ref(null)
 const kardexTypeFilter = ref(null)
+const loadingKardex = ref(false)
 
 // Components
 const componentItems = ref([])
@@ -590,6 +537,16 @@ const isIncoming = (t) => ['PURCHASE_IN', 'RETURN_IN', 'TRANSFER_IN', 'ADJUSTMEN
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 
+const loadStockPage = ({ page }) => {
+  stockPage.value = page || 1
+  loadStock()
+}
+
+const loadKardexPage = ({ page }) => {
+  kardexPage.value = page || 1
+  loadKardex()
+}
+
 // Helpers para stock y alertas
 const getStockColor = (item) => {
   if (item.on_hand <= 0) return 'error'
@@ -633,27 +590,48 @@ const searchVariant3 = (s) => doSearchVariant(s, variantResults3, searchingVaria
 // Cargar stock (solo productos para venta, excluir insumos)
 const loadStock = async () => {
   if (!tenantId.value) return
-  const r = await inventoryService.getStockBalances(tenantId.value, stockPage.value, stockPageSize.value, {
-    location_id: stockLocationFilter.value || undefined
-  })
-  if (r.success) {
-    // Filtrar solo productos que NO son componentes
-    stockItems.value = r.data.filter(item => {
-      const isComponent = item.variant?.is_component === true || item.variant?.product?.is_component === true
-      return !isComponent
+  loadingStock.value = true
+  try {
+    const r = await inventoryService.getStockBalances(tenantId.value, stockPage.value, stockPageSize.value, {
+      location_id: stockLocationFilter.value || undefined
     })
-    stockTotal.value = stockItems.value.length
+    if (r.success) {
+      // Filtrar solo productos que NO son componentes
+      stockItems.value = (r.data || [])
+        .filter(item => {
+          const isComponent = item.variant?.is_component === true || item.variant?.product?.is_component === true
+          return !isComponent
+        })
+        .map(item => ({
+          ...item,
+          _list_key: `${item.location_id}-${item.variant_id}`
+        }))
+      stockTotal.value = stockItems.value.length
+    }
+  } finally {
+    loadingStock.value = false
   }
 }
 
 // Cargar kardex
 const loadKardex = async () => {
   if (!tenantId.value) return
-  const r = await inventoryService.getInventoryMoves(tenantId.value, kardexPage.value, kardexPageSize.value, {
-    location_id: kardexLocationFilter.value || undefined,
-    move_type: kardexTypeFilter.value || undefined
-  })
-  if (r.success) { kardexItems.value = r.data; kardexTotal.value = r.total }
+  loadingKardex.value = true
+  try {
+    const r = await inventoryService.getInventoryMoves(tenantId.value, kardexPage.value, kardexPageSize.value, {
+      location_id: kardexLocationFilter.value || undefined,
+      move_type: kardexTypeFilter.value || undefined
+    })
+    if (r.success) {
+      kardexItems.value = (r.data || []).map(move => ({
+        ...move,
+        _list_key: move.inventory_move_id
+      }))
+      kardexTotal.value = r.total
+    }
+  } finally {
+    loadingKardex.value = false
+  }
 }
 
 // Cargar componentes/insumos (solo productos marcados como componentes)
@@ -689,7 +667,7 @@ const doAdjustment = async () => {
     if (r.success) { 
       showMsg('Ajuste registrado')
       adjust.value = { location_id: null, variant: null, quantity: 0, unit_cost: 0, is_increase: true, note: '' }
-      variantResults1.value = []
+      variantResults.value = []
       adjustForm.value.resetValidation()
       loadStock()
       loadKardex()
@@ -828,3 +806,31 @@ onMounted(async () => {
 })
 </script>
 
+<style scoped>
+.inventory-page :deep(.v-card) {
+  border: 1px solid rgba(93, 131, 239, 0.2);
+}
+
+.inventory-page :deep(.v-card-title) {
+  font-weight: 700;
+}
+
+.inventory-page :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.inventory-page :deep(.v-table thead th) {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.inventory-page :deep(.v-table tbody tr:hover) {
+  background: rgba(57, 103, 232, 0.1);
+}
+
+.inventory-page :deep(.v-btn) {
+  border-radius: 10px;
+  font-weight: 700;
+}
+</style>

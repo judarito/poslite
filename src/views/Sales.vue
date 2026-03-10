@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="ofir-page sales-page">
     <!-- Tabs -->
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="sales">Historial de Ventas</v-tab>
@@ -10,7 +10,7 @@
       <!-- VENTAS -->
       <v-window-item value="sales">
         <!-- Filtros -->
-        <v-card class="mb-4" elevation="1">
+        <v-card class="mb-4 sales-filter-card" elevation="1">
           <v-card-text>
             <v-row dense>
               <v-col cols="12" sm="6" md="3">
@@ -888,3 +888,13 @@ onMounted(async () => {
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 </script>
+
+<style scoped>
+.sales-filter-card {
+  border: 1px solid rgba(95, 131, 236, 0.2);
+}
+
+.sales-page :deep(.v-field) {
+  border-radius: 12px;
+}
+</style>

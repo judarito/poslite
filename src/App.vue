@@ -1,14 +1,14 @@
 <template>
-  <v-app>
+  <v-app class="ofir-shell" :class="isDark ? 'ofir-shell--dark' : 'ofir-shell--light'">
     <!-- Layout con sidebar para rutas autenticadas -->
     <template v-if="!isAuthRoute">
       <v-app-bar
-        color="primary"
-        density="default"
-        dark
-        elevation="4"
+        class="ofir-topbar"
+        density="comfortable"
+        elevation="0"
       >
         <v-app-bar-nav-icon 
+          class="ofir-topbar__icon"
           @click="drawer = !drawer"
         ></v-app-bar-nav-icon>
 
@@ -24,7 +24,7 @@
             <v-btn
               v-bind="props"
               variant="text"
-              class="text-none mr-1"
+              class="text-none mr-1 ofir-topbar__text-btn"
               prepend-icon="mdi-translate"
             >
               {{ currentLanguageLabel }}
@@ -59,7 +59,7 @@
           </template>
         </v-switch>
 
-        <v-btn v-if="userProfile || tenantId" icon @click="alertsDialog = true">
+        <v-btn v-if="userProfile || tenantId" class="ofir-topbar__icon-btn" icon @click="alertsDialog = true">
           <v-badge
             :content="totalAlertsCount"
             :color="totalAlertsCount > 0 ? 'error' : 'grey'"
@@ -69,12 +69,13 @@
           </v-badge>
         </v-btn>
 
-        <v-btn icon @click="handleProfileClick">
+        <v-btn class="ofir-topbar__icon-btn" icon @click="handleProfileClick">
           <v-icon>mdi-account-circle</v-icon>
         </v-btn>
       </v-app-bar>
 
       <v-navigation-drawer
+        class="ofir-sidebar"
         v-model="drawer"
         :permanent="!isMobile"
         :temporary="isMobile"
@@ -94,7 +95,7 @@
 
         <v-divider></v-divider>
 
-        <v-list density="compact" nav>
+        <v-list class="ofir-sidebar__menu" density="compact" nav>
           <template v-if="menuSections && menuSections.length > 0">
             <template v-for="(section, idx) in menuSections" :key="`section-${section?.title || idx}`">
               <!-- Item suelto (sin grupo) -->
@@ -152,13 +153,13 @@
         </template>
       </v-navigation-drawer>
 
-      <v-main>
-        <v-container fluid class="pa-4">
+      <v-main class="ofir-main">
+        <v-container fluid class="pa-4 ofir-main__container">
           <router-view></router-view>
         </v-container>
       </v-main>
 
-      <v-footer app class="text-center" :class="isDark ? 'bg-grey-darken-4' : 'bg-grey-lighten-4'" elevation="2">
+      <v-footer app class="text-center ofir-footer" elevation="0">
         <v-col class="text-center" cols="12">
           {{ new Date().getFullYear() }} — <strong>OfirOne</strong>
         </v-col>
@@ -173,20 +174,20 @@
       </v-snackbar>
 
       <!-- Dialog de alertas -->
-      <v-dialog v-model="alertsDialog" max-width="1000" scrollable>
-        <v-card>
-          <v-card-title class="d-flex align-center pa-4">
+      <v-dialog v-model="alertsDialog" max-width="1000" scrollable class="alerts-dialog">
+        <v-card class="alerts-modal">
+          <v-card-title class="d-flex align-center pa-4 alerts-modal__header">
             <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
             {{ t('app.alerts') }}
             <v-spacer></v-spacer>
-            <v-btn icon variant="text" @click="alertsDialog = false">
+            <v-btn icon variant="text" class="alerts-modal__close" @click="alertsDialog = false">
               <v-icon>mdi-close</v-icon>
             </v-btn>
           </v-card-title>
 
           <v-divider></v-divider>
 
-          <v-tabs v-model="alertsTab" bg-color="primary">
+          <v-tabs v-model="alertsTab" class="alerts-modal__tabs">
             <v-tab value="stock">
               <v-badge
                 :content="stockAlertsCount"
@@ -239,11 +240,11 @@
             </v-tab>
           </v-tabs>
 
-          <v-window v-model="alertsTab">
+          <v-window v-model="alertsTab" class="alerts-modal__window">
             <!-- Tab de Stock -->
             <v-window-item value="stock">
               <!-- Filtros Stock -->
-              <v-card-text class="pa-4">
+              <v-card-text class="pa-4 alerts-modal__filters">
                 <v-row dense>
                   <v-col cols="12" sm="6" md="3">
                     <v-select
@@ -284,9 +285,9 @@
               <v-divider></v-divider>
 
               <!-- Lista Stock Mobile -->
-              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+              <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
-                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
                 </div>
@@ -294,7 +295,7 @@
                   v-else
                   v-for="alert in stockAlerts"
                   :key="alert.alert_id"
-                  class="mb-2"
+                  class="mb-2 alerts-mobile-item"
                   :color="getStockAlertColor(alert.alert_level) + '-lighten-5'"
                   variant="outlined"
                 >
@@ -327,13 +328,13 @@
               </v-card-text>
 
               <!-- Tabla Stock Desktop -->
-              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+              <v-card-text v-else class="pa-0 alerts-table-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
-                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
                 </div>
-                <v-table v-else density="compact" fixed-header height="500">
+                <v-table v-else class="alerts-table" density="compact" fixed-header height="500">
                   <thead>
                     <tr>
                       <th>{{ t('app.alert') }}</th>
@@ -369,7 +370,7 @@
 
               <v-divider></v-divider>
 
-              <v-card-actions class="pa-4">
+              <v-card-actions class="pa-4 alerts-modal__actions">
                 <v-btn color="primary" variant="text" @click="loadStockAlerts">
                   <v-icon start>mdi-refresh</v-icon>
                   {{ t('common.update') }}
@@ -385,7 +386,7 @@
             <!-- Tab de Vencimientos -->
             <v-window-item value="expiration">
               <!-- Filtros Vencimientos -->
-              <v-card-text class="pa-4">
+              <v-card-text class="pa-4 alerts-modal__filters">
                 <v-row dense>
                   <v-col cols="12" sm="6" md="3">
                     <v-select
@@ -426,9 +427,9 @@
               <v-divider></v-divider>
 
               <!-- Lista Vencimientos Mobile -->
-              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+              <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
                 </div>
@@ -436,7 +437,7 @@
                   v-else
                   v-for="alert in expirationAlerts"
                   :key="alert.alert_id"
-                  class="mb-2"
+                  class="mb-2 alerts-mobile-item"
                   :color="getExpirationAlertColor(alert.alert_level) + '-lighten-5'"
                   variant="outlined"
                 >
@@ -485,13 +486,13 @@
               </v-card-text>
 
               <!-- Tabla Vencimientos Desktop -->
-              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+              <v-card-text v-else class="pa-0 alerts-table-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
                 </div>
-                <v-table v-else density="compact" fixed-header height="500">
+                <v-table v-else class="alerts-table" density="compact" fixed-header height="500">
                   <thead>
                     <tr>
                       <th>{{ t('app.alert') }}</th>
@@ -539,7 +540,7 @@
 
               <v-divider></v-divider>
 
-              <v-card-actions class="pa-4">
+              <v-card-actions class="pa-4 alerts-modal__actions">
                 <v-btn color="error" variant="text" @click="loadExpirationAlerts">
                   <v-icon start>mdi-refresh</v-icon>
                   {{ t('common.update') }}
@@ -555,7 +556,7 @@
             <!-- Tab de Layaway -->
             <v-window-item value="layaway">
               <!-- Filtros Layaway -->
-              <v-card-text class="pa-4">
+              <v-card-text class="pa-4 alerts-modal__filters">
                 <v-row dense>
                   <v-col cols="12" sm="6">
                     <v-select
@@ -584,9 +585,9 @@
               <v-divider></v-divider>
 
               <!-- Lista Layaway Mobile -->
-              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+              <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
                 </div>
@@ -594,7 +595,7 @@
                   v-else
                   v-for="alert in filteredLayawayAlerts"
                   :key="alert.alert_id"
-                  class="mb-2"
+                  class="mb-2 alerts-mobile-item"
                   :color="getLayawayAlertColor(alert.alert_level) + '-lighten-5'"
                   variant="outlined"
                 >
@@ -624,13 +625,13 @@
               </v-card-text>
 
               <!-- Tabla Layaway Desktop -->
-              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+              <v-card-text v-else class="pa-0 alerts-table-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
                 </div>
-                <v-table v-else density="compact" fixed-header height="500">
+                <v-table v-else class="alerts-table" density="compact" fixed-header height="500">
                   <thead>
                     <tr>
                       <th>{{ t('app.status') }}</th>
@@ -678,7 +679,7 @@
 
               <v-divider></v-divider>
 
-              <v-card-actions class="pa-4">
+              <v-card-actions class="pa-4 alerts-modal__actions">
                 <v-btn color="warning" variant="text" @click="loadLayawayAlerts">
                   <v-icon start>mdi-refresh</v-icon>
                   {{ t('common.update') }}
@@ -694,7 +695,7 @@
             <!-- Tab de Cuentas por Pagar -->
             <v-window-item value="payable">
               <!-- Filtros CxP -->
-              <v-card-text class="pa-4">
+              <v-card-text class="pa-4 alerts-modal__filters">
                 <v-row dense>
                   <v-col cols="12" sm="6">
                     <v-select
@@ -722,9 +723,9 @@
 
               <v-divider></v-divider>
 
-              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+              <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
                 </div>
@@ -732,7 +733,7 @@
                   v-else
                   v-for="alert in payableAlerts"
                   :key="alert.alert_id"
-                  class="mb-2"
+                  class="mb-2 alerts-mobile-item"
                   :color="getPayableAlertColor(alert.alert_level) + '-lighten-5'"
                   variant="outlined"
                 >
@@ -761,13 +762,13 @@
                 </v-card>
               </v-card-text>
 
-              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+              <v-card-text v-else class="pa-0 alerts-table-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
                 </div>
-                <v-table v-else density="compact" fixed-header height="500">
+                <v-table v-else class="alerts-table" density="compact" fixed-header height="500">
                   <thead>
                     <tr>
                       <th>{{ t('app.status') }}</th>
@@ -804,7 +805,7 @@
 
               <v-divider></v-divider>
 
-              <v-card-actions class="pa-4">
+              <v-card-actions class="pa-4 alerts-modal__actions">
                 <v-btn color="error" variant="text" @click="loadPayableAlerts">
                   <v-icon start>mdi-refresh</v-icon>
                   {{ t('common.update') }}
@@ -819,7 +820,7 @@
 
             <!-- Tab de Cartera / CxC -->
             <v-window-item value="receivable">
-              <v-card-text class="pa-4">
+              <v-card-text class="pa-4 alerts-modal__filters">
                 <v-row dense>
                   <v-col cols="12" sm="6">
                     <v-select
@@ -847,9 +848,9 @@
 
               <v-divider></v-divider>
 
-              <v-card-text v-if="isMobile" class="pa-2" style="max-height: 500px;">
+              <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
                 </div>
@@ -857,7 +858,7 @@
                   v-else
                   v-for="alert in receivableAlerts"
                   :key="alert.alert_id"
-                  class="mb-2"
+                  class="mb-2 alerts-mobile-item"
                   :color="getReceivableAlertColor(alert.alert_level) + '-lighten-5'"
                   variant="outlined"
                 >
@@ -884,13 +885,13 @@
                 </v-card>
               </v-card-text>
 
-              <v-card-text v-else class="pa-0" style="max-height: 500px;">
+              <v-card-text v-else class="pa-0 alerts-table-wrap">
                 <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey">
+                <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
                   <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
                   <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
                 </div>
-                <v-table v-else density="compact" fixed-header height="500">
+                <v-table v-else class="alerts-table" density="compact" fixed-header height="500">
                   <thead>
                     <tr>
                       <th>{{ t('app.status') }}</th>
@@ -921,7 +922,7 @@
 
               <v-divider></v-divider>
 
-              <v-card-actions class="pa-4">
+              <v-card-actions class="pa-4 alerts-modal__actions">
                 <v-btn color="warning" variant="text" @click="loadReceivableAlerts">
                   <v-icon start>mdi-refresh</v-icon>
                   {{ t('common.update') }}
@@ -1104,6 +1105,7 @@ const menuSections = computed(() => {
   })
 })
 
+
 const handleResize = () => {
   windowWidth.value = window.innerWidth
   if (isMobile.value) {
@@ -1262,8 +1264,71 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.v-navigation-drawer {
-  z-index: 1000;
+.ofir-shell {
+  --ofir-blue: #2563eb;
+  --ofir-blue-soft: #1d4ed8;
+  --ofir-green: #78d64b;
+  --ofir-panel-dark: rgba(11, 18, 38, 0.86);
+  --ofir-panel-light: rgba(255, 255, 255, 0.92);
+  --ofir-border-dark: rgba(122, 153, 255, 0.2);
+  --ofir-border-light: rgba(37, 99, 235, 0.22);
+}
+
+.ofir-shell :deep(.v-application__wrap) {
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.ofir-shell--dark :deep(.v-application__wrap) {
+  background-image:
+    radial-gradient(circle at 10% 5%, rgba(46, 90, 255, 0.24), transparent 32%),
+    radial-gradient(circle at 95% 0%, rgba(120, 214, 75, 0.2), transparent 28%),
+    linear-gradient(160deg, #060b18 0%, #0a1125 45%, #060b18 100%);
+}
+
+.ofir-shell--light :deep(.v-application__wrap) {
+  background-image:
+    radial-gradient(circle at 10% 4%, rgba(37, 99, 235, 0.12), transparent 32%),
+    radial-gradient(circle at 92% 0%, rgba(120, 214, 75, 0.1), transparent 24%),
+    linear-gradient(165deg, #ecf2fb 0%, #f6f9ff 42%, #edf3fd 100%);
+}
+
+.ofir-topbar {
+  z-index: 1200;
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(8px);
+}
+
+.ofir-shell--dark .ofir-topbar {
+  background: rgba(10, 16, 35, 0.78) !important;
+  border-bottom-color: var(--ofir-border-dark);
+}
+
+.ofir-shell--light .ofir-topbar {
+  background: rgba(248, 251, 255, 0.88) !important;
+  border-bottom-color: var(--ofir-border-light);
+}
+
+.ofir-topbar__icon {
+  border-radius: 12px;
+}
+
+.ofir-topbar__icon-btn,
+.ofir-topbar__text-btn {
+  border-radius: 12px;
+}
+
+.ofir-shell--dark .ofir-topbar__icon-btn,
+.ofir-shell--dark .ofir-topbar__text-btn {
+  background: rgba(14, 24, 48, 0.7);
+  color: #ecf2ff;
+  border: 1px solid rgba(112, 141, 255, 0.2);
+}
+
+.ofir-shell--light .ofir-topbar__icon-btn,
+.ofir-shell--light .ofir-topbar__text-btn {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(44, 88, 209, 0.15);
 }
 
 .app-brand {
@@ -1287,20 +1352,413 @@ onUnmounted(() => {
 }
 
 .app-brand__name {
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  font-weight: 800;
+  letter-spacing: 0.25px;
   line-height: 1;
 }
 
-@media (max-width: 600px) {
-  .app-brand__logo-full {
-    width: 52px;
-    height: 44px;
+.ofir-shell--dark .app-brand__name {
+  color: #eef3ff;
+}
+
+.ofir-shell--light .app-brand__name {
+  color: #203763;
+}
+
+.ofir-sidebar {
+  z-index: 1000;
+  border-right: 1px solid transparent;
+}
+
+.ofir-shell--dark .ofir-sidebar {
+  background: linear-gradient(180deg, rgba(9, 16, 35, 0.95), rgba(8, 14, 28, 0.92)) !important;
+  border-right-color: rgba(99, 131, 255, 0.22);
+}
+
+.ofir-shell--light .ofir-sidebar {
+  background: linear-gradient(180deg, rgba(237, 244, 255, 0.95), rgba(234, 242, 252, 0.95)) !important;
+  border-right-color: rgba(68, 110, 228, 0.2);
+}
+
+.ofir-sidebar__menu :deep(.v-list-item) {
+  border-radius: 14px;
+  margin: 2px 8px;
+}
+
+.ofir-shell--dark .ofir-sidebar__menu :deep(.v-list-item) {
+  color: #d8e2ff;
+}
+
+.ofir-shell--dark .ofir-sidebar__menu :deep(.v-list-item:hover) {
+  background: rgba(33, 59, 126, 0.32);
+}
+
+.ofir-shell--light .ofir-sidebar__menu :deep(.v-list-item) {
+  color: #29416e;
+}
+
+.ofir-shell--light .ofir-sidebar__menu :deep(.v-list-item:hover) {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.ofir-sidebar__menu :deep(.v-list-item--active) {
+  position: relative;
+  font-weight: 700;
+}
+
+.ofir-shell--dark .ofir-sidebar__menu :deep(.v-list-item--active) {
+  background: linear-gradient(90deg, rgba(120, 214, 75, 0.24), rgba(37, 99, 235, 0.26));
+  color: #f4ffe9;
+}
+
+.ofir-shell--light .ofir-sidebar__menu :deep(.v-list-item--active) {
+  background: linear-gradient(90deg, rgba(120, 214, 75, 0.2), rgba(37, 99, 235, 0.18));
+  color: #1f3661;
+}
+
+.ofir-main__container {
+  max-width: 1500px;
+}
+
+.ofir-main {
+  position: relative;
+}
+
+.ofir-shell--dark .ofir-main {
+  color: #dde8ff;
+}
+
+.ofir-shell--light .ofir-main {
+  color: #23406f;
+}
+
+.ofir-main :deep(.v-card) {
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ofir-main :deep(.v-card:hover) {
+  transform: translateY(-1px);
+}
+
+.ofir-shell--dark .ofir-main :deep(.v-card) {
+  background: linear-gradient(145deg, rgba(15, 24, 48, 0.9), rgba(11, 18, 37, 0.9)) !important;
+  border-color: rgba(112, 142, 255, 0.2);
+  box-shadow: 0 10px 24px rgba(2, 7, 18, 0.44);
+}
+
+.ofir-shell--light .ofir-main :deep(.v-card) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(241, 247, 255, 0.95)) !important;
+  border-color: rgba(37, 99, 235, 0.14);
+  box-shadow: 0 10px 20px rgba(35, 74, 148, 0.1);
+}
+
+.ofir-main :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.ofir-shell--dark .ofir-main :deep(.v-field) {
+  background: rgba(10, 18, 36, 0.68);
+}
+
+.ofir-shell--light .ofir-main :deep(.v-field) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.ofir-main :deep(.v-table) {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.ofir-shell--dark .ofir-main :deep(.v-table) {
+  background: rgba(8, 15, 32, 0.64);
+}
+
+.ofir-shell--light .ofir-main :deep(.v-table) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ofir-main :deep(.v-table thead th) {
+  font-weight: 700 !important;
+  letter-spacing: 0.2px;
+}
+
+.ofir-shell :deep(.v-tabs) {
+  border-radius: 14px;
+  padding: 6px;
+}
+
+.ofir-shell--dark :deep(.v-tabs) {
+  background: rgba(9, 16, 33, 0.58);
+  border: 1px solid rgba(108, 139, 255, 0.2);
+}
+
+.ofir-shell--light :deep(.v-tabs) {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+}
+
+.ofir-shell :deep(.v-tab) {
+  border-radius: 10px;
+  min-height: 44px;
+  padding-inline: 14px;
+  text-transform: none;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: normal;
+  overflow: visible;
+}
+
+.ofir-shell :deep(.v-tab .v-btn__content) {
+  line-height: 1.2;
+  padding-block: 4px;
+  overflow: visible;
+}
+
+.ofir-shell :deep(.v-slide-group__content) {
+  align-items: stretch;
+}
+
+.ofir-shell--dark :deep(.v-tab--selected) {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.28), rgba(120, 214, 75, 0.26));
+}
+
+.ofir-shell--light :deep(.v-tab--selected) {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.18), rgba(120, 214, 75, 0.16));
+}
+
+:deep(.v-overlay__content > .v-card) {
+  border-radius: 18px;
+  border: 1px solid transparent;
+  overflow: hidden;
+  background: linear-gradient(
+    145deg,
+    rgba(var(--v-theme-surface), 0.98),
+    rgba(var(--v-theme-background), 0.95)
+  ) !important;
+  border-color: rgba(var(--v-theme-primary), 0.2);
+  box-shadow: 0 16px 36px rgba(16, 24, 40, 0.18);
+}
+
+:deep(.v-overlay__content .v-card-title) {
+  font-weight: 800;
+  letter-spacing: 0.25px;
+}
+
+:deep(.v-overlay__content .v-card-actions) {
+  border-top: 1px solid transparent;
+  padding-top: 10px;
+  border-top-color: rgba(var(--v-theme-primary), 0.14);
+}
+
+.alerts-dialog :deep(.v-overlay__content) {
+  width: min(1080px, calc(100vw - 24px));
+}
+
+.alerts-modal {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
+  background: linear-gradient(
+    145deg,
+    rgba(var(--v-theme-surface), 0.985),
+    rgba(var(--v-theme-background), 0.95)
+  ) !important;
+  box-shadow: 0 20px 38px rgba(18, 28, 48, 0.2);
+}
+
+.alerts-modal__header {
+  min-height: 60px;
+  gap: 8px;
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.2);
+  letter-spacing: 0.25px;
+}
+
+.ofir-shell--dark .alerts-modal__header {
+  background: linear-gradient(120deg, rgba(29, 80, 196, 0.95), rgba(20, 42, 103, 0.92));
+  color: #f4f8ff;
+}
+
+.ofir-shell--light .alerts-modal__header {
+  background: linear-gradient(120deg, rgba(38, 95, 224, 0.92), rgba(62, 139, 230, 0.9));
+  color: #f8fcff;
+}
+
+.alerts-modal__close {
+  border-radius: 12px;
+}
+
+.ofir-shell--dark .alerts-modal__close {
+  background: rgba(8, 15, 33, 0.38);
+}
+
+.ofir-shell--light .alerts-modal__close {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.alerts-modal__tabs {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.16);
+}
+
+.ofir-shell--dark .alerts-modal__tabs {
+  background: linear-gradient(180deg, rgba(10, 18, 38, 0.85), rgba(9, 15, 31, 0.75));
+}
+
+.ofir-shell--light .alerts-modal__tabs {
+  background: linear-gradient(180deg, rgba(245, 249, 255, 0.98), rgba(236, 243, 255, 0.92));
+}
+
+.alerts-modal__tabs :deep(.v-slide-group__content) {
+  gap: 8px;
+}
+
+.alerts-modal__tabs :deep(.v-tab) {
+  min-height: 42px;
+  border-radius: 11px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alerts-modal__tabs :deep(.v-tab--selected) {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.28), rgba(120, 214, 75, 0.24));
+}
+
+.alerts-modal__tabs :deep(.v-badge__badge) {
+  font-weight: 800;
+}
+
+.alerts-modal__window {
+  background: transparent;
+}
+
+.alerts-modal__filters {
+  padding-top: 14px !important;
+  padding-bottom: 10px !important;
+}
+
+.alerts-modal__filters :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.alerts-mobile-wrap {
+  max-height: 500px;
+  overflow: auto;
+  padding: 10px !important;
+}
+
+.alerts-mobile-item {
+  border-radius: 14px !important;
+  border-width: 1px !important;
+}
+
+.ofir-shell--dark .alerts-mobile-item {
+  border-color: rgba(112, 141, 255, 0.24) !important;
+}
+
+.ofir-shell--light .alerts-mobile-item {
+  border-color: rgba(37, 99, 235, 0.18) !important;
+}
+
+.alerts-table-wrap {
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.alerts-table {
+  background: transparent !important;
+}
+
+.alerts-table :deep(thead th) {
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alerts-table :deep(td) {
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
+  vertical-align: middle;
+}
+
+.alerts-table :deep(tbody tr) {
+  transition: background 0.18s ease;
+}
+
+.ofir-shell--dark .alerts-table :deep(tbody tr:hover) {
+  background: rgba(34, 63, 133, 0.2);
+}
+
+.ofir-shell--light .alerts-table :deep(tbody tr:hover) {
+  background: rgba(37, 99, 235, 0.07);
+}
+
+.alerts-empty-state {
+  margin: 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(var(--v-theme-primary), 0.3);
+}
+
+.ofir-shell--dark .alerts-empty-state {
+  background: rgba(11, 18, 38, 0.64);
+}
+
+.ofir-shell--light .alerts-empty-state {
+  background: rgba(245, 250, 255, 0.9);
+}
+
+.alerts-modal__actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.alerts-modal__actions :deep(.v-btn) {
+  border-radius: 11px;
+  font-weight: 700;
+  text-transform: none;
+}
+
+@media (max-width: 960px) {
+  .alerts-dialog :deep(.v-overlay__content) {
+    width: calc(100vw - 12px);
   }
 
-  .app-brand__name {
-    font-size: 1.05rem;
+  .alerts-modal__tabs {
+    padding-inline: 6px;
   }
+
+  .alerts-modal__tabs :deep(.v-tab) {
+    min-width: max-content;
+    font-size: 0.75rem;
+    padding-inline: 10px;
+  }
+
+  .alerts-modal__actions {
+    padding: 12px !important;
+  }
+}
+
+.ofir-footer {
+  backdrop-filter: blur(6px);
+  border-top: 1px solid transparent;
+}
+
+.ofir-shell--dark .ofir-footer {
+  background: rgba(9, 14, 28, 0.72) !important;
+  border-top-color: rgba(98, 129, 255, 0.2);
+  color: #d2dcff;
+}
+
+.ofir-shell--light .ofir-footer {
+  background: rgba(244, 248, 255, 0.9) !important;
+  border-top-color: rgba(62, 108, 224, 0.2);
+  color: #2d466f;
 }
 
 .user-avatar {
@@ -1320,6 +1778,17 @@ onUnmounted(() => {
 }
 
 .theme-switch :deep(.v-icon) {
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(229, 238, 255, 0.95);
+}
+
+@media (max-width: 960px) {
+  .app-brand__logo-full {
+    width: 52px;
+    height: 44px;
+  }
+
+  .app-brand__name {
+    font-size: 1.05rem;
+  }
 }
 </style>

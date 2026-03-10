@@ -1,7 +1,7 @@
 <template>
-  <div class="pos-container">
+  <div class="pos-container ofir-page ofir-pos">
     <!-- Barra Superior POS -->
-    <v-card flat class="mb-2">
+    <v-card flat class="mb-2 pos-header-card">
       <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2">
         <div class="d-flex align-center mb-2 mb-sm-0">
           <v-icon class="mr-2">mdi-point-of-sale</v-icon>
@@ -23,7 +23,7 @@
     <v-row no-gutters>
       <!-- Panel Izquierdo: Búsqueda de productos -->
       <v-col cols="12" md="7" class="pr-md-2">
-        <v-card>
+        <v-card class="pos-panel">
           <v-card-text class="pa-2">
             <!-- Búsqueda con autocompletado -->
             <v-autocomplete
@@ -213,7 +213,7 @@
 
       <!-- Panel Derecho: Totales y Pago -->
       <v-col cols="12" md="5" class="pl-md-2 mt-2 mt-md-0">
-        <v-card>
+        <v-card class="pos-panel">
           <!-- Cliente -->
           <v-card-text class="pa-2">
             <v-autocomplete
@@ -1383,23 +1383,84 @@ const handleKeyboardShortcuts = (e) => {
 .pos-container {
   height: 100%;
 }
+
+.pos-header-card {
+  border: 1px solid rgba(94, 132, 244, 0.26);
+  background: linear-gradient(115deg, rgba(12, 20, 41, 0.92), rgba(11, 18, 35, 0.86)) !important;
+}
+
+.pos-panel {
+  border: 1px solid rgba(94, 132, 244, 0.22);
+  background: linear-gradient(145deg, rgba(14, 22, 43, 0.9), rgba(9, 16, 31, 0.92)) !important;
+}
+
+:global(.ofir-shell--light) .pos-header-card {
+  border-color: rgba(46, 92, 205, 0.2);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(242, 248, 255, 0.96)) !important;
+}
+
+:global(.ofir-shell--light) .pos-panel {
+  border-color: rgba(46, 92, 205, 0.16);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(246, 250, 255, 0.95)) !important;
+}
+
+.pos-container :deep(.v-field) {
+  border-radius: 12px;
+}
+
+.pos-container :deep(.v-field__input) {
+  font-weight: 500;
+}
+
+.pos-container :deep(.v-btn) {
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  font-weight: 700;
+}
+
+.pos-container :deep(.v-table thead th) {
+  font-size: 0.78rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.pos-container :deep(.v-table tbody tr:hover) {
+  background: rgba(63, 105, 228, 0.11);
+}
+
 .cursor-pointer:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(63, 105, 228, 0.11);
   cursor: pointer;
 }
 
 .held-sale-card {
-  border-radius: 10px;
+  border-radius: 12px;
+  border-color: rgba(98, 139, 255, 0.24) !important;
+}
+
+:global(.ofir-shell--dark) .held-sale-card {
+  background: linear-gradient(130deg, rgba(14, 23, 45, 0.74), rgba(9, 17, 33, 0.7));
+  border-color: rgba(98, 139, 255, 0.3) !important;
 }
 
 /* Total sticky en desktop */
 @media (min-width: 960px) {
   .totals-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: rgb(var(--v-theme-surface));
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 8px 16px rgba(16, 24, 40, 0.12);
+    border: 1px solid rgba(88, 123, 223, 0.18);
+    border-radius: 12px;
+  }
+
+  :global(.ofir-shell--dark) .totals-sticky {
+    background: linear-gradient(130deg, rgba(14, 23, 46, 0.95), rgba(9, 16, 31, 0.92));
+    box-shadow: 0 10px 22px rgba(4, 9, 21, 0.34);
+    border-color: rgba(92, 128, 234, 0.28);
+  }
+
+  :global(.ofir-shell--light) .totals-sticky {
+    background: rgba(var(--v-theme-surface), 0.94);
   }
 }
 
