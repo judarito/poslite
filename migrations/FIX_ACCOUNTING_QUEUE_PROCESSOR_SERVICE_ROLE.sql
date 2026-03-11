@@ -1,21 +1,7 @@
 -- ===================================================================
--- Migración: Procesador de cola contable (POS -> Contabilidad)
+-- Fix: Permitir procesamiento de cola contable desde service_role
 -- Fecha: 2026-03-11
--- Objetivo: sacar eventos de PENDING a PROCESSED/FAILED/SKIPPED
 -- ===================================================================
-
-DO $$
-BEGIN
-  RAISE NOTICE '';
-  RAISE NOTICE '════════════════════════════════════════════════════════';
-  RAISE NOTICE '⚙️  INSTALANDO PROCESADOR DE COLA CONTABLE';
-  RAISE NOTICE '════════════════════════════════════════════════════════';
-END $$;
-
--- Evitar duplicar asientos por el mismo evento origen
-CREATE UNIQUE INDEX IF NOT EXISTS uq_accounting_entries_source_event
-  ON accounting_entries (tenant_id, source_module, source_event, source_id)
-  WHERE source_id IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION fn_accounting_process_queue(
   p_tenant_id UUID,
@@ -62,9 +48,9 @@ BEGIN
     RETURN jsonb_build_object('success', FALSE, 'message', 'tenant_id es requerido');
   END IF;
 
-  -- Usuario normal: requiere auth.uid + pertenecer al tenant
+  -- Usuario normal: requiere pertenecer al tenant
   -- service_role: permitido para workers automáticos
-  IF v_role IS DISTINCT FROM 'service_role' THEN
+  IF v_role <> 'service_role' THEN
     IF v_uid IS NULL THEN
       RETURN jsonb_build_object('success', FALSE, 'message', 'Usuario no autenticado');
     END IF;
@@ -79,7 +65,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Cuentas base para contabilización automática
   SELECT account_id INTO v_account_cash
   FROM accounting_accounts
   WHERE tenant_id = p_tenant_id AND code = '110505' AND is_active = TRUE AND is_postable = TRUE
@@ -120,7 +105,6 @@ BEGIN
     WHERE event_id = v_event.event_id;
 
     BEGIN
-      -- Idempotencia: si ya existe asiento por evento origen, marcar procesado.
       SELECT e.entry_id INTO v_entry_id
       FROM accounting_entries e
       WHERE e.tenant_id = p_tenant_id
@@ -352,12 +336,3 @@ $$;
 
 GRANT EXECUTE ON FUNCTION fn_accounting_process_queue(UUID, INT, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION fn_accounting_process_queue(UUID, INT, UUID) TO service_role;
-
-COMMENT ON FUNCTION fn_accounting_process_queue IS
-  'Procesa eventos contables en cola para un tenant y actualiza estados PENDING/FAILED -> PROCESSED/FAILED/SKIPPED.';
-
-DO $$
-BEGIN
-  RAISE NOTICE '✅ fn_accounting_process_queue instalada';
-  RAISE NOTICE '🧭 Uso: SELECT fn_accounting_process_queue(''<tenant_uuid>'', 50, NULL);';
-END $$;

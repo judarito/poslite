@@ -10,7 +10,12 @@ jobs:
     steps:
       - name: Trigger accounting queue worker
         run: |
-          curl -sS -X POST "${{ secrets.ACCOUNTING_QUEUE_WORKER_URL }}" \
+          response="$(curl --fail-with-body -sS -X POST "${{ secrets.ACCOUNTING_QUEUE_WORKER_URL }}" \
             -H "Content-Type: application/json" \
             -H "x-cron-key: ${{ secrets.ACCOUNTING_QUEUE_CRON_KEY }}" \
-            -d '{"limit":100}'
+            -d '{"limit":100}')"
+
+          echo "$response"
+
+          echo "$response" | jq -e '.success == true' >/dev/null
+          echo "$response" | jq -e '([.results[]? | select(.success == false)] | length) == 0' >/dev/null
