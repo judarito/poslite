@@ -69,3 +69,30 @@ supabase secrets set DEEPSEEK_API_KEY=tu_api_key --project-ref [TU_PROJECT_REF]
 Migración requerida:
 
 - `migrations/ADD_CHAT_ORDER_AI_CACHE.sql`
+
+## Worker automático de cola contable
+
+Edge Function:
+
+```bash
+supabase functions deploy accounting-queue-worker --project-ref [TU_PROJECT_REF]
+```
+
+Secret recomendado:
+
+```bash
+supabase secrets set ACCOUNTING_QUEUE_CRON_KEY=tu_clave_segura --project-ref [TU_PROJECT_REF]
+```
+
+Invocación manual de prueba:
+
+```bash
+curl -X POST "https://[PROJECT_REF].supabase.co/functions/v1/accounting-queue-worker" \
+  -H "Content-Type: application/json" \
+  -H "x-cron-key: tu_clave_segura" \
+  -d '{"limit":100}'
+```
+
+Migración requerida:
+
+- `migrations/ADD_ACCOUNTING_QUEUE_PROCESSOR.sql`

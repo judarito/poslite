@@ -10,6 +10,7 @@
         <v-tab value="general">General</v-tab>
         <v-tab value="ui">Interfaz</v-tab>
         <v-tab value="ai">Inteligencia IA</v-tab>
+        <v-tab value="accounting">Contabilidad</v-tab>
         <v-tab value="inventory">Inventario</v-tab>
         <v-tab value="sales">Ventas</v-tab>
         <v-tab value="invoicing">Facturación</v-tab>
@@ -252,6 +253,77 @@
                   </v-btn>
                 </v-col>
               </v-row>
+            </v-window-item>
+
+            <!-- CONTABILIDAD -->
+            <v-window-item value="accounting">
+              <div class="text-h6 mb-4">Configuración de Contabilidad</div>
+              <v-alert type="info" variant="tonal" class="mb-4">
+                Define cómo se conecta contabilidad con el POS sin bloquear ventas ni compras.
+              </v-alert>
+
+              <v-row>
+                <v-col cols="12" sm="6">
+                  <v-switch
+                    v-model="settings.accounting_enabled"
+                    label="Contabilidad habilitada"
+                    color="success"
+                    hint="Activa o desactiva el módulo contable. El POS sigue operando si está apagado."
+                    persistent-hint
+                  ></v-switch>
+                </v-col>
+
+                <v-col cols="12" sm="6">
+                  <v-select
+                    v-model="settings.accounting_mode"
+                    :items="accountingModeOptions"
+                    item-title="title"
+                    item-value="value"
+                    label="Modo de integración contable"
+                    variant="outlined"
+                    hint="Forma de operar la integración con el POS"
+                    persistent-hint
+                  ></v-select>
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    {{ accountingModeDescription }}
+                  </div>
+                </v-col>
+
+                <v-col cols="12" sm="4">
+                  <v-switch
+                    v-model="settings.accounting_auto_post_sales"
+                    label="Auto contabilizar ventas"
+                    color="primary"
+                    hint="Envía automáticamente ventas a la cola contable"
+                    persistent-hint
+                  ></v-switch>
+                </v-col>
+
+                <v-col cols="12" sm="4">
+                  <v-switch
+                    v-model="settings.accounting_auto_post_purchases"
+                    label="Auto contabilizar compras"
+                    color="primary"
+                    hint="Envía automáticamente compras a la cola contable"
+                    persistent-hint
+                  ></v-switch>
+                </v-col>
+
+                <v-col cols="12" sm="4">
+                  <v-switch
+                    v-model="settings.accounting_ai_enabled"
+                    label="IA contable"
+                    color="secondary"
+                    hint="Habilita sugerencias IA para asientos y análisis"
+                    persistent-hint
+                  ></v-switch>
+                </v-col>
+              </v-row>
+
+              <v-alert type="info" variant="tonal" class="mt-2" icon="mdi-lightbulb-on-outline">
+                <strong>Recomendado para iniciar:</strong> Contabilidad habilitada + modo ASYNC +
+                auto ventas activado. Activa auto compras cuando valides el flujo contable de compras.
+              </v-alert>
             </v-window-item>
 
             <!-- INVENTARIO -->
@@ -641,7 +713,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAICache } from '@/composables/useAICache'
@@ -692,6 +764,12 @@ const localeOptions = [
   { title: 'Español México (es-MX)', value: 'es-MX' },
   { title: 'Español España (es-ES)', value: 'es-ES' },
   { title: 'Inglés US (en-US)', value: 'en-US' }
+]
+
+const accountingModeOptions = [
+  { title: 'OFF - Desactivado', value: 'OFF' },
+  { title: 'ASYNC - Cola desacoplada', value: 'ASYNC' },
+  { title: 'MANUAL - Registro manual', value: 'MANUAL' }
 ]
 
 const roundingOptions = [
@@ -773,6 +851,14 @@ const settings = ref({
   ai_purchase_suggestion_days: 14,
   ai_purchase_advisor_enabled: true,
   ai_sales_forecast_enabled: true,
+
+  // Contabilidad
+  accounting_enabled: false,
+  accounting_mode: 'ASYNC',
+  accounting_ai_enabled: true,
+  accounting_auto_post_sales: false,
+  accounting_auto_post_purchases: false,
+  accounting_country_code: 'CO',
   
   // Inventario (sin duplicados - min_stock y allow_backorder ya existen por producto)
   expiry_alert_days: 30,
@@ -795,6 +881,13 @@ const settings = ref({
   alert_email: '',
   notify_low_stock: true,
   notify_expiring_products: true
+})
+
+const accountingModeDescription = computed(() => {
+  const mode = settings.value.accounting_mode
+  if (mode === 'OFF') return 'No se generan eventos contables automáticos.'
+  if (mode === 'MANUAL') return 'El equipo contable registra asientos manualmente.'
+  return 'El POS envía eventos a una cola y contabilidad los procesa sin bloquear operación.'
 })
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
@@ -869,6 +962,14 @@ const loadData = async () => {
       ai_purchase_suggestion_days: data.ai_purchase_suggestion_days || 14,
       ai_purchase_advisor_enabled: data.ai_purchase_advisor_enabled !== false,
       ai_sales_forecast_enabled: data.ai_sales_forecast_enabled !== false,
+
+      // Contabilidad
+      accounting_enabled: data.accounting_enabled || false,
+      accounting_mode: data.accounting_mode || 'ASYNC',
+      accounting_ai_enabled: data.accounting_ai_enabled !== false,
+      accounting_auto_post_sales: data.accounting_auto_post_sales || false,
+      accounting_auto_post_purchases: data.accounting_auto_post_purchases || false,
+      accounting_country_code: data.accounting_country_code || 'CO',
       
       // Inventario (sin duplicados)
       expiry_alert_days: data.expiry_alert_days || 30,

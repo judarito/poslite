@@ -51,6 +51,14 @@ export function useTenantSettings() {
   const aiPurchaseAdvisorEnabled = computed(() => settings.value?.ai_purchase_advisor_enabled !== false)
   const aiSalesForecastEnabled = computed(() => settings.value?.ai_sales_forecast_enabled !== false)
 
+  // Configuración de Contabilidad
+  const accountingEnabled = computed(() => settings.value?.accounting_enabled || false)
+  const accountingMode = computed(() => settings.value?.accounting_mode || 'ASYNC')
+  const accountingAiEnabled = computed(() => settings.value?.accounting_ai_enabled !== false)
+  const accountingAutoPostSales = computed(() => settings.value?.accounting_auto_post_sales || false)
+  const accountingAutoPostPurchases = computed(() => settings.value?.accounting_auto_post_purchases || false)
+  const accountingCountryCode = computed(() => settings.value?.accounting_country_code || 'CO')
+
   // Configuración de Inventario
   const expiryAlertDays = computed(() => settings.value?.expiry_alert_days || 30)
   const reserveStockOnLayaway = computed(() => settings.value?.reserve_stock_on_layaway !== false)
@@ -146,6 +154,14 @@ export function useTenantSettings() {
     aiPurchaseSuggestionDays,
     aiPurchaseAdvisorEnabled,
     aiSalesForecastEnabled,
+
+    // Contabilidad
+    accountingEnabled,
+    accountingMode,
+    accountingAiEnabled,
+    accountingAutoPostSales,
+    accountingAutoPostPurchases,
+    accountingCountryCode,
 
     // Inventario
     expiryAlertDays,

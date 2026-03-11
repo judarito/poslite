@@ -65,6 +65,14 @@ class TenantSettingsService {
           ai_purchase_suggestion_days: settings.ai_purchase_suggestion_days || 14,
           ai_purchase_advisor_enabled: settings.ai_purchase_advisor_enabled !== false,
           ai_sales_forecast_enabled: settings.ai_sales_forecast_enabled !== false,
+
+          // Contabilidad
+          accounting_enabled: settings.accounting_enabled || false,
+          accounting_mode: settings.accounting_mode || 'ASYNC',
+          accounting_ai_enabled: settings.accounting_ai_enabled !== false,
+          accounting_auto_post_sales: settings.accounting_auto_post_sales || false,
+          accounting_auto_post_purchases: settings.accounting_auto_post_purchases || false,
+          accounting_country_code: settings.accounting_country_code || 'CO',
           
           // Inventario (sin duplicados - min_stock y allow_backorder ya existen por producto)
           expiry_alert_days: settings.expiry_alert_days || 30,

@@ -39,6 +39,7 @@ import Purchases from '@/views/Purchases.vue'
 import ProductionOrders from '@/views/ProductionOrders.vue'
 import BOMs from '@/views/BOMs.vue'
 import Cartera from '@/views/Cartera.vue'
+import Accounting from '@/views/Accounting.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
 const MENU_ROUTES_CACHE_TTL_MS = 60 * 1000
@@ -65,8 +66,14 @@ function isRecoveryNavigation(to) {
   return hash.includes('type=recovery') || fullPath.includes('type=recovery')
 }
 async function getAllowedMenuRoutes(authUserId) {
+  return getAllowedMenuRoutesWithOptions(authUserId, { force: false })
+}
+
+async function getAllowedMenuRoutesWithOptions(authUserId, options = {}) {
+  const force = options?.force === true
   const now = Date.now()
   if (
+    !force &&
     menuRoutesCache.authUserId === authUserId &&
     Array.isArray(menuRoutesCache.routes) &&
     now - menuRoutesCache.loadedAt <= MENU_ROUTES_CACHE_TTL_MS
@@ -361,6 +368,13 @@ const routes = [
     component: Cartera,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/accounting',
+    name: 'Accounting',
+    component: Accounting,
+    alias: ['/contabilidad'],
+    meta: { requiresAuth: true }
+  },
 ]
 
 const router = createRouter({
@@ -428,9 +442,13 @@ router.beforeEach(async (to, from, next) => {
     ) {
       const allowedRoutes = await getAllowedMenuRoutes(session.user.id)
       if (Array.isArray(allowedRoutes) && !canAccessPathByMenu(to.path, allowedRoutes)) {
-        console.warn(`Acceso denegado por menú: ${to.path}`)
-        next('/')
-        return
+        // Reintento forzado para evitar falsos bloqueos por caché de menús desactualizado.
+        const freshAllowedRoutes = await getAllowedMenuRoutesWithOptions(session.user.id, { force: true })
+        if (Array.isArray(freshAllowedRoutes) && !canAccessPathByMenu(to.path, freshAllowedRoutes)) {
+          console.warn(`Acceso denegado por menú: ${to.path}`)
+          next('/')
+          return
+        }
       }
     }
     next()
@@ -446,4 +464,3 @@ router.beforeEach(async (to, from, next) => {
 })
 
 export default router
-
