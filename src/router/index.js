@@ -40,6 +40,11 @@ import ProductionOrders from '@/views/ProductionOrders.vue'
 import BOMs from '@/views/BOMs.vue'
 import Cartera from '@/views/Cartera.vue'
 import Accounting from '@/views/Accounting.vue'
+import AccountingJournal from '@/views/AccountingJournal.vue'
+import AccountingLedger from '@/views/AccountingLedger.vue'
+import AccountingWithholdings from '@/views/AccountingWithholdings.vue'
+import AccountingClosing from '@/views/AccountingClosing.vue'
+import AccountingAutomation from '@/views/AccountingAutomation.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
 const MENU_ROUTES_CACHE_TTL_MS = 60 * 1000
@@ -373,6 +378,69 @@ const routes = [
     name: 'Accounting',
     component: Accounting,
     alias: ['/contabilidad'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/dashboard',
+    name: 'AccountingDashboard',
+    component: Accounting,
+    alias: ['/contabilidad/dashboard'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/compliance',
+    name: 'AccountingCompliance',
+    component: Accounting,
+    alias: ['/contabilidad/compliance'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/queue',
+    name: 'AccountingQueue',
+    component: Accounting,
+    alias: ['/contabilidad/queue'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/assistant',
+    name: 'AccountingAssistant',
+    component: Accounting,
+    alias: ['/contabilidad/asistente-ia'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/retenciones',
+    name: 'AccountingWithholdings',
+    component: AccountingWithholdings,
+    alias: ['/contabilidad/retenciones'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/cierre',
+    name: 'AccountingClosing',
+    component: AccountingClosing,
+    alias: ['/contabilidad/cierre'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/automatizacion',
+    name: 'AccountingAutomation',
+    component: AccountingAutomation,
+    alias: ['/contabilidad/automatizacion'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/diario',
+    name: 'AccountingJournal',
+    component: AccountingJournal,
+    alias: ['/contabilidad/diario'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/mayor',
+    name: 'AccountingLedger',
+    component: AccountingLedger,
+    alias: ['/contabilidad/mayor'],
     meta: { requiresAuth: true }
   },
 ]

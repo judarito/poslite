@@ -1,5 +1,16 @@
 <template>
   <div>
+    <div v-if="isFromAccounting" class="mb-3">
+      <v-btn
+        color="primary"
+        variant="tonal"
+        prepend-icon="mdi-arrow-left"
+        @click="goBackToAccounting"
+      >
+        Volver a Contabilidad
+      </v-btn>
+    </div>
+
     <!-- Header con breadcrumb -->
     <v-breadcrumbs :items="breadcrumbs" class="pa-0 mb-4">
       <template #divider><v-icon>mdi-chevron-right</v-icon></template>
@@ -450,12 +461,15 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '@/i18n'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import inventoryService from '@/services/inventory.service'
 import { formatMoney, formatDate, formatDateTime } from '@/utils/formatters'
 
+const route = useRoute()
+const router = useRouter()
 const { tenantId } = useTenant()
 const { t } = useI18n()
 
@@ -504,6 +518,7 @@ const filteredStockAlerts = computed(() => {
   return stockAlerts.value.filter(item => item.alert_level === alertLevelFilter.value)
 })
 const stockAlertsCount = computed(() => stockAlerts.value.length)
+const isFromAccounting = computed(() => String(route.query.from || '') === 'accounting')
 
 const filteredMovements = computed(() => {
   if (movementTypeFilter.value === 'ALL') return cashMovements.value
@@ -576,6 +591,14 @@ const loadStockAlerts = async () => {
   } finally {
     loadingAlerts.value = false
   }
+}
+
+const goBackToAccounting = () => {
+  const tab = String(route.query.tab || 'compliance')
+  router.push({
+    path: '/accounting',
+    query: { tab }
+  })
 }
 
 onMounted(async () => {

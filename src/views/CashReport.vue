@@ -1,5 +1,16 @@
 <template>
   <div>
+    <div v-if="isFromAccounting" class="mb-3">
+      <v-btn
+        color="primary"
+        variant="tonal"
+        prepend-icon="mdi-arrow-left"
+        @click="goBackToAccounting"
+      >
+        Volver a Contabilidad
+      </v-btn>
+    </div>
+
     <v-breadcrumbs :items="breadcrumbs" class="pa-0 mb-4">
       <template #divider><v-icon>mdi-chevron-right</v-icon></template>
     </v-breadcrumbs>
@@ -299,11 +310,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '@/i18n'
 import { useTenant } from '@/composables/useTenant'
 import reportsService from '@/services/reports.service'
 import { formatMoney, formatDate, formatDateTime } from '@/utils/formatters'
 
+const route = useRoute()
+const router = useRouter()
 const { tenantId } = useTenant()
 const { t } = useI18n()
 
@@ -328,6 +342,7 @@ const totalSalesCount = computed(() => sessions.value.reduce((s, x) => s + (x.sa
 const totalSalesAmount = computed(() => sessions.value.reduce((s, x) => s + (x.sales_total || 0), 0))
 const sessionsWithDiff = computed(() => sessions.value.filter(s => s.has_difference).length)
 const sessionsWithDifferences = computed(() => sessions.value.filter(s => s.has_difference))
+const isFromAccounting = computed(() => String(route.query.from || '') === 'accounting')
 
 const loadSessions = async () => {
   if (!tenantId.value) return
@@ -359,6 +374,14 @@ const loadLocations = async () => {
   const { default: locService } = await import('@/services/locations.service')
   const r = await locService.getLocations(tenantId.value, 1, 100)
   if (r.success) locations.value = r.data
+}
+
+const goBackToAccounting = () => {
+  const tab = String(route.query.tab || 'compliance')
+  router.push({
+    path: '/accounting',
+    query: { tab }
+  })
 }
 
 onMounted(async () => {
