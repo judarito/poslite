@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-03-11
 Owner: Equipo POSLite
-Ultimo cambio registrado: Politica estricta de periodos contables (solo 1 OPEN por tenant)
+Ultimo cambio registrado: Listview contable con separadores y paginacion estilo catalogo
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -48,6 +48,23 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 - Exportables adicionales:
   - Balanza (XLSX/CSV)
   - Checklist DIAN/obligaciones (XLSX/CSV)
+
+### UX contable (actualizado)
+
+- Nuevo modo de visualizacion compartido: `LIST` / `TABLE` con persistencia local (`localStorage`).
+- Composable: `src/composables/useAccountingViewMode.js`.
+- Vistas ajustadas para doble modo:
+  - `src/views/Accounting.vue`
+  - `src/views/AccountingAutomation.vue`
+  - `src/views/AccountingWithholdings.vue`
+  - `src/views/AccountingJournal.vue`
+  - `src/views/AccountingLedger.vue`
+  - `src/views/AccountingClosing.vue`
+- En modo `LIST`, las tablas densas se muestran como cards/listas para mejorar lectura, edicion y uso en pantallas reducidas.
+- Mejora UX adicional en modo `LIST`:
+  - Separadores visuales entre items (`v-divider`).
+  - `density="compact"` para reducir altura de filas.
+  - Paginacion cliente con `v-pagination` + leyenda "Mostrando X - Y de N registros".
 
 ### Competitividad contable v1 (implementado)
 

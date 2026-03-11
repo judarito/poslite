@@ -11,9 +11,21 @@
             Módulo contable desacoplado del POS, con integración asíncrona e IA.
           </div>
         </div>
-        <v-btn color="primary" variant="elevated" prepend-icon="mdi-refresh" :loading="loading" @click="loadAll">
-          Actualizar
-        </v-btn>
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
+          <v-btn color="primary" variant="elevated" prepend-icon="mdi-refresh" :loading="loading" @click="loadAll">
+            Actualizar
+          </v-btn>
+        </div>
       </v-card-text>
     </v-card>
 
@@ -200,7 +212,7 @@
             </v-card-title>
             <v-divider />
 
-            <v-card-text class="pa-0">
+            <v-card-text v-if="isTableView" class="pa-0">
               <v-table density="comfortable" fixed-header height="380">
                 <thead>
                   <tr>
@@ -225,15 +237,60 @@
                       {{ formatMoney(row.balance) }}
                     </td>
                   </tr>
+                  <tr v-if="trialBalance.length === 0">
+                    <td colspan="7" class="text-center text-medium-emphasis py-6">
+                      No hay datos para el período seleccionado.
+                    </td>
+                  </tr>
                 </tbody>
               </v-table>
+            </v-card-text>
+            <v-card-text v-else>
+              <v-alert
+                v-if="trialBalance.length === 0"
+                type="info"
+                variant="tonal"
+                density="comfortable"
+              >
+                No hay datos para el período seleccionado.
+              </v-alert>
+              <v-row v-else>
+                <v-col v-for="row in paginatedTrialBalance" :key="row.account_code" cols="12" md="6" lg="4">
+                  <v-card variant="outlined" class="h-100">
+                    <v-card-text>
+                      <div class="d-flex align-center justify-space-between">
+                        <code>{{ row.account_code }}</code>
+                        <v-chip size="x-small" color="indigo">{{ row.natural_side }}</v-chip>
+                      </div>
+                      <div class="text-subtitle-2 font-weight-bold mt-2">{{ row.account_name }}</div>
+                      <div class="text-caption">{{ row.account_type }}</div>
+                      <div class="text-caption mt-2">Débitos: {{ formatMoney(row.debit_total) }}</div>
+                      <div class="text-caption">Créditos: {{ formatMoney(row.credit_total) }}</div>
+                      <div class="text-body-2 font-weight-bold mt-2" :class="Number(row.balance || 0) < 0 ? 'text-error' : ''">
+                        Saldo: {{ formatMoney(row.balance) }}
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+              <div v-if="trialBalanceTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+                <v-pagination
+                  v-model="trialBalancePage"
+                  :length="trialBalanceTotalPages"
+                  :total-visible="$vuetify.display.xs ? 5 : 7"
+                  size="small"
+                />
+                <div class="text-caption text-medium-emphasis">
+                  Mostrando {{ trialBalanceRangeLabel }}
+                </div>
+              </div>
             </v-card-text>
           </v-card>
 
           <v-card id="entries-section">
             <v-card-title>Últimos Asientos</v-card-title>
             <v-divider />
-            <v-card-text class="pa-0">
+            <v-card-text v-if="isTableView" class="pa-0">
               <v-table density="comfortable" fixed-header height="320">
                 <thead>
                   <tr>
@@ -261,8 +318,58 @@
                     </td>
                     <td>{{ formatDate(entry.created_at) }}</td>
                   </tr>
+                  <tr v-if="recentEntries.length === 0">
+                    <td colspan="6" class="text-center text-medium-emphasis py-6">
+                      No hay asientos recientes.
+                    </td>
+                  </tr>
                 </tbody>
               </v-table>
+            </v-card-text>
+            <v-card-text v-else>
+              <v-alert
+                v-if="recentEntries.length === 0"
+                type="info"
+                variant="tonal"
+                density="comfortable"
+              >
+                No hay asientos recientes.
+              </v-alert>
+              <v-list v-else lines="three" density="compact" class="py-0">
+                <template v-for="(entry, idx) in paginatedRecentEntries" :key="entry.entry_id">
+                  <v-list-item class="px-0">
+                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+                      <div>
+                        <strong>#{{ entry.entry_number }}</strong>
+                        <span class="ml-2">{{ formatDate(entry.entry_date) }}</span>
+                      </div>
+                      <v-chip
+                        size="x-small"
+                        :color="entry.status === 'POSTED' ? 'success' : (entry.status === 'VOIDED' ? 'error' : 'warning')"
+                      >
+                        {{ entry.status }}
+                      </v-chip>
+                    </v-list-item-title>
+                    <v-list-item-subtitle>
+                      <div><strong>Módulo:</strong> {{ entry.source_module }}</div>
+                      <div class="text-caption">{{ entry.description || '-' }}</div>
+                      <div class="text-caption text-medium-emphasis">Creado: {{ formatDate(entry.created_at) }}</div>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                  <v-divider v-if="idx < paginatedRecentEntries.length - 1" />
+                </template>
+              </v-list>
+              <div v-if="recentEntriesTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+                <v-pagination
+                  v-model="recentEntriesPage"
+                  :length="recentEntriesTotalPages"
+                  :total-visible="$vuetify.display.xs ? 5 : 7"
+                  size="small"
+                />
+                <div class="text-caption text-medium-emphasis">
+                  Mostrando {{ recentEntriesRangeLabel }}
+                </div>
+              </div>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -463,7 +570,7 @@
               </div>
             </v-card-title>
             <v-divider />
-            <v-card-text class="pa-0">
+            <v-card-text v-if="isTableView" class="pa-0">
               <v-table density="comfortable" fixed-header height="360">
                 <thead>
                   <tr>
@@ -498,8 +605,62 @@
                       </v-btn>
                     </td>
                   </tr>
+                  <tr v-if="(compliance.obligations || []).length === 0">
+                    <td colspan="6" class="text-center text-medium-emphasis py-6">
+                      Sin obligaciones para mostrar.
+                    </td>
+                  </tr>
                 </tbody>
               </v-table>
+            </v-card-text>
+            <v-card-text v-else>
+              <v-alert
+                v-if="(compliance.obligations || []).length === 0"
+                type="info"
+                variant="tonal"
+                density="comfortable"
+              >
+                Sin obligaciones para mostrar.
+              </v-alert>
+              <v-row v-else>
+                <v-col v-for="item in paginatedObligations" :key="item.key" cols="12" md="6">
+                  <v-card variant="outlined" class="h-100">
+                    <v-card-text>
+                      <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+                        <div class="font-weight-bold">{{ item.name }}</div>
+                        <v-chip size="x-small" :color="getComplianceStatusColor(item.status)">
+                          {{ getComplianceStatusLabel(item.status) }}
+                        </v-chip>
+                      </div>
+                      <div class="text-caption mt-2"><strong>Frecuencia:</strong> {{ item.frequency }}</div>
+                      <div class="text-caption mt-1">{{ item.meaning }}</div>
+                      <div class="text-caption mt-2"><strong>Evidencia:</strong> {{ item.evidence || '-' }}</div>
+                      <div class="mt-3">
+                        <v-btn
+                          size="small"
+                          variant="tonal"
+                          color="primary"
+                          :disabled="!item.route"
+                          @click="openComplianceItem(item)"
+                        >
+                          Abrir
+                        </v-btn>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+              <div v-if="obligationsTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+                <v-pagination
+                  v-model="obligationsPage"
+                  :length="obligationsTotalPages"
+                  :total-visible="$vuetify.display.xs ? 5 : 7"
+                  size="small"
+                />
+                <div class="text-caption text-medium-emphasis">
+                  Mostrando {{ obligationsRangeLabel }}
+                </div>
+              </div>
             </v-card-text>
           </v-card>
 
@@ -559,7 +720,7 @@
               </div>
             </v-card-title>
             <v-divider />
-            <v-card-text class="pa-0">
+            <v-card-text v-if="isTableView" class="pa-0">
               <v-table density="comfortable" fixed-header height="580">
                 <thead>
                   <tr>
@@ -589,8 +750,53 @@
                     </td>
                     <td class="text-caption text-error">{{ event.last_error || '-' }}</td>
                   </tr>
+                  <tr v-if="eventQueue.length === 0">
+                    <td colspan="7" class="text-center text-medium-emphasis py-6">
+                      No hay eventos en la cola.
+                    </td>
+                  </tr>
                 </tbody>
               </v-table>
+            </v-card-text>
+            <v-card-text v-else>
+              <v-alert
+                v-if="eventQueue.length === 0"
+                type="info"
+                variant="tonal"
+                density="comfortable"
+              >
+                No hay eventos en la cola.
+              </v-alert>
+              <v-list v-else lines="three" density="compact" class="py-0">
+                <template v-for="(event, idx) in paginatedQueueEvents" :key="event.event_id">
+                  <v-list-item class="px-0">
+                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+                      <div>{{ event.source_module }} · {{ event.event_type }}</div>
+                      <v-chip size="x-small" :color="getQueueStatusColor(event.status)">
+                        {{ event.status }}
+                      </v-chip>
+                    </v-list-item-title>
+                    <v-list-item-subtitle>
+                      <div><strong>Creado:</strong> {{ formatDate(event.created_at) }}</div>
+                      <div><strong>Referencia:</strong> <code>{{ event.source_id }}</code></div>
+                      <div><strong>Intentos:</strong> {{ event.attempts }}</div>
+                      <div class="text-caption text-error"><strong>Error:</strong> {{ event.last_error || '-' }}</div>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                  <v-divider v-if="idx < paginatedQueueEvents.length - 1" />
+                </template>
+              </v-list>
+              <div v-if="queueTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+                <v-pagination
+                  v-model="queuePage"
+                  :length="queueTotalPages"
+                  :total-visible="$vuetify.display.xs ? 5 : 7"
+                  size="small"
+                />
+                <div class="text-caption text-medium-emphasis">
+                  Mostrando {{ queueRangeLabel }}
+                </div>
+              </div>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -635,7 +841,7 @@
                 <div v-for="(w, idx) in aiResult.warnings" :key="idx">- {{ w }}</div>
               </v-alert>
 
-              <v-table density="comfortable" v-if="aiResult.entry?.lines?.length">
+              <v-table density="comfortable" v-if="isTableView && aiResult.entry?.lines?.length">
                 <thead>
                   <tr>
                     <th>Cuenta</th>
@@ -655,6 +861,43 @@
                   </tr>
                 </tbody>
               </v-table>
+              <v-list
+                v-else-if="aiResult.entry?.lines?.length"
+                lines="three"
+                density="compact"
+                class="py-0"
+              >
+                <template v-for="(line, idx) in paginatedAiLines" :key="`ai-line-${idx}`">
+                  <v-list-item class="px-0">
+                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+                      <div>
+                        <code>{{ line.account_code }}</code>
+                        <span class="ml-2">{{ line.account_name }}</span>
+                      </div>
+                      <div>
+                        <strong>D:</strong> {{ formatMoney(line.debit_amount || 0) }}
+                        <span class="mx-1">|</span>
+                        <strong>C:</strong> {{ formatMoney(line.credit_amount || 0) }}
+                      </div>
+                    </v-list-item-title>
+                    <v-list-item-subtitle class="text-caption">
+                      {{ line.reason || '-' }}
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                  <v-divider v-if="idx < paginatedAiLines.length - 1" />
+                </template>
+              </v-list>
+              <div v-if="aiLinesTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+                <v-pagination
+                  v-model="aiLinesPage"
+                  :length="aiLinesTotalPages"
+                  :total-visible="$vuetify.display.xs ? 5 : 7"
+                  size="small"
+                />
+                <div class="text-caption text-medium-emphasis">
+                  Mostrando {{ aiLinesRangeLabel }}
+                </div>
+              </div>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -669,12 +912,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { utils, writeFileXLSX } from 'xlsx'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 
 const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const loading = ref(false)
 const aiLoading = ref(false)
@@ -716,6 +961,56 @@ const filters = ref({
 
 const aiPrompt = ref('')
 const aiResult = ref(null)
+
+const LIST_PAGE_SIZE = {
+  trialBalance: 12,
+  recentEntries: 8,
+  obligations: 6,
+  queue: 8,
+  aiLines: 8
+}
+
+const trialBalancePage = ref(1)
+const recentEntriesPage = ref(1)
+const obligationsPage = ref(1)
+const queuePage = ref(1)
+const aiLinesPage = ref(1)
+
+const getPaginatedItems = (items, page, pageSize) => {
+  const list = Array.isArray(items) ? items : []
+  const start = Math.max(0, (page - 1) * pageSize)
+  return list.slice(start, start + pageSize)
+}
+
+const getRangeLabel = (items, page, pageSize) => {
+  const list = Array.isArray(items) ? items : []
+  if (list.length === 0) return '0 de 0 registros'
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, list.length)
+  return `${start} - ${end} de ${list.length} registros`
+}
+
+const trialBalanceTotalPages = computed(() => Math.max(1, Math.ceil((trialBalance.value || []).length / LIST_PAGE_SIZE.trialBalance)))
+const paginatedTrialBalance = computed(() => getPaginatedItems(trialBalance.value, trialBalancePage.value, LIST_PAGE_SIZE.trialBalance))
+const trialBalanceRangeLabel = computed(() => getRangeLabel(trialBalance.value, trialBalancePage.value, LIST_PAGE_SIZE.trialBalance))
+
+const recentEntriesTotalPages = computed(() => Math.max(1, Math.ceil((recentEntries.value || []).length / LIST_PAGE_SIZE.recentEntries)))
+const paginatedRecentEntries = computed(() => getPaginatedItems(recentEntries.value, recentEntriesPage.value, LIST_PAGE_SIZE.recentEntries))
+const recentEntriesRangeLabel = computed(() => getRangeLabel(recentEntries.value, recentEntriesPage.value, LIST_PAGE_SIZE.recentEntries))
+
+const obligationsItems = computed(() => compliance.value?.obligations || [])
+const obligationsTotalPages = computed(() => Math.max(1, Math.ceil(obligationsItems.value.length / LIST_PAGE_SIZE.obligations)))
+const paginatedObligations = computed(() => getPaginatedItems(obligationsItems.value, obligationsPage.value, LIST_PAGE_SIZE.obligations))
+const obligationsRangeLabel = computed(() => getRangeLabel(obligationsItems.value, obligationsPage.value, LIST_PAGE_SIZE.obligations))
+
+const queueTotalPages = computed(() => Math.max(1, Math.ceil((eventQueue.value || []).length / LIST_PAGE_SIZE.queue)))
+const paginatedQueueEvents = computed(() => getPaginatedItems(eventQueue.value, queuePage.value, LIST_PAGE_SIZE.queue))
+const queueRangeLabel = computed(() => getRangeLabel(eventQueue.value, queuePage.value, LIST_PAGE_SIZE.queue))
+
+const aiLinesItems = computed(() => aiResult.value?.entry?.lines || [])
+const aiLinesTotalPages = computed(() => Math.max(1, Math.ceil(aiLinesItems.value.length / LIST_PAGE_SIZE.aiLines)))
+const paginatedAiLines = computed(() => getPaginatedItems(aiLinesItems.value, aiLinesPage.value, LIST_PAGE_SIZE.aiLines))
+const aiLinesRangeLabel = computed(() => getRangeLabel(aiLinesItems.value, aiLinesPage.value, LIST_PAGE_SIZE.aiLines))
 
 const isEnabled = computed(() => settings.value.accounting_enabled)
 const pendingQueueCount = computed(() => Number(summary.value?.pending_events || 0))
@@ -1127,6 +1422,46 @@ const generateAISuggestion = async () => {
     aiLoading.value = false
   }
 }
+
+watch(() => trialBalance.value.length, () => {
+  trialBalancePage.value = 1
+})
+
+watch(() => recentEntries.value.length, () => {
+  recentEntriesPage.value = 1
+})
+
+watch(() => obligationsItems.value.length, () => {
+  obligationsPage.value = 1
+})
+
+watch(() => eventQueue.value.length, () => {
+  queuePage.value = 1
+})
+
+watch(() => aiLinesItems.value.length, () => {
+  aiLinesPage.value = 1
+})
+
+watch(trialBalanceTotalPages, (total) => {
+  if (trialBalancePage.value > total) trialBalancePage.value = total
+})
+
+watch(recentEntriesTotalPages, (total) => {
+  if (recentEntriesPage.value > total) recentEntriesPage.value = total
+})
+
+watch(obligationsTotalPages, (total) => {
+  if (obligationsPage.value > total) obligationsPage.value = total
+})
+
+watch(queueTotalPages, (total) => {
+  if (queuePage.value > total) queuePage.value = total
+})
+
+watch(aiLinesTotalPages, (total) => {
+  if (aiLinesPage.value > total) aiLinesPage.value = total
+})
 
 onMounted(() => {
   activeTab.value = resolveTabFromRoute()

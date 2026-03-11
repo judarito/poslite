@@ -112,7 +112,17 @@
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between flex-wrap gap-2">
         <span>Detalle del Diario</span>
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
           <v-btn
             color="success"
             variant="tonal"
@@ -136,7 +146,7 @@
         </div>
       </v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="560">
           <thead>
             <tr>
@@ -182,16 +192,70 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="journalLines.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          No hay movimientos para el filtro seleccionado.
+        </v-alert>
+        <v-list v-else lines="three" density="compact" class="py-0">
+          <template v-for="(line, idx) in paginatedJournalLines" :key="line.line_id">
+            <v-list-item class="px-0">
+              <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+                <div>
+                  <strong>#{{ line.entry_number }} · L{{ line.line_number }}</strong>
+                  <span class="ml-2">{{ formatDate(line.entry_date) }}</span>
+                </div>
+                <v-chip
+                  size="x-small"
+                  :color="line.entry_status === 'POSTED' ? 'success' : (line.entry_status === 'VOIDED' ? 'error' : 'warning')"
+                >
+                  {{ line.entry_status }}
+                </v-chip>
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                <div><strong>Módulo:</strong> {{ line.source_module }}</div>
+                <div>
+                  <strong>Cuenta:</strong> <code>{{ line.account_code }}</code>
+                  <span class="ml-1">{{ line.account_name }}</span>
+                </div>
+                <div class="text-caption">{{ line.line_description || line.entry_description || '-' }}</div>
+                <div class="text-caption text-medium-emphasis">{{ line.source_event || '-' }}</div>
+                <div class="mt-1">
+                  <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
+                  <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
+                </div>
+              </v-list-item-subtitle>
+            </v-list-item>
+            <v-divider v-if="idx < paginatedJournalLines.length - 1" />
+          </template>
+        </v-list>
+        <div v-if="journalListTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="journalListPage"
+            :length="journalListTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ journalListRangeLabel }}
+          </div>
+        </div>
+      </v-card-text>
     </v-card>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { utils, writeFileXLSX } from 'xlsx'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
@@ -199,6 +263,7 @@ const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const period = accountingService.getDefaultPeriod()
 const loading = ref(false)
@@ -231,6 +296,8 @@ const moduleOptions = [
 const journalEntries = ref([])
 const journalLines = ref([])
 const journalTotals = ref({ debit: 0, credit: 0, balanced: true })
+const journalListPage = ref(1)
+const JOURNAL_LIST_PAGE_SIZE = 12
 
 const breadcrumbs = computed(() => [
   { title: 'Contabilidad', to: '/accounting', disabled: false },
@@ -244,6 +311,18 @@ const summary = computed(() => ({
   credit: Number(journalTotals.value.credit || 0),
   balanced: Boolean(journalTotals.value.balanced)
 }))
+
+const journalListTotalPages = computed(() => Math.max(1, Math.ceil(journalLines.value.length / JOURNAL_LIST_PAGE_SIZE)))
+const paginatedJournalLines = computed(() => {
+  const start = (journalListPage.value - 1) * JOURNAL_LIST_PAGE_SIZE
+  return journalLines.value.slice(start, start + JOURNAL_LIST_PAGE_SIZE)
+})
+const journalListRangeLabel = computed(() => {
+  if (!journalLines.value.length) return '0 de 0 registros'
+  const start = (journalListPage.value - 1) * JOURNAL_LIST_PAGE_SIZE + 1
+  const end = Math.min(journalListPage.value * JOURNAL_LIST_PAGE_SIZE, journalLines.value.length)
+  return `${start} - ${end} de ${journalLines.value.length} registros`
+})
 
 const sanitizeForExport = (value) => {
   if (value === null || value === undefined) return ''
@@ -356,6 +435,14 @@ const goBackToAccounting = () => {
   const tab = String(route.query.tab || 'compliance')
   router.push({ path: '/accounting', query: { tab } })
 }
+
+watch(() => journalLines.value.length, () => {
+  journalListPage.value = 1
+})
+
+watch(journalListTotalPages, (total) => {
+  if (journalListPage.value > total) journalListPage.value = total
+})
 
 onMounted(loadJournal)
 </script>

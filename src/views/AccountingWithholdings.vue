@@ -16,7 +16,17 @@
           <v-icon color="warning">mdi-percent-outline</v-icon>
           Retenciones (CO)
         </span>
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
           <v-btn
             color="success"
             variant="tonal"
@@ -87,7 +97,7 @@
     <v-card class="mb-4">
       <v-card-title>Estimacion por concepto</v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="300">
           <thead>
             <tr>
@@ -116,6 +126,46 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="(summary.items || []).length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Sin datos para el periodo seleccionado.
+        </v-alert>
+        <v-row v-else>
+          <v-col v-for="item in paginatedSummaryItems" :key="item.code" cols="12" md="6" lg="4">
+            <v-card variant="outlined" class="h-100">
+              <v-card-text>
+                <div class="d-flex align-center justify-space-between">
+                  <code>{{ item.code }}</code>
+                  <v-chip size="x-small" color="primary">{{ item.applies_to }}</v-chip>
+                </div>
+                <div class="text-subtitle-2 font-weight-bold mt-2">{{ item.name }}</div>
+                <div class="text-caption mt-2">Tarifa: {{ Number(item.rate || 0).toFixed(4) }}%</div>
+                <div class="text-caption">Base: {{ formatMoney(item.base_amount || 0) }}</div>
+                <div class="text-caption">Base gravable: {{ formatMoney(item.taxable_base || 0) }}</div>
+                <div class="text-body-2 font-weight-bold mt-2">
+                  Retencion estimada: {{ formatMoney(item.estimated_withholding || 0) }}
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+        <div v-if="summaryTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="summaryListPage"
+            :length="summaryTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ summaryRangeLabel }}
+          </div>
+        </div>
+      </v-card-text>
     </v-card>
 
     <v-card>
@@ -126,7 +176,7 @@
         </v-btn>
       </v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="360">
           <thead>
             <tr>
@@ -183,6 +233,84 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="configs.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          No hay conceptos de retencion configurados.
+        </v-alert>
+        <v-expansion-panels v-else variant="accordion">
+          <v-expansion-panel v-for="cfg in paginatedConfigs" :key="cfg.config_id">
+            <v-expansion-panel-title>
+              <div class="d-flex align-center justify-space-between w-100 pr-2 flex-wrap ga-2">
+                <div>
+                  <code>{{ cfg.code || 'SIN-COD' }}</code>
+                  <span class="ml-2">{{ cfg.name || 'Sin nombre' }}</span>
+                </div>
+                <div class="d-flex align-center ga-2">
+                  <v-chip size="x-small" color="primary">{{ cfg.applies_to }}</v-chip>
+                  <v-chip size="x-small" :color="cfg.is_active ? 'success' : 'grey'">
+                    {{ cfg.is_active ? 'Activo' : 'Inactivo' }}
+                  </v-chip>
+                </div>
+              </div>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-row>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model="cfg.code" label="Codigo" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-text-field v-model="cfg.name" label="Nombre" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-select
+                    v-model="cfg.applies_to"
+                    :items="appliesOptions"
+                    item-title="title"
+                    item-value="value"
+                    label="Aplica"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model="cfg.account_code" label="Cuenta pasivo" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model.number="cfg.rate" label="Tarifa %" type="number" step="0.0001" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model.number="cfg.base_threshold" label="Base minima" type="number" step="0.01" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-switch v-model="cfg.is_active" color="primary" label="Activo" hide-details density="compact" />
+                </v-col>
+                <v-col cols="12" md="2" class="d-flex align-center">
+                  <v-btn color="primary" :loading="savingId === cfg.config_id" @click="saveConfig(cfg)">
+                    Guardar
+                  </v-btn>
+                </v-col>
+              </v-row>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+        <div v-if="configsTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="configsListPage"
+            :length="configsTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ configsRangeLabel }}
+          </div>
+        </div>
+      </v-card-text>
     </v-card>
 
     <v-dialog v-model="showAddDialog" max-width="640">
@@ -232,11 +360,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { utils, writeFileXLSX } from 'xlsx'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 import { formatMoney } from '@/utils/formatters'
 
@@ -244,6 +373,7 @@ const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const period = accountingService.getDefaultPeriod()
 const filters = ref({
@@ -261,6 +391,10 @@ const showAddDialog = ref(false)
 
 const summary = ref({ kpis: {}, items: [] })
 const configs = ref([])
+const summaryListPage = ref(1)
+const configsListPage = ref(1)
+const SUMMARY_LIST_PAGE_SIZE = 6
+const CONFIGS_LIST_PAGE_SIZE = 6
 
 const appliesOptions = [
   { title: 'Compras', value: 'PURCHASES' },
@@ -282,6 +416,31 @@ const breadcrumbs = computed(() => [
   { title: 'Contabilidad', to: '/accounting', disabled: false },
   { title: 'Retenciones', disabled: true }
 ])
+
+const summaryItems = computed(() => summary.value?.items || [])
+const summaryTotalPages = computed(() => Math.max(1, Math.ceil(summaryItems.value.length / SUMMARY_LIST_PAGE_SIZE)))
+const paginatedSummaryItems = computed(() => {
+  const start = (summaryListPage.value - 1) * SUMMARY_LIST_PAGE_SIZE
+  return summaryItems.value.slice(start, start + SUMMARY_LIST_PAGE_SIZE)
+})
+const summaryRangeLabel = computed(() => {
+  if (!summaryItems.value.length) return '0 de 0 registros'
+  const start = (summaryListPage.value - 1) * SUMMARY_LIST_PAGE_SIZE + 1
+  const end = Math.min(summaryListPage.value * SUMMARY_LIST_PAGE_SIZE, summaryItems.value.length)
+  return `${start} - ${end} de ${summaryItems.value.length} registros`
+})
+
+const configsTotalPages = computed(() => Math.max(1, Math.ceil(configs.value.length / CONFIGS_LIST_PAGE_SIZE)))
+const paginatedConfigs = computed(() => {
+  const start = (configsListPage.value - 1) * CONFIGS_LIST_PAGE_SIZE
+  return configs.value.slice(start, start + CONFIGS_LIST_PAGE_SIZE)
+})
+const configsRangeLabel = computed(() => {
+  if (!configs.value.length) return '0 de 0 registros'
+  const start = (configsListPage.value - 1) * CONFIGS_LIST_PAGE_SIZE + 1
+  const end = Math.min(configsListPage.value * CONFIGS_LIST_PAGE_SIZE, configs.value.length)
+  return `${start} - ${end} de ${configs.value.length} registros`
+})
 
 const sanitizeForExport = (value) => {
   if (value === null || value === undefined) return ''
@@ -439,6 +598,22 @@ const goBackToAccounting = () => {
   const tab = String(route.query.tab || 'compliance')
   router.push({ path: '/accounting', query: { tab } })
 }
+
+watch(() => summaryItems.value.length, () => {
+  summaryListPage.value = 1
+})
+
+watch(() => configs.value.length, () => {
+  configsListPage.value = 1
+})
+
+watch(summaryTotalPages, (total) => {
+  if (summaryListPage.value > total) summaryListPage.value = total
+})
+
+watch(configsTotalPages, (total) => {
+  if (configsListPage.value > total) configsListPage.value = total
+})
 
 onMounted(async () => {
   await Promise.all([loadConfigs(), loadSummary()])

@@ -16,9 +16,21 @@
           <v-icon color="error">mdi-lock-check-outline</v-icon>
           Cierre Contable por Periodo
         </span>
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="loadingClosures" @click="loadClosures">
-          Refrescar
-        </v-btn>
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
+          <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="loadingClosures" @click="loadClosures">
+            Refrescar
+          </v-btn>
+        </div>
       </v-card-title>
       <v-divider />
       <v-card-text>
@@ -88,7 +100,7 @@
     <v-card>
       <v-card-title>Historial de cierres</v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="520">
           <thead>
             <tr>
@@ -119,6 +131,36 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="closures.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          No hay cierres registrados.
+        </v-alert>
+        <v-timeline v-else density="compact" side="end" align="start">
+          <v-timeline-item
+            v-for="item in closures"
+            :key="item.closure_id"
+            :dot-color="item.status === 'CLOSED' ? 'error' : 'success'"
+            size="small"
+          >
+            <template #opposite>
+              <strong>{{ item.period_year }}-{{ String(item.period_month).padStart(2, '0') }}</strong>
+            </template>
+            <div class="mb-1">
+              <v-chip size="x-small" :color="item.status === 'CLOSED' ? 'error' : 'success'">
+                {{ item.status === 'CLOSED' ? 'CERRADO' : 'ABIERTO' }}
+              </v-chip>
+            </div>
+            <div class="text-caption"><strong>Cerrado:</strong> {{ formatDate(item.closed_at) || '-' }}</div>
+            <div class="text-caption"><strong>Reabierto:</strong> {{ formatDate(item.reopened_at) || '-' }}</div>
+            <div class="text-caption"><strong>Notas:</strong> {{ item.notes || '-' }}</div>
+          </v-timeline-item>
+        </v-timeline>
+      </v-card-text>
     </v-card>
   </div>
 </template>
@@ -128,6 +170,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 import { formatDateTime as formatDate } from '@/utils/formatters'
 
@@ -135,6 +178,7 @@ const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const now = new Date()
 const period = ref({

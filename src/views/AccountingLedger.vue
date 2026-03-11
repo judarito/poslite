@@ -104,7 +104,17 @@
             Naturaleza: {{ ledger.account.natural_side }}
           </v-chip>
         </span>
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
           <v-btn
             color="success"
             variant="tonal"
@@ -128,7 +138,7 @@
         </div>
       </v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="560">
           <thead>
             <tr>
@@ -163,16 +173,67 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="!ledger || ledger.movements.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Selecciona una cuenta y consulta para ver el libro mayor.
+        </v-alert>
+        <v-list v-else lines="three" density="compact" class="py-0">
+          <template v-for="(line, idx) in paginatedLedgerMovements" :key="line.line_id">
+            <v-list-item class="px-0">
+              <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+                <div>
+                  <strong>{{ formatDate(line.entry_date) }}</strong>
+                  <span class="ml-2">#{{ line.entry_number }} · L{{ line.line_number }}</span>
+                </div>
+                <v-chip size="x-small" color="primary">{{ line.source_module }}</v-chip>
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                <div>{{ line.line_description || line.entry_description || '-' }}</div>
+                <div class="mt-1">
+                  <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
+                  <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
+                </div>
+                <div class="mt-1">
+                  <strong>Movimiento:</strong>
+                  <span :class="line.delta >= 0 ? 'text-success' : 'text-error'">
+                    {{ line.delta >= 0 ? '+' : '' }}{{ formatMoney(line.delta) }}
+                  </span>
+                  |
+                  <strong>Saldo:</strong> {{ formatMoney(line.running_balance) }}
+                </div>
+              </v-list-item-subtitle>
+            </v-list-item>
+            <v-divider v-if="idx < paginatedLedgerMovements.length - 1" />
+          </template>
+        </v-list>
+        <div v-if="ledgerListTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="ledgerListPage"
+            :length="ledgerListTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ ledgerListRangeLabel }}
+          </div>
+        </div>
+      </v-card-text>
     </v-card>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { utils, writeFileXLSX } from 'xlsx'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
@@ -180,6 +241,7 @@ const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const period = accountingService.getDefaultPeriod()
 const loading = ref(false)
@@ -201,6 +263,8 @@ const statusOptions = [
 
 const accounts = ref([])
 const ledger = ref(null)
+const ledgerListPage = ref(1)
+const LEDGER_LIST_PAGE_SIZE = 12
 
 const breadcrumbs = computed(() => [
   { title: 'Contabilidad', to: '/accounting', disabled: false },
@@ -217,6 +281,19 @@ const accountOptions = computed(() => {
 const selectedAccountLabel = computed(() => {
   const selected = accountOptions.value.find((account) => account.account_id === filters.value.account_id)
   return selected?.label || ''
+})
+
+const ledgerMovements = computed(() => ledger.value?.movements || [])
+const ledgerListTotalPages = computed(() => Math.max(1, Math.ceil(ledgerMovements.value.length / LEDGER_LIST_PAGE_SIZE)))
+const paginatedLedgerMovements = computed(() => {
+  const start = (ledgerListPage.value - 1) * LEDGER_LIST_PAGE_SIZE
+  return ledgerMovements.value.slice(start, start + LEDGER_LIST_PAGE_SIZE)
+})
+const ledgerListRangeLabel = computed(() => {
+  if (!ledgerMovements.value.length) return '0 de 0 registros'
+  const start = (ledgerListPage.value - 1) * LEDGER_LIST_PAGE_SIZE + 1
+  const end = Math.min(ledgerListPage.value * LEDGER_LIST_PAGE_SIZE, ledgerMovements.value.length)
+  return `${start} - ${end} de ${ledgerMovements.value.length} registros`
 })
 
 const sanitizeForExport = (value) => {
@@ -352,6 +429,14 @@ const goBackToAccounting = () => {
   const tab = String(route.query.tab || 'compliance')
   router.push({ path: '/accounting', query: { tab } })
 }
+
+watch(() => ledgerMovements.value.length, () => {
+  ledgerListPage.value = 1
+})
+
+watch(ledgerListTotalPages, (total) => {
+  if (ledgerListPage.value > total) ledgerListPage.value = total
+})
 
 onMounted(async () => {
   await loadAccounts()

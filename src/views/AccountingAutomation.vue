@@ -16,7 +16,17 @@
           <v-icon color="secondary">mdi-cogs</v-icon>
           Automatizacion Contable
         </span>
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center gap-2 flex-wrap">
+          <v-btn-toggle
+            v-model="viewMode"
+            mandatory
+            color="primary"
+            density="comfortable"
+            variant="outlined"
+          >
+            <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
+            <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+          </v-btn-toggle>
           <v-btn color="success" variant="tonal" prepend-icon="mdi-play-circle-outline" :loading="processingQueue" @click="processQueueNow">
             Procesar cola
           </v-btn>
@@ -76,7 +86,7 @@
         </v-btn>
       </v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="360">
           <thead>
             <tr>
@@ -133,12 +143,97 @@
           </tbody>
         </v-table>
       </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="filteredRules.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          No hay reglas para el filtro seleccionado.
+        </v-alert>
+        <v-expansion-panels v-else variant="accordion">
+          <v-expansion-panel v-for="rule in paginatedRules" :key="rule.rule_id">
+            <v-expansion-panel-title>
+              <div class="d-flex align-center justify-space-between w-100 pr-2 flex-wrap ga-2">
+                <div class="font-weight-medium">{{ rule.rule_name || 'Regla sin nombre' }}</div>
+                <div class="d-flex align-center ga-1">
+                  <v-chip size="x-small" color="primary">{{ rule.source_module }}</v-chip>
+                  <v-chip size="x-small" color="secondary">{{ rule.event_type }}</v-chip>
+                </div>
+              </div>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field v-model="rule.rule_name" label="Nombre" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-select
+                    v-model="rule.source_module"
+                    :items="moduleOptions.filter((m) => m.value !== 'ALL')"
+                    item-title="title"
+                    item-value="value"
+                    label="Modulo"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-select
+                    v-model="rule.event_type"
+                    :items="eventOptions.filter((e) => e.value !== 'ALL')"
+                    item-title="title"
+                    item-value="value"
+                    label="Evento"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model="rule.debit_account_code" label="Cuenta debito" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="3">
+                  <v-text-field v-model="rule.credit_account_code" label="Cuenta credito" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-text-field v-model.number="rule.priority" label="Prioridad" type="number" density="compact" variant="outlined" hide-details />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-switch v-model="rule.auto_post" label="Auto post" density="compact" color="primary" hide-details />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-switch v-model="rule.is_active" label="Activa" density="compact" color="primary" hide-details />
+                </v-col>
+                <v-col cols="12" md="2" class="d-flex align-center">
+                  <v-btn color="primary" :loading="savingRuleId === rule.rule_id" @click="saveRule(rule)">
+                    Guardar
+                  </v-btn>
+                </v-col>
+              </v-row>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+        <div v-if="rulesTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="rulesListPage"
+            :length="rulesTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ rulesRangeLabel }}
+          </div>
+        </div>
+      </v-card-text>
     </v-card>
 
     <v-card>
       <v-card-title>Excepciones de automatizacion</v-card-title>
       <v-divider />
-      <v-card-text class="pa-0">
+      <v-card-text v-if="isTableView" class="pa-0">
         <v-table density="comfortable" fixed-header height="360">
           <thead>
             <tr>
@@ -182,6 +277,60 @@
             </tr>
           </tbody>
         </v-table>
+      </v-card-text>
+      <v-card-text v-else>
+        <v-alert
+          v-if="exceptions.length === 0"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          No hay excepciones para el filtro seleccionado.
+        </v-alert>
+        <v-list v-else lines="three" density="compact" class="py-0">
+          <template v-for="(item, idx) in paginatedExceptions" :key="item.exception_id">
+            <v-list-item class="px-0">
+              <template #prepend>
+                <v-icon color="warning">mdi-alert-circle-outline</v-icon>
+              </template>
+              <v-list-item-title class="d-flex align-center ga-2 flex-wrap">
+                <span>{{ item.source_module }} · {{ item.event_type }}</span>
+                <v-chip size="x-small" :color="item.status === 'OPEN' ? 'error' : (item.status === 'RESOLVED' ? 'success' : 'grey')">
+                  {{ item.status }}
+                </v-chip>
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                <div><strong>Fecha:</strong> {{ formatDate(item.created_at) }}</div>
+                <div><strong>Referencia:</strong> <code>{{ item.source_id || '-' }}</code></div>
+                <div class="text-caption mt-1">{{ item.reason }}</div>
+              </v-list-item-subtitle>
+              <template #append>
+                <v-btn
+                  v-if="item.status === 'OPEN'"
+                  color="success"
+                  size="small"
+                  variant="tonal"
+                  :loading="resolvingExceptionId === item.exception_id"
+                  @click="resolveException(item)"
+                >
+                  Resolver
+                </v-btn>
+              </template>
+            </v-list-item>
+            <v-divider v-if="idx < paginatedExceptions.length - 1" />
+          </template>
+        </v-list>
+        <div v-if="exceptionsTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
+          <v-pagination
+            v-model="exceptionsListPage"
+            :length="exceptionsTotalPages"
+            :total-visible="$vuetify.display.xs ? 5 : 7"
+            size="small"
+          />
+          <div class="text-caption text-medium-emphasis">
+            Mostrando {{ exceptionsRangeLabel }}
+          </div>
+        </div>
       </v-card-text>
     </v-card>
 
@@ -241,10 +390,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
+import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
 import { formatDateTime as formatDate } from '@/utils/formatters'
 
@@ -252,6 +402,7 @@ const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
+const { viewMode, isTableView } = useAccountingViewMode()
 
 const loadingRules = ref(false)
 const loadingExceptions = ref(false)
@@ -263,6 +414,10 @@ const showAddDialog = ref(false)
 
 const rules = ref([])
 const exceptions = ref([])
+const rulesListPage = ref(1)
+const exceptionsListPage = ref(1)
+const RULES_LIST_PAGE_SIZE = 6
+const EXCEPTIONS_LIST_PAGE_SIZE = 8
 
 const filters = ref({
   source_module: 'ALL',
@@ -312,6 +467,30 @@ const filteredRules = computed(() => {
     const eventOk = filters.value.event_type === 'ALL' || rule.event_type === filters.value.event_type
     return sourceOk && eventOk
   })
+})
+
+const rulesTotalPages = computed(() => Math.max(1, Math.ceil(filteredRules.value.length / RULES_LIST_PAGE_SIZE)))
+const paginatedRules = computed(() => {
+  const start = (rulesListPage.value - 1) * RULES_LIST_PAGE_SIZE
+  return filteredRules.value.slice(start, start + RULES_LIST_PAGE_SIZE)
+})
+const rulesRangeLabel = computed(() => {
+  if (!filteredRules.value.length) return '0 de 0 registros'
+  const start = (rulesListPage.value - 1) * RULES_LIST_PAGE_SIZE + 1
+  const end = Math.min(rulesListPage.value * RULES_LIST_PAGE_SIZE, filteredRules.value.length)
+  return `${start} - ${end} de ${filteredRules.value.length} registros`
+})
+
+const exceptionsTotalPages = computed(() => Math.max(1, Math.ceil(exceptions.value.length / EXCEPTIONS_LIST_PAGE_SIZE)))
+const paginatedExceptions = computed(() => {
+  const start = (exceptionsListPage.value - 1) * EXCEPTIONS_LIST_PAGE_SIZE
+  return exceptions.value.slice(start, start + EXCEPTIONS_LIST_PAGE_SIZE)
+})
+const exceptionsRangeLabel = computed(() => {
+  if (!exceptions.value.length) return '0 de 0 registros'
+  const start = (exceptionsListPage.value - 1) * EXCEPTIONS_LIST_PAGE_SIZE + 1
+  const end = Math.min(exceptionsListPage.value * EXCEPTIONS_LIST_PAGE_SIZE, exceptions.value.length)
+  return `${start} - ${end} de ${exceptions.value.length} registros`
 })
 
 const loadRules = async () => {
@@ -443,6 +622,22 @@ const goBackToAccounting = () => {
   const tab = String(route.query.tab || 'compliance')
   router.push({ path: '/accounting', query: { tab } })
 }
+
+watch(() => filteredRules.value.length, () => {
+  rulesListPage.value = 1
+})
+
+watch(() => exceptions.value.length, () => {
+  exceptionsListPage.value = 1
+})
+
+watch(rulesTotalPages, (total) => {
+  if (rulesListPage.value > total) rulesListPage.value = total
+})
+
+watch(exceptionsTotalPages, (total) => {
+  if (exceptionsListPage.value > total) exceptionsListPage.value = total
+})
 
 onMounted(loadAll)
 </script>
