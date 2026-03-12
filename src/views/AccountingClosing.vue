@@ -27,7 +27,13 @@
             <v-btn value="LIST" size="small" prepend-icon="mdi-view-list">Lista</v-btn>
             <v-btn value="TABLE" size="small" prepend-icon="mdi-table">Tabla</v-btn>
           </v-btn-toggle>
-          <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="loadingClosures" @click="loadClosures">
+          <v-btn
+            color="primary"
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="loadingClosures || loadingChecklist"
+            @click="loadAll"
+          >
             Refrescar
           </v-btn>
         </div>
@@ -94,6 +100,74 @@
         <v-alert type="info" variant="tonal" class="mt-4" density="comfortable">
           Solo se puede contabilizar cuando el periodo existe y esta OPEN. Si no existe o esta CLOSED, el posteo se bloquea.
         </v-alert>
+      </v-card-text>
+    </v-card>
+
+    <v-card class="mb-4">
+      <v-card-title class="d-flex align-center justify-space-between">
+        <span>Checklist previo al cierre</span>
+        <v-chip size="small" color="primary">{{ closeChecks.length }} controles</v-chip>
+      </v-card-title>
+      <v-divider />
+      <v-card-text v-if="isTableView" class="pa-0">
+        <v-table density="comfortable" fixed-header height="340">
+          <thead>
+            <tr>
+              <th>Control</th>
+              <th>Estado</th>
+              <th class="text-right">Valor</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in closeChecks" :key="item.key">
+              <td>{{ item.title }}</td>
+              <td>
+                <v-chip size="x-small" :color="getCheckColor(item.status)">
+                  {{ item.status }}
+                </v-chip>
+              </td>
+              <td class="text-right">{{ item.value ?? '-' }}</td>
+              <td class="text-caption">{{ item.detail || '-' }}</td>
+            </tr>
+            <tr v-if="closeChecks.length === 0">
+              <td colspan="4" class="text-center text-medium-emphasis py-6">Sin controles para el periodo seleccionado.</td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card-text>
+      <v-card-text v-else>
+        <ListView
+          title="Checklist de cierre"
+          icon="mdi-clipboard-check-outline"
+          :items="paginatedCloseChecks"
+          :total-items="closeChecks.length"
+          :loading="loadingChecklist"
+          :page-size="CHECKS_LIST_PAGE_SIZE"
+          item-key="key"
+          title-field="title"
+          avatar-icon="mdi-clipboard-check-outline"
+          avatar-color="primary"
+          empty-message="Sin controles para el periodo seleccionado."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onChecksListPage"
+        >
+          <template #title="{ item }">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+              <span class="font-weight-medium">{{ item.title }}</span>
+              <v-chip size="x-small" :color="getCheckColor(item.status)">
+                {{ item.status }}
+              </v-chip>
+            </div>
+          </template>
+          <template #content="{ item }">
+            <div class="text-caption">Valor: {{ item.value ?? '-' }}</div>
+            <div class="text-caption">{{ item.detail || '-' }}</div>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
 
@@ -193,11 +267,15 @@ const period = ref({
 })
 
 const loadingClosures = ref(false)
+const loadingChecklist = ref(false)
 const closingPeriod = ref(false)
 const openingPeriod = ref(false)
 const closures = ref([])
+const checklist = ref({ period: {}, checks: [] })
 const closuresListPage = ref(1)
+const checksListPage = ref(1)
 const CLOSURES_LIST_PAGE_SIZE = 8
+const CHECKS_LIST_PAGE_SIZE = 6
 
 const monthOptions = [
   { value: 1, title: '01 - Enero' },
@@ -251,6 +329,28 @@ const paginatedClosures = computed(() => {
   const start = (closuresListPage.value - 1) * CLOSURES_LIST_PAGE_SIZE
   return closures.value.slice(start, start + CLOSURES_LIST_PAGE_SIZE)
 })
+const closeChecks = computed(() => checklist.value?.checks || [])
+const checksTotalPages = computed(() => Math.max(1, Math.ceil(closeChecks.value.length / CHECKS_LIST_PAGE_SIZE)))
+const paginatedCloseChecks = computed(() => {
+  const start = (checksListPage.value - 1) * CHECKS_LIST_PAGE_SIZE
+  return closeChecks.value.slice(start, start + CHECKS_LIST_PAGE_SIZE)
+})
+
+const getCheckColor = (status) => {
+  if (status === 'PASS') return 'success'
+  if (status === 'WARN') return 'warning'
+  if (status === 'INFO') return 'primary'
+  return 'grey'
+}
+
+const buildPeriodRange = (year, month) => {
+  const safeYear = Number(year || now.getFullYear())
+  const safeMonth = Math.min(12, Math.max(1, Number(month || (now.getMonth() + 1))))
+  const dateFrom = `${safeYear}-${String(safeMonth).padStart(2, '0')}-01`
+  const lastDay = new Date(safeYear, safeMonth, 0).getDate()
+  const dateTo = `${safeYear}-${String(safeMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return { date_from: dateFrom, date_to: dateTo }
+}
 
 const loadClosures = async () => {
   if (!tenantId.value) return
@@ -271,6 +371,26 @@ const loadClosures = async () => {
   }
 }
 
+const loadChecklist = async () => {
+  if (!tenantId.value) return
+  loadingChecklist.value = true
+  try {
+    const periodRange = buildPeriodRange(period.value.year, period.value.month)
+    const result = await accountingService.getCloseChecklist(tenantId.value, periodRange)
+    if (!result.success) {
+      show(result.error || 'No se pudo cargar checklist de cierre.', 'error')
+      return
+    }
+    checklist.value = result.data || { period: periodRange, checks: [] }
+  } finally {
+    loadingChecklist.value = false
+  }
+}
+
+const loadAll = async () => {
+  await Promise.all([loadClosures(), loadChecklist()])
+}
+
 const closeCurrentPeriod = async () => {
   if (!tenantId.value) return
   closingPeriod.value = true
@@ -287,7 +407,7 @@ const closeCurrentPeriod = async () => {
     }
 
     show('Periodo cerrado correctamente.', 'success')
-    await loadClosures()
+    await loadAll()
   } finally {
     closingPeriod.value = false
   }
@@ -309,7 +429,7 @@ const openCurrentPeriod = async () => {
     }
 
     show('Periodo abierto correctamente.', 'success')
-    await loadClosures()
+    await loadAll()
   } finally {
     openingPeriod.value = false
   }
@@ -324,13 +444,32 @@ const onClosuresListPage = ({ page }) => {
   closuresListPage.value = Number(page || 1)
 }
 
+const onChecksListPage = ({ page }) => {
+  checksListPage.value = Number(page || 1)
+}
+
 watch(() => closures.value.length, () => {
   closuresListPage.value = 1
+})
+
+watch(() => closeChecks.value.length, () => {
+  checksListPage.value = 1
 })
 
 watch(closuresTotalPages, (total) => {
   if (closuresListPage.value > total) closuresListPage.value = total
 })
 
-onMounted(loadClosures)
+watch(checksTotalPages, (total) => {
+  if (checksListPage.value > total) checksListPage.value = total
+})
+
+watch(
+  () => [period.value.year, period.value.month],
+  () => {
+    loadChecklist()
+  }
+)
+
+onMounted(loadAll)
 </script>

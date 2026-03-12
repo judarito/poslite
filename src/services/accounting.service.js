@@ -430,6 +430,48 @@ class AccountingService {
           purpose: 'Reglas de contabilización automática y excepciones de integración.',
           route: '/accounting/automatizacion',
           status: pendingQueueEvents > 0 ? 'ALERT' : 'READY'
+        },
+        {
+          key: 'manual_entries',
+          name: 'Asientos Manuales',
+          purpose: 'Registrar, postear o anular asientos manuales controlados por periodo.',
+          route: '/accounting/asientos-manuales',
+          status: draftEntries > 0 ? 'ALERT' : (postedEntries > 0 ? 'READY' : 'PENDING')
+        },
+        {
+          key: 'chart_of_accounts',
+          name: 'Plan de Cuentas',
+          purpose: 'Administrar codificación, naturaleza y estado de cuentas contables.',
+          route: '/accounting/plan-cuentas',
+          status: 'READY'
+        },
+        {
+          key: 'financial_statements_module',
+          name: 'Estados Financieros',
+          purpose: 'Consultar estado de resultados y balance general por periodo.',
+          route: '/accounting/estados-financieros',
+          status: postedEntries > 0 ? 'READY' : 'PENDING'
+        },
+        {
+          key: 'tax_center',
+          name: 'Centro Tributario',
+          purpose: 'Consolidar IVA, retenciones y vista preliminar de exógena.',
+          route: '/accounting/centro-tributario',
+          status: sales.length > 0 || purchases.length > 0 ? 'READY' : 'PENDING'
+        },
+        {
+          key: 'reconciliation',
+          name: 'Conciliación Caja/Bancos',
+          purpose: 'Cruzar cierres de caja contra saldos contables de caja y bancos.',
+          route: '/accounting/conciliacion',
+          status: pendingQueueEvents > 0 ? 'ALERT' : 'PARTIAL'
+        },
+        {
+          key: 'ai_internal_control',
+          name: 'Control Interno IA',
+          purpose: 'Detectar asientos atípicos y priorizar acciones de auditoría.',
+          route: '/accounting/control-ia',
+          status: postedEntries > 0 ? 'PARTIAL' : 'PENDING'
         }
       ]
 
@@ -1060,6 +1102,796 @@ class AccountingService {
 
       if (error) throw error
       return { success: true, data: Array.isArray(data) ? data[0] : data }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getCurrentUserProfile() {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser()
+      if (authError) throw authError
+      const authUserId = authData?.user?.id
+      if (!authUserId) return { success: false, error: 'Usuario no autenticado', data: null }
+
+      const { data, error } = await supabaseService.client
+        .from('users')
+        .select('user_id, tenant_id, full_name, email')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle()
+
+      if (error) throw error
+      if (!data?.user_id) return { success: false, error: 'Perfil de usuario no encontrado', data: null }
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getManualEntries(tenantId, filters = {}) {
+    return this.getJournalEntries(tenantId, {
+      ...filters,
+      source_module: 'MANUAL',
+      limit: filters.limit || 1000
+    })
+  }
+
+  async createManualEntry(tenantId, payload = {}) {
+    try {
+      const entryDate = payload.entry_date || new Date().toISOString().substring(0, 10)
+      const description = String(payload.description || '').trim()
+      const lines = Array.isArray(payload.lines) ? payload.lines : []
+
+      if (lines.length < 2) {
+        return { success: false, error: 'El asiento debe tener al menos dos lineas.' }
+      }
+
+      let totalDebit = 0
+      let totalCredit = 0
+      for (const line of lines) {
+        const debit = Number(line.debit_amount || 0)
+        const credit = Number(line.credit_amount || 0)
+        totalDebit += debit
+        totalCredit += credit
+
+        if (!line.account_id) {
+          return { success: false, error: 'Todas las lineas deben tener cuenta contable.' }
+        }
+        if ((debit > 0 && credit > 0) || (debit <= 0 && credit <= 0)) {
+          return { success: false, error: 'Cada linea debe tener solo debito o solo credito.' }
+        }
+      }
+
+      if (Math.round(totalDebit * 100) !== Math.round(totalCredit * 100)) {
+        return { success: false, error: 'El asiento no esta balanceado.' }
+      }
+
+      const userResult = await this.getCurrentUserProfile()
+      if (!userResult.success) return userResult
+
+      const profile = userResult.data
+
+      const { data: entryRows, error: entryError } = await supabaseService.client
+        .from('accounting_entries')
+        .insert({
+          tenant_id: tenantId,
+          entry_date: entryDate,
+          source_module: 'MANUAL',
+          source_event: 'MANUAL_ENTRY',
+          description: description || 'Asiento manual',
+          status: 'DRAFT',
+          created_by: profile.user_id
+        })
+        .select('*')
+        .limit(1)
+
+      if (entryError) throw entryError
+
+      const entry = Array.isArray(entryRows) ? entryRows[0] : entryRows
+      if (!entry?.entry_id) {
+        return { success: false, error: 'No se pudo crear la cabecera del asiento.' }
+      }
+
+      const linesPayload = lines.map((line, index) => ({
+        entry_id: entry.entry_id,
+        tenant_id: tenantId,
+        line_number: index + 1,
+        account_id: line.account_id,
+        third_party_id: line.third_party_id || null,
+        description: String(line.description || '').trim() || null,
+        debit_amount: Number(line.debit_amount || 0),
+        credit_amount: Number(line.credit_amount || 0),
+        cost_center: line.cost_center ? String(line.cost_center).trim() : null
+      }))
+
+      const { error: linesError } = await supabaseService.client
+        .from('accounting_entry_lines')
+        .insert(linesPayload)
+
+      if (linesError) {
+        await supabaseService.client
+          .from('accounting_entries')
+          .delete()
+          .eq('tenant_id', tenantId)
+          .eq('entry_id', entry.entry_id)
+        throw linesError
+      }
+
+      return { success: true, data: entry }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async postEntry(tenantId, entryId, postedBy = null) {
+    try {
+      const { data, error } = await supabaseService.client
+        .rpc('fn_accounting_post_entry', {
+          p_tenant_id: tenantId,
+          p_entry_id: entryId,
+          p_posted_by: postedBy || null
+        })
+
+      if (error) throw error
+      if (!data?.success) {
+        return { success: false, error: data?.message || 'No se pudo postear el asiento', data }
+      }
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async voidDraftEntry(tenantId, entryId, reason = '') {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('accounting_entries')
+        .update({
+          status: 'VOIDED',
+          description: reason
+            ? `ANULADO: ${String(reason).trim()}`
+            : undefined
+        })
+        .eq('tenant_id', tenantId)
+        .eq('entry_id', entryId)
+        .eq('status', 'DRAFT')
+        .select('*')
+        .limit(1)
+
+      if (error) throw error
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Solo se pueden anular asientos en borrador.' }
+      }
+      return { success: true, data: data[0] }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getChartOfAccounts(tenantId, options = {}) {
+    try {
+      let query = supabaseService.client
+        .from('accounting_accounts')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('code', { ascending: true })
+
+      if (!options.includeInactive) {
+        query = query.eq('is_active', true)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  async saveAccount(tenantId, account = {}) {
+    try {
+      const payload = {
+        tenant_id: tenantId,
+        code: String(account.code || '').trim(),
+        name: String(account.name || '').trim(),
+        account_class: String(account.account_class || '').trim(),
+        account_type: String(account.account_type || '').trim().toUpperCase(),
+        natural_side: String(account.natural_side || '').trim().toUpperCase(),
+        parent_account_id: account.parent_account_id || null,
+        is_postable: account.is_postable !== false,
+        is_active: account.is_active !== false,
+        is_system: Boolean(account.is_system)
+      }
+
+      if (!payload.code || !payload.name || !payload.account_class || !payload.account_type || !payload.natural_side) {
+        return { success: false, error: 'code, name, account_class, account_type y natural_side son requeridos.' }
+      }
+
+      if (account.account_id) {
+        const { data, error } = await supabaseService.client
+          .from('accounting_accounts')
+          .update(payload)
+          .eq('tenant_id', tenantId)
+          .eq('account_id', account.account_id)
+          .select('*')
+          .limit(1)
+
+        if (error) throw error
+        return { success: true, data: Array.isArray(data) ? data[0] : data }
+      }
+
+      const { data, error } = await supabaseService.client
+        .from('accounting_accounts')
+        .insert(payload)
+        .select('*')
+        .limit(1)
+
+      if (error) throw error
+      return { success: true, data: Array.isArray(data) ? data[0] : data }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async toggleAccountActive(tenantId, accountId, isActive) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('accounting_accounts')
+        .update({ is_active: Boolean(isActive) })
+        .eq('tenant_id', tenantId)
+        .eq('account_id', accountId)
+        .select('*')
+        .limit(1)
+
+      if (error) throw error
+      return { success: true, data: Array.isArray(data) ? data[0] : data }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getFinancialStatements(tenantId, filters = {}) {
+    try {
+      const trial = await this.getTrialBalance(tenantId, filters)
+      if (!trial.success) return trial
+
+      const rows = trial.data || []
+      const byType = {
+        ASSET: [],
+        LIABILITY: [],
+        EQUITY: [],
+        INCOME: [],
+        COST: [],
+        EXPENSE: []
+      }
+
+      const signedValue = (row) => {
+        const debit = Number(row.debit_total || 0)
+        const credit = Number(row.credit_total || 0)
+        return row.natural_side === 'CREDIT' ? credit - debit : debit - credit
+      }
+
+      rows.forEach((row) => {
+        const type = String(row.account_type || '').toUpperCase()
+        if (byType[type]) {
+          byType[type].push({
+            ...row,
+            signed_amount: signedValue(row)
+          })
+        }
+      })
+
+      const sumSigned = (items) => items.reduce((acc, item) => acc + Number(item.signed_amount || 0), 0)
+      const totalAssets = sumSigned(byType.ASSET)
+      const totalLiabilities = sumSigned(byType.LIABILITY)
+      const totalEquity = sumSigned(byType.EQUITY)
+      const totalIncome = sumSigned(byType.INCOME)
+      const totalCost = sumSigned(byType.COST)
+      const totalExpense = sumSigned(byType.EXPENSE)
+      const netProfit = totalIncome - totalCost - totalExpense
+
+      return {
+        success: true,
+        data: {
+          period: {
+            date_from: filters.date_from || null,
+            date_to: filters.date_to || null
+          },
+          income_statement: {
+            income: totalIncome,
+            cost: totalCost,
+            expense: totalExpense,
+            net_profit: netProfit,
+            details: {
+              income: byType.INCOME,
+              cost: byType.COST,
+              expense: byType.EXPENSE
+            }
+          },
+          balance_sheet: {
+            assets: totalAssets,
+            liabilities: totalLiabilities,
+            equity: totalEquity,
+            retained_earnings_current: netProfit,
+            liabilities_plus_equity: totalLiabilities + totalEquity + netProfit,
+            details: {
+              assets: byType.ASSET,
+              liabilities: byType.LIABILITY,
+              equity: byType.EQUITY
+            }
+          }
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getTaxCenterData(tenantId, filters = {}) {
+    try {
+      const period = {
+        ...this.getDefaultPeriod(),
+        ...filters
+      }
+
+      const fromDateTime = `${period.date_from}T00:00:00`
+      const toDateTime = `${period.date_to}T23:59:59.999`
+
+      const [salesRes, purchasesRes, withholdingRes] = await Promise.all([
+        supabaseService.client
+          .from('sales')
+          .select('sale_id, sold_at, third_party_id, subtotal, tax_total, total, status')
+          .eq('tenant_id', tenantId)
+          .in('status', ['COMPLETED', 'PARTIAL_RETURN', 'RETURNED'])
+          .gte('sold_at', fromDateTime)
+          .lte('sold_at', toDateTime),
+        supabaseService.client
+          .from('purchases')
+          .select('purchase_id, created_at, supplier_id, total')
+          .eq('tenant_id', tenantId)
+          .gte('created_at', fromDateTime)
+          .lte('created_at', toDateTime),
+        this.getWithholdingSummary(tenantId, period)
+      ])
+
+      if (salesRes.error) throw salesRes.error
+      if (purchasesRes.error) throw purchasesRes.error
+      if (!withholdingRes.success) {
+        return { success: false, error: withholdingRes.error || 'No se pudo cargar retenciones.', data: null }
+      }
+
+      const sales = salesRes.data || []
+      const purchases = purchasesRes.data || []
+
+      const ivaGenerated = sales.reduce((acc, row) => acc + Number(row.tax_total || 0), 0)
+      const ivaPurchasesBase = purchases.reduce((acc, row) => acc + Number(row.total || 0), 0)
+
+      const byCounterparty = new Map()
+      sales.forEach((sale) => {
+        const key = sale.third_party_id || 'CONSUMIDOR_FINAL'
+        if (!byCounterparty.has(key)) {
+          byCounterparty.set(key, {
+            counterparty_id: key,
+            sales_total: 0,
+            purchases_total: 0,
+            operations_count: 0
+          })
+        }
+        const current = byCounterparty.get(key)
+        current.sales_total += Number(sale.total || 0)
+        current.operations_count += 1
+      })
+      purchases.forEach((purchase) => {
+        const key = purchase.supplier_id || 'SUPPLIER_UNDEFINED'
+        if (!byCounterparty.has(key)) {
+          byCounterparty.set(key, {
+            counterparty_id: key,
+            sales_total: 0,
+            purchases_total: 0,
+            operations_count: 0
+          })
+        }
+        const current = byCounterparty.get(key)
+        current.purchases_total += Number(purchase.total || 0)
+        current.operations_count += 1
+      })
+
+      const exogenaPreview = Array.from(byCounterparty.values())
+        .map((row) => ({
+          ...row,
+          grand_total: Number(row.sales_total || 0) + Number(row.purchases_total || 0)
+        }))
+        .sort((a, b) => b.grand_total - a.grand_total)
+
+      return {
+        success: true,
+        data: {
+          period,
+          iva: {
+            generated: ivaGenerated,
+            deductible_estimated: 0,
+            purchases_base_reference: ivaPurchasesBase,
+            payable_estimated: ivaGenerated
+          },
+          withholdings: withholdingRes.data || { items: [], kpis: {} },
+          exogena_preview: exogenaPreview
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getCloseChecklist(tenantId, filters = {}) {
+    try {
+      const period = {
+        ...this.getDefaultPeriod(),
+        ...filters
+      }
+
+      const fromDate = period.date_from
+      const toDate = period.date_to
+
+      const [entriesRes, queueRes, exceptionsRes, trialRes] = await Promise.all([
+        supabaseService.client
+          .from('accounting_entries')
+          .select('entry_id, status, entry_date')
+          .eq('tenant_id', tenantId)
+          .gte('entry_date', fromDate)
+          .lte('entry_date', toDate),
+        supabaseService.client
+          .from('accounting_event_queue')
+          .select('event_id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .in('status', ['PENDING', 'FAILED']),
+        supabaseService.client
+          .from('accounting_automation_exceptions')
+          .select('exception_id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .eq('status', 'OPEN'),
+        this.getTrialBalance(tenantId, { date_from: fromDate, date_to: toDate })
+      ])
+
+      if (entriesRes.error) throw entriesRes.error
+      if (queueRes.error) throw queueRes.error
+      if (exceptionsRes.error) throw exceptionsRes.error
+      if (!trialRes.success) return trialRes
+
+      const entries = entriesRes.data || []
+      const drafts = entries.filter((entry) => entry.status === 'DRAFT').length
+      const voided = entries.filter((entry) => entry.status === 'VOIDED').length
+      const posted = entries.filter((entry) => entry.status === 'POSTED').length
+      const pendingQueue = Number(queueRes.count || 0)
+      const openExceptions = Number(exceptionsRes.count || 0)
+      const trialRows = trialRes.data || []
+      const hasMovements = trialRows.some((row) => Number(row.debit_total || 0) > 0 || Number(row.credit_total || 0) > 0)
+
+      const checks = [
+        {
+          key: 'draft_entries',
+          title: 'Sin asientos en borrador',
+          status: drafts === 0 ? 'PASS' : 'WARN',
+          value: drafts,
+          detail: drafts === 0 ? 'No hay borradores pendientes.' : `Hay ${drafts} asientos en DRAFT.`
+        },
+        {
+          key: 'pending_queue',
+          title: 'Cola contable al dia',
+          status: pendingQueue === 0 ? 'PASS' : 'WARN',
+          value: pendingQueue,
+          detail: pendingQueue === 0 ? 'Sin eventos pendientes/fallidos.' : `${pendingQueue} eventos pendientes/fallidos.`
+        },
+        {
+          key: 'automation_exceptions',
+          title: 'Excepciones de automatizacion resueltas',
+          status: openExceptions === 0 ? 'PASS' : 'WARN',
+          value: openExceptions,
+          detail: openExceptions === 0 ? 'No hay excepciones abiertas.' : `${openExceptions} excepciones abiertas.`
+        },
+        {
+          key: 'posted_entries',
+          title: 'Movimiento contable del periodo',
+          status: posted > 0 && hasMovements ? 'PASS' : 'WARN',
+          value: posted,
+          detail: posted > 0 ? `${posted} asientos posteados en el periodo.` : 'No hay asientos posteados en el periodo.'
+        },
+        {
+          key: 'voided_entries',
+          title: 'Asientos anulados controlados',
+          status: 'INFO',
+          value: voided,
+          detail: `${voided} asientos anulados (revisar soporte documental).`
+        }
+      ]
+
+      return {
+        success: true,
+        data: {
+          period,
+          checks
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async getReconciliationSnapshot(tenantId, filters = {}) {
+    try {
+      const period = {
+        ...this.getDefaultPeriod(),
+        ...filters
+      }
+
+      const fromDateTime = `${period.date_from}T00:00:00`
+      const toDateTime = `${period.date_to}T23:59:59.999`
+
+      const [cashSessionsRes, accountsRes] = await Promise.all([
+        supabaseService.client
+          .from('cash_sessions')
+          .select('cash_session_id, opening_amount, closing_amount_expected, closing_amount_counted, difference, status, opened_at, closed_at')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'CLOSED')
+          .gte('opened_at', fromDateTime)
+          .lte('opened_at', toDateTime),
+        this.getAccounts(tenantId, { onlyPostable: true, limit: 5000 })
+      ])
+
+      if (cashSessionsRes.error) throw cashSessionsRes.error
+      if (!accountsRes.success) return accountsRes
+
+      const sessions = cashSessionsRes.data || []
+      const cashExpected = sessions.reduce((acc, row) => acc + Number(row.closing_amount_expected || 0), 0)
+      const cashCounted = sessions.reduce((acc, row) => acc + Number(row.closing_amount_counted || 0), 0)
+      const cashDifference = sessions.reduce((acc, row) => acc + Number(row.difference || 0), 0)
+
+      const candidateAccounts = (accountsRes.data || []).filter((account) => String(account.code || '').startsWith('11'))
+      const ledgerBalances = []
+
+      for (const account of candidateAccounts.slice(0, 25)) {
+        const ledgerResult = await this.getLedgerReport(tenantId, {
+          account_id: account.account_id,
+          date_from: period.date_from,
+          date_to: period.date_to,
+          status: 'POSTED',
+          limit: 2500
+        })
+        if (!ledgerResult.success || !ledgerResult.data) continue
+        ledgerBalances.push({
+          account_id: account.account_id,
+          account_code: account.code,
+          account_name: account.name,
+          closing_balance: Number(ledgerResult.data.closing_balance || 0)
+        })
+      }
+
+      const ledgerCashBalance = ledgerBalances.reduce((acc, row) => acc + Number(row.closing_balance || 0), 0)
+
+      return {
+        success: true,
+        data: {
+          period,
+          cash_sessions: sessions,
+          ledger_cash_accounts: ledgerBalances,
+          kpis: {
+            sessions_closed: sessions.length,
+            cash_expected_total: cashExpected,
+            cash_counted_total: cashCounted,
+            cash_difference_total: cashDifference,
+            ledger_cash_balance: ledgerCashBalance,
+            reconciliation_gap: cashCounted - ledgerCashBalance
+          }
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async seedAdvancedPostingRules(tenantId) {
+    try {
+      const suggestedRules = [
+        {
+          source_module: 'POS',
+          event_type: 'SALE_RETURNED',
+          rule_name: 'Reversion venta',
+          debit_account_code: '413595',
+          credit_account_code: '110505',
+          description_template: 'Reversion automatica venta {{source_id}}',
+          auto_post: true,
+          priority: 80,
+          is_active: true
+        },
+        {
+          source_module: 'PURCHASES',
+          event_type: 'PURCHASE_RETURNED',
+          rule_name: 'Reversion compra',
+          debit_account_code: '220505',
+          credit_account_code: '143505',
+          description_template: 'Reversion automatica compra {{source_id}}',
+          auto_post: true,
+          priority: 80,
+          is_active: true
+        },
+        {
+          source_module: 'CASH',
+          event_type: 'CASH_EXPENSE_CREATED',
+          rule_name: 'Gasto de caja',
+          debit_account_code: '513530',
+          credit_account_code: '110505',
+          description_template: 'Gasto de caja {{source_id}}',
+          auto_post: true,
+          priority: 100,
+          is_active: true
+        },
+        {
+          source_module: 'CASH',
+          event_type: 'CASH_INCOME_CREATED',
+          rule_name: 'Ingreso de caja',
+          debit_account_code: '110505',
+          credit_account_code: '429595',
+          description_template: 'Ingreso de caja {{source_id}}',
+          auto_post: true,
+          priority: 100,
+          is_active: true
+        }
+      ]
+
+      const results = []
+      for (const rule of suggestedRules) {
+        const result = await this.savePostingRule(tenantId, rule)
+        if (!result.success) {
+          results.push({ ...rule, success: false, error: result.error })
+        } else {
+          results.push({ ...rule, success: true })
+        }
+      }
+
+      const failed = results.filter((item) => !item.success)
+      return {
+        success: failed.length === 0,
+        data: {
+          total: results.length,
+          created_or_updated: results.length - failed.length,
+          failed: failed.length,
+          details: results
+        },
+        error: failed.length ? 'Algunas reglas no pudieron guardarse.' : null
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async detectAccountingAnomalies(tenantId, filters = {}) {
+    try {
+      const result = await this.getJournalEntries(tenantId, {
+        ...filters,
+        status: 'POSTED',
+        limit: filters.limit || 2000
+      })
+
+      if (!result.success) return result
+
+      const lines = result.data?.lines || []
+      if (!lines.length) {
+        return { success: true, data: { anomalies: [], sample_size: 0 } }
+      }
+
+      const byAccount = new Map()
+      for (const line of lines) {
+        const key = line.account_code || 'NO_CODE'
+        if (!byAccount.has(key)) byAccount.set(key, [])
+        byAccount.get(key).push(Math.abs(Number(line.debit_amount || 0) - Number(line.credit_amount || 0)))
+      }
+
+      const stats = new Map()
+      for (const [code, values] of byAccount.entries()) {
+        const avg = values.reduce((acc, v) => acc + v, 0) / Math.max(1, values.length)
+        const variance = values.reduce((acc, v) => acc + ((v - avg) ** 2), 0) / Math.max(1, values.length)
+        const std = Math.sqrt(variance)
+        stats.set(code, { avg, std })
+      }
+
+      const anomalies = []
+      for (const line of lines) {
+        const code = line.account_code || 'NO_CODE'
+        const magnitude = Math.abs(Number(line.debit_amount || 0) - Number(line.credit_amount || 0))
+        const accountStats = stats.get(code) || { avg: 0, std: 0 }
+        const zScore = accountStats.std > 0 ? (magnitude - accountStats.avg) / accountStats.std : 0
+        const suspicious = zScore >= 3 || magnitude >= accountStats.avg * 4
+        if (!suspicious) continue
+
+        anomalies.push({
+          entry_id: line.entry_id,
+          entry_number: line.entry_number,
+          entry_date: line.entry_date,
+          account_code: line.account_code,
+          account_name: line.account_name,
+          source_module: line.source_module,
+          line_description: line.line_description || line.entry_description || '-',
+          debit_amount: Number(line.debit_amount || 0),
+          credit_amount: Number(line.credit_amount || 0),
+          magnitude,
+          z_score: Number(zScore.toFixed(2))
+        })
+      }
+
+      anomalies.sort((a, b) => b.magnitude - a.magnitude)
+
+      return {
+        success: true,
+        data: {
+          sample_size: lines.length,
+          anomalies: anomalies.slice(0, 200)
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  async requestAIAnomalyInsights({ tenantId, anomalies = [] }) {
+    try {
+      const items = (anomalies || []).slice(0, 30)
+      if (!items.length) {
+        return { success: false, error: 'No hay anomalias para analizar.' }
+      }
+
+      const payload = items.map((item) => ({
+        entry_number: item.entry_number,
+        entry_date: item.entry_date,
+        source_module: item.source_module,
+        account_code: item.account_code,
+        account_name: item.account_name,
+        debit_amount: item.debit_amount,
+        credit_amount: item.credit_amount,
+        z_score: item.z_score,
+        magnitude: item.magnitude,
+        description: item.line_description
+      }))
+
+      const messages = [
+        {
+          role: 'system',
+          content: 'Eres auditor contable senior para Colombia. Responde SOLO JSON valido.'
+        },
+        {
+          role: 'user',
+          content: `Analiza estas lineas atipicas y responde SOLO JSON:
+{
+  "summary": "string",
+  "risk_level": "LOW|MEDIUM|HIGH",
+  "top_findings": [{"finding":"string","reason":"string","entry_number":"string"}],
+  "recommended_actions": ["string"]
+}
+
+Datos:
+${JSON.stringify(payload, null, 2)}`
+        }
+      ]
+
+      const { data, error } = await supabase.functions.invoke(AI_EDGE_FUNCTION, {
+        body: {
+          model: AI_MODEL,
+          messages,
+          temperature: 0.1,
+          max_tokens: 1400
+        }
+      })
+
+      if (error) throw error
+
+      const content = data?.content || ''
+      const parsed = typeof content === 'object' ? content : extractJsonBlock(content)
+      if (!parsed) {
+        return {
+          success: false,
+          error: 'La IA respondio en un formato no interpretable.',
+          raw: content
+        }
+      }
+      return { success: true, data: parsed, raw: content }
     } catch (error) {
       return { success: false, error: error.message, data: null }
     }

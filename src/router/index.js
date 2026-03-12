@@ -45,6 +45,12 @@ import AccountingLedger from '@/views/AccountingLedger.vue'
 import AccountingWithholdings from '@/views/AccountingWithholdings.vue'
 import AccountingClosing from '@/views/AccountingClosing.vue'
 import AccountingAutomation from '@/views/AccountingAutomation.vue'
+import AccountingManualEntries from '@/views/AccountingManualEntries.vue'
+import AccountingChartOfAccounts from '@/views/AccountingChartOfAccounts.vue'
+import AccountingStatements from '@/views/AccountingStatements.vue'
+import AccountingTaxCenter from '@/views/AccountingTaxCenter.vue'
+import AccountingReconciliation from '@/views/AccountingReconciliation.vue'
+import AccountingAIControl from '@/views/AccountingAIControl.vue'
 import SetupWizard from '@/components/SetupWizard.vue'
 
 const MENU_ROUTES_CACHE_TTL_MS = 60 * 1000
@@ -406,6 +412,48 @@ const routes = [
     name: 'AccountingAssistant',
     component: Accounting,
     alias: ['/contabilidad/asistente-ia'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/asientos-manuales',
+    name: 'AccountingManualEntries',
+    component: AccountingManualEntries,
+    alias: ['/contabilidad/asientos-manuales'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/plan-cuentas',
+    name: 'AccountingChartOfAccounts',
+    component: AccountingChartOfAccounts,
+    alias: ['/contabilidad/plan-cuentas'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/estados-financieros',
+    name: 'AccountingStatements',
+    component: AccountingStatements,
+    alias: ['/contabilidad/estados-financieros'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/centro-tributario',
+    name: 'AccountingTaxCenter',
+    component: AccountingTaxCenter,
+    alias: ['/contabilidad/centro-tributario'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/conciliacion',
+    name: 'AccountingReconciliation',
+    component: AccountingReconciliation,
+    alias: ['/contabilidad/conciliacion'],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/accounting/control-ia',
+    name: 'AccountingAIControl',
+    component: AccountingAIControl,
+    alias: ['/contabilidad/control-ia'],
     meta: { requiresAuth: true }
   },
   {

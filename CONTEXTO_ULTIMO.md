@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-03-12
 Owner: Equipo POSLite
-Ultimo cambio registrado: Migracion del modulo contable al componente generico `<ListView>` en modo LIST
+Ultimo cambio registrado: Implementacion de 8 capacidades contables de producto + rutas/menu y regla obligatoria de `<ListView>`
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -77,6 +77,12 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
   - `density="compact"` para reducir altura de filas.
   - Paginacion cliente con `v-pagination` + leyenda "Mostrando X - Y de N registros".
 
+### Regla de producto obligatoria (listas)
+
+- Toda funcionalidad nueva de listas en la app debe implementar `<ListView>` como componente base.
+- En contabilidad esta regla es obligatoria sin excepcion para modo `LIST`.
+- Cualquier vista nueva que no use `<ListView>` en listados se considera incumplimiento tecnico.
+
 ### Competitividad contable v1 (implementado)
 
 1. Retenciones
@@ -103,6 +109,57 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 - El cierre (`fn_accounting_close_period`) exige que el periodo exista y este `OPEN`.
 - Apertura explicita por periodo con `fn_accounting_open_period`.
 - Compatibilidad mantenida: `fn_accounting_reopen_period` delega a `fn_accounting_open_period`.
+
+### Contabilidad producto v2 (8 puntos implementados)
+
+1. Asientos manuales operativos
+- Vista: `/accounting/asientos-manuales`
+- Servicio: `getManualEntries`, `createManualEntry`, `postEntry`, `voidDraftEntry`
+- Soporta creacion balanceada, posteo y anulacion controlada.
+
+2. Plan de cuentas gestionable
+- Vista: `/accounting/plan-cuentas`
+- Servicio: `getChartOfAccounts`, `saveAccount`, `toggleAccountActive`
+- Alta/edicion/activacion por tenant.
+
+3. Estados financieros en modulo contable
+- Vista: `/accounting/estados-financieros`
+- Servicio: `getFinancialStatements`
+- Estado de resultados + balance general por periodo.
+
+4. Centro tributario unificado
+- Vista: `/accounting/centro-tributario`
+- Servicio: `getTaxCenterData`
+- IVA, retenciones y preview de exogena por tercero.
+
+5. Cierre contable con checklist operativo
+- Vista: `/accounting/cierre` (extendida)
+- Servicio: `getCloseChecklist` integrado en UI de cierre.
+- Checklist previo al cierre con estados `PASS/WARN/INFO`.
+
+6. Conciliacion caja/bancos
+- Vista: `/accounting/conciliacion`
+- Servicio: `getReconciliationSnapshot`
+- Cruce de sesiones de caja cerradas vs saldos contables de cuentas 11*.
+
+7. Automatizacion avanzada de reglas
+- Vista: `/accounting/automatizacion` (extendida)
+- Servicio: `seedAdvancedPostingRules`
+- Cobertura de eventos: devoluciones ventas/compras y movimientos de caja.
+
+8. Control interno IA de anomalias
+- Vista: `/accounting/control-ia`
+- Servicio: `detectAccountingAnomalies`, `requestAIAnomalyInsights`
+- Deteccion estadistica + resumen de riesgo y acciones IA.
+
+### Rutas nuevas contables (fase producto)
+
+- `/accounting/asientos-manuales`
+- `/accounting/plan-cuentas`
+- `/accounting/estados-financieros`
+- `/accounting/centro-tributario`
+- `/accounting/conciliacion`
+- `/accounting/control-ia`
 
 ## Contexto mas antiguo (resumen historico)
 
@@ -137,6 +194,8 @@ Nota: este resumen historico se debe mantener y actualizar en cada nuevo `CONTEX
 4. `migrations/ADD_ACCOUNTING_PHASE1_REPORT_MENUS.sql`
 5. `migrations/ADD_ACCOUNTING_PHASE1_OPERATIONAL_MENUS.sql`
 6. `migrations/ADD_ACCOUNTING_COMPETITIVE_CORE.sql`
+7. `migrations/ENFORCE_ACCOUNTING_SINGLE_OPEN_PERIOD.sql`
+8. `migrations/ADD_ACCOUNTING_PHASE2_PRODUCT_MENUS.sql`
 
 ## Nota operativa
 

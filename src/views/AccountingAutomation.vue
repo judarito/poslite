@@ -30,6 +30,9 @@
           <v-btn color="success" variant="tonal" prepend-icon="mdi-play-circle-outline" :loading="processingQueue" @click="processQueueNow">
             Procesar cola
           </v-btn>
+          <v-btn color="secondary" variant="tonal" prepend-icon="mdi-auto-fix" :loading="seedingRules" @click="seedAdvancedRules">
+            Sembrar reglas avanzadas
+          </v-btn>
           <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="loadingRules || loadingExceptions" @click="loadAll">
             Refrescar
           </v-btn>
@@ -397,6 +400,7 @@ const { viewMode, isTableView } = useAccountingViewMode()
 const loadingRules = ref(false)
 const loadingExceptions = ref(false)
 const processingQueue = ref(false)
+const seedingRules = ref(false)
 const savingRuleId = ref(null)
 const resolvingExceptionId = ref(null)
 const creatingRule = ref(false)
@@ -418,13 +422,20 @@ const filters = ref({
 const moduleOptions = [
   { title: 'Todos', value: 'ALL' },
   { title: 'POS', value: 'POS' },
-  { title: 'Compras', value: 'PURCHASES' }
+  { title: 'Compras', value: 'PURCHASES' },
+  { title: 'Caja', value: 'CASH' },
+  { title: 'Manual', value: 'MANUAL' }
 ]
 
 const eventOptions = [
   { title: 'Todos', value: 'ALL' },
   { title: 'SALE_CREATED', value: 'SALE_CREATED' },
-  { title: 'PURCHASE_CREATED', value: 'PURCHASE_CREATED' }
+  { title: 'PURCHASE_CREATED', value: 'PURCHASE_CREATED' },
+  { title: 'SALE_RETURNED', value: 'SALE_RETURNED' },
+  { title: 'PURCHASE_RETURNED', value: 'PURCHASE_RETURNED' },
+  { title: 'CASH_EXPENSE_CREATED', value: 'CASH_EXPENSE_CREATED' },
+  { title: 'CASH_INCOME_CREATED', value: 'CASH_INCOME_CREATED' },
+  { title: 'MANUAL_ENTRY', value: 'MANUAL_ENTRY' }
 ]
 
 const exceptionStatusOptions = [
@@ -601,6 +612,27 @@ const processQueueNow = async () => {
     await loadAll()
   } finally {
     processingQueue.value = false
+  }
+}
+
+const seedAdvancedRules = async () => {
+  if (!tenantId.value) return
+  seedingRules.value = true
+  try {
+    const result = await accountingService.seedAdvancedPostingRules(tenantId.value)
+    if (!result.success) {
+      show(result.error || 'No se pudieron sembrar reglas avanzadas.', 'error')
+      return
+    }
+
+    const payload = result.data || {}
+    show(
+      `Reglas avanzadas: ${payload.created_or_updated || 0} aplicadas, ${payload.failed || 0} fallidas.`,
+      'success'
+    )
+    await loadRules()
+  } finally {
+    seedingRules.value = false
   }
 }
 
