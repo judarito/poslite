@@ -193,57 +193,52 @@
         </v-table>
       </v-card-text>
       <v-card-text v-else>
-        <v-alert
-          v-if="journalLines.length === 0"
-          type="info"
-          variant="tonal"
-          density="comfortable"
+        <ListView
+          title="Detalle del Diario"
+          icon="mdi-book-open-variant"
+          :items="paginatedJournalLines"
+          :total-items="journalLines.length"
+          :loading="loading"
+          :page-size="JOURNAL_LIST_PAGE_SIZE"
+          item-key="line_id"
+          title-field="entry_number"
+          avatar-icon="mdi-book-open-page-variant"
+          avatar-color="primary"
+          empty-message="No hay movimientos para el filtro seleccionado."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onJournalListPage"
         >
-          No hay movimientos para el filtro seleccionado.
-        </v-alert>
-        <v-list v-else lines="three" density="compact" class="py-0">
-          <template v-for="(line, idx) in paginatedJournalLines" :key="line.line_id">
-            <v-list-item class="px-0">
-              <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
-                <div>
-                  <strong>#{{ line.entry_number }} · L{{ line.line_number }}</strong>
-                  <span class="ml-2">{{ formatDate(line.entry_date) }}</span>
-                </div>
-                <v-chip
-                  size="x-small"
-                  :color="line.entry_status === 'POSTED' ? 'success' : (line.entry_status === 'VOIDED' ? 'error' : 'warning')"
-                >
-                  {{ line.entry_status }}
-                </v-chip>
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                <div><strong>Módulo:</strong> {{ line.source_module }}</div>
-                <div>
-                  <strong>Cuenta:</strong> <code>{{ line.account_code }}</code>
-                  <span class="ml-1">{{ line.account_name }}</span>
-                </div>
-                <div class="text-caption">{{ line.line_description || line.entry_description || '-' }}</div>
-                <div class="text-caption text-medium-emphasis">{{ line.source_event || '-' }}</div>
-                <div class="mt-1">
-                  <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
-                  <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
-                </div>
-              </v-list-item-subtitle>
-            </v-list-item>
-            <v-divider v-if="idx < paginatedJournalLines.length - 1" />
+          <template #title="{ item: line }">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+              <div>
+                <strong>#{{ line.entry_number }} · L{{ line.line_number }}</strong>
+                <span class="ml-2">{{ formatDate(line.entry_date) }}</span>
+              </div>
+              <v-chip
+                size="x-small"
+                :color="line.entry_status === 'POSTED' ? 'success' : (line.entry_status === 'VOIDED' ? 'error' : 'warning')"
+              >
+                {{ line.entry_status }}
+              </v-chip>
+            </div>
           </template>
-        </v-list>
-        <div v-if="journalListTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-          <v-pagination
-            v-model="journalListPage"
-            :length="journalListTotalPages"
-            :total-visible="$vuetify.display.xs ? 5 : 7"
-            size="small"
-          />
-          <div class="text-caption text-medium-emphasis">
-            Mostrando {{ journalListRangeLabel }}
-          </div>
-        </div>
+          <template #content="{ item: line }">
+            <div class="text-caption mt-1"><strong>Módulo:</strong> {{ line.source_module }}</div>
+            <div class="text-caption">
+              <strong>Cuenta:</strong> <code>{{ line.account_code }}</code>
+              <span class="ml-1">{{ line.account_name }}</span>
+            </div>
+            <div class="text-caption">{{ line.line_description || line.entry_description || '-' }}</div>
+            <div class="text-caption text-medium-emphasis">{{ line.source_event || '-' }}</div>
+            <div class="text-caption mt-1">
+              <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
+              <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
+            </div>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
   </div>
@@ -257,6 +252,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
+import ListView from '@/components/ListView.vue'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
 const router = useRouter()
@@ -317,12 +313,10 @@ const paginatedJournalLines = computed(() => {
   const start = (journalListPage.value - 1) * JOURNAL_LIST_PAGE_SIZE
   return journalLines.value.slice(start, start + JOURNAL_LIST_PAGE_SIZE)
 })
-const journalListRangeLabel = computed(() => {
-  if (!journalLines.value.length) return '0 de 0 registros'
-  const start = (journalListPage.value - 1) * JOURNAL_LIST_PAGE_SIZE + 1
-  const end = Math.min(journalListPage.value * JOURNAL_LIST_PAGE_SIZE, journalLines.value.length)
-  return `${start} - ${end} de ${journalLines.value.length} registros`
-})
+
+const onJournalListPage = ({ page }) => {
+  journalListPage.value = Number(page || 1)
+}
 
 const sanitizeForExport = (value) => {
   if (value === null || value === undefined) return ''

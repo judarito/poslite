@@ -127,44 +127,42 @@
         </v-table>
       </v-card-text>
       <v-card-text v-else>
-        <v-alert
-          v-if="(summary.items || []).length === 0"
-          type="info"
-          variant="tonal"
-          density="comfortable"
+        <ListView
+          title="Estimacion por concepto"
+          icon="mdi-calculator-variant-outline"
+          :items="paginatedSummaryItems"
+          :total-items="summaryItems.length"
+          :loading="loadingSummary"
+          :page-size="SUMMARY_LIST_PAGE_SIZE"
+          item-key="code"
+          title-field="name"
+          avatar-icon="mdi-percent-outline"
+          avatar-color="primary"
+          empty-message="Sin datos para el periodo seleccionado."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onSummaryListPage"
         >
-          Sin datos para el periodo seleccionado.
-        </v-alert>
-        <v-row v-else>
-          <v-col v-for="item in paginatedSummaryItems" :key="item.code" cols="12" md="6" lg="4">
-            <v-card variant="outlined" class="h-100">
-              <v-card-text>
-                <div class="d-flex align-center justify-space-between">
-                  <code>{{ item.code }}</code>
-                  <v-chip size="x-small" color="primary">{{ item.applies_to }}</v-chip>
-                </div>
-                <div class="text-subtitle-2 font-weight-bold mt-2">{{ item.name }}</div>
-                <div class="text-caption mt-2">Tarifa: {{ Number(item.rate || 0).toFixed(4) }}%</div>
-                <div class="text-caption">Base: {{ formatMoney(item.base_amount || 0) }}</div>
-                <div class="text-caption">Base gravable: {{ formatMoney(item.taxable_base || 0) }}</div>
-                <div class="text-body-2 font-weight-bold mt-2">
-                  Retencion estimada: {{ formatMoney(item.estimated_withholding || 0) }}
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-        <div v-if="summaryTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-          <v-pagination
-            v-model="summaryListPage"
-            :length="summaryTotalPages"
-            :total-visible="$vuetify.display.xs ? 5 : 7"
-            size="small"
-          />
-          <div class="text-caption text-medium-emphasis">
-            Mostrando {{ summaryRangeLabel }}
-          </div>
-        </div>
+          <template #title="{ item }">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+              <div>
+                <code>{{ item.code }}</code>
+                <span class="ml-2 font-weight-medium">{{ item.name }}</span>
+              </div>
+              <v-chip size="x-small" color="primary">{{ item.applies_to }}</v-chip>
+            </div>
+          </template>
+          <template #content="{ item }">
+            <div class="text-caption mt-1">Tarifa: {{ Number(item.rate || 0).toFixed(4) }}%</div>
+            <div class="text-caption">Base: {{ formatMoney(item.base_amount || 0) }}</div>
+            <div class="text-caption">Base gravable: {{ formatMoney(item.taxable_base || 0) }}</div>
+            <div class="text-body-2 font-weight-bold mt-1">
+              Retencion estimada: {{ formatMoney(item.estimated_withholding || 0) }}
+            </div>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
 
@@ -234,82 +232,78 @@
         </v-table>
       </v-card-text>
       <v-card-text v-else>
-        <v-alert
-          v-if="configs.length === 0"
-          type="info"
-          variant="tonal"
-          density="comfortable"
+        <ListView
+          title="Configuracion de retenciones"
+          icon="mdi-tune-variant"
+          :items="paginatedConfigs"
+          :total-items="configs.length"
+          :loading="loadingConfigs"
+          :page-size="CONFIGS_LIST_PAGE_SIZE"
+          item-key="config_id"
+          title-field="name"
+          avatar-icon="mdi-percent-box"
+          avatar-color="warning"
+          empty-message="No hay conceptos de retencion configurados."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onConfigsListPage"
         >
-          No hay conceptos de retencion configurados.
-        </v-alert>
-        <v-expansion-panels v-else variant="accordion">
-          <v-expansion-panel v-for="cfg in paginatedConfigs" :key="cfg.config_id">
-            <v-expansion-panel-title>
-              <div class="d-flex align-center justify-space-between w-100 pr-2 flex-wrap ga-2">
-                <div>
-                  <code>{{ cfg.code || 'SIN-COD' }}</code>
-                  <span class="ml-2">{{ cfg.name || 'Sin nombre' }}</span>
-                </div>
-                <div class="d-flex align-center ga-2">
-                  <v-chip size="x-small" color="primary">{{ cfg.applies_to }}</v-chip>
-                  <v-chip size="x-small" :color="cfg.is_active ? 'success' : 'grey'">
-                    {{ cfg.is_active ? 'Activo' : 'Inactivo' }}
-                  </v-chip>
-                </div>
+          <template #title="{ item: cfg }">
+            <div class="d-flex align-center justify-space-between w-100 flex-wrap ga-2">
+              <div>
+                <code>{{ cfg.code || 'SIN-COD' }}</code>
+                <span class="ml-2">{{ cfg.name || 'Sin nombre' }}</span>
               </div>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <v-row>
-                <v-col cols="12" md="3">
-                  <v-text-field v-model="cfg.code" label="Codigo" density="compact" variant="outlined" hide-details />
-                </v-col>
-                <v-col cols="12" md="4">
-                  <v-text-field v-model="cfg.name" label="Nombre" density="compact" variant="outlined" hide-details />
-                </v-col>
-                <v-col cols="12" md="2">
-                  <v-select
-                    v-model="cfg.applies_to"
-                    :items="appliesOptions"
-                    item-title="title"
-                    item-value="value"
-                    label="Aplica"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                  />
-                </v-col>
-                <v-col cols="12" md="3">
-                  <v-text-field v-model="cfg.account_code" label="Cuenta pasivo" density="compact" variant="outlined" hide-details />
-                </v-col>
-                <v-col cols="12" md="3">
-                  <v-text-field v-model.number="cfg.rate" label="Tarifa %" type="number" step="0.0001" density="compact" variant="outlined" hide-details />
-                </v-col>
-                <v-col cols="12" md="3">
-                  <v-text-field v-model.number="cfg.base_threshold" label="Base minima" type="number" step="0.01" density="compact" variant="outlined" hide-details />
-                </v-col>
-                <v-col cols="12" md="2">
-                  <v-switch v-model="cfg.is_active" color="primary" label="Activo" hide-details density="compact" />
-                </v-col>
-                <v-col cols="12" md="2" class="d-flex align-center">
-                  <v-btn color="primary" :loading="savingId === cfg.config_id" @click="saveConfig(cfg)">
-                    Guardar
-                  </v-btn>
-                </v-col>
-              </v-row>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
-        <div v-if="configsTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-          <v-pagination
-            v-model="configsListPage"
-            :length="configsTotalPages"
-            :total-visible="$vuetify.display.xs ? 5 : 7"
-            size="small"
-          />
-          <div class="text-caption text-medium-emphasis">
-            Mostrando {{ configsRangeLabel }}
-          </div>
-        </div>
+              <div class="d-flex align-center ga-2">
+                <v-chip size="x-small" color="primary">{{ cfg.applies_to }}</v-chip>
+                <v-chip size="x-small" :color="cfg.is_active ? 'success' : 'grey'">
+                  {{ cfg.is_active ? 'Activo' : 'Inactivo' }}
+                </v-chip>
+              </div>
+            </div>
+          </template>
+          <template #content="{ item: cfg }">
+            <v-row class="mt-1">
+              <v-col cols="12" md="3">
+                <v-text-field v-model="cfg.code" label="Codigo" density="compact" variant="outlined" hide-details />
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field v-model="cfg.name" label="Nombre" density="compact" variant="outlined" hide-details />
+              </v-col>
+              <v-col cols="12" md="2">
+                <v-select
+                  v-model="cfg.applies_to"
+                  :items="appliesOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Aplica"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                />
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-text-field v-model="cfg.account_code" label="Cuenta pasivo" density="compact" variant="outlined" hide-details />
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-text-field v-model.number="cfg.rate" label="Tarifa %" type="number" step="0.0001" density="compact" variant="outlined" hide-details />
+              </v-col>
+              <v-col cols="12" md="3">
+                <v-text-field v-model.number="cfg.base_threshold" label="Base minima" type="number" step="0.01" density="compact" variant="outlined" hide-details />
+              </v-col>
+              <v-col cols="12" md="2">
+                <v-switch v-model="cfg.is_active" color="primary" label="Activo" hide-details density="compact" />
+              </v-col>
+            </v-row>
+          </template>
+          <template #actions="{ item: cfg }">
+            <v-btn color="primary" :loading="savingId === cfg.config_id" @click.stop="saveConfig(cfg)">
+              Guardar
+            </v-btn>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
 
@@ -367,6 +361,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
+import ListView from '@/components/ListView.vue'
 import { formatMoney } from '@/utils/formatters'
 
 const router = useRouter()
@@ -423,24 +418,20 @@ const paginatedSummaryItems = computed(() => {
   const start = (summaryListPage.value - 1) * SUMMARY_LIST_PAGE_SIZE
   return summaryItems.value.slice(start, start + SUMMARY_LIST_PAGE_SIZE)
 })
-const summaryRangeLabel = computed(() => {
-  if (!summaryItems.value.length) return '0 de 0 registros'
-  const start = (summaryListPage.value - 1) * SUMMARY_LIST_PAGE_SIZE + 1
-  const end = Math.min(summaryListPage.value * SUMMARY_LIST_PAGE_SIZE, summaryItems.value.length)
-  return `${start} - ${end} de ${summaryItems.value.length} registros`
-})
 
 const configsTotalPages = computed(() => Math.max(1, Math.ceil(configs.value.length / CONFIGS_LIST_PAGE_SIZE)))
 const paginatedConfigs = computed(() => {
   const start = (configsListPage.value - 1) * CONFIGS_LIST_PAGE_SIZE
   return configs.value.slice(start, start + CONFIGS_LIST_PAGE_SIZE)
 })
-const configsRangeLabel = computed(() => {
-  if (!configs.value.length) return '0 de 0 registros'
-  const start = (configsListPage.value - 1) * CONFIGS_LIST_PAGE_SIZE + 1
-  const end = Math.min(configsListPage.value * CONFIGS_LIST_PAGE_SIZE, configs.value.length)
-  return `${start} - ${end} de ${configs.value.length} registros`
-})
+
+const onSummaryListPage = ({ page }) => {
+  summaryListPage.value = Number(page || 1)
+}
+
+const onConfigsListPage = ({ page }) => {
+  configsListPage.value = Number(page || 1)
+}
 
 const sanitizeForExport = (value) => {
   if (value === null || value === undefined) return ''

@@ -132,46 +132,51 @@
         </v-table>
       </v-card-text>
       <v-card-text v-else>
-        <v-alert
-          v-if="closures.length === 0"
-          type="info"
-          variant="tonal"
-          density="comfortable"
+        <ListView
+          title="Historial de cierres"
+          icon="mdi-history"
+          :items="paginatedClosures"
+          :total-items="closures.length"
+          :loading="loadingClosures"
+          :page-size="CLOSURES_LIST_PAGE_SIZE"
+          item-key="closure_id"
+          title-field="period_year"
+          avatar-icon="mdi-lock-check-outline"
+          avatar-color="error"
+          empty-message="No hay cierres registrados."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onClosuresListPage"
         >
-          No hay cierres registrados.
-        </v-alert>
-        <v-timeline v-else density="compact" side="end" align="start">
-          <v-timeline-item
-            v-for="item in closures"
-            :key="item.closure_id"
-            :dot-color="item.status === 'CLOSED' ? 'error' : 'success'"
-            size="small"
-          >
-            <template #opposite>
+          <template #title="{ item }">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
               <strong>{{ item.period_year }}-{{ String(item.period_month).padStart(2, '0') }}</strong>
-            </template>
-            <div class="mb-1">
               <v-chip size="x-small" :color="item.status === 'CLOSED' ? 'error' : 'success'">
                 {{ item.status === 'CLOSED' ? 'CERRADO' : 'ABIERTO' }}
               </v-chip>
             </div>
+          </template>
+          <template #content="{ item }">
             <div class="text-caption"><strong>Cerrado:</strong> {{ formatDate(item.closed_at) || '-' }}</div>
             <div class="text-caption"><strong>Reabierto:</strong> {{ formatDate(item.reopened_at) || '-' }}</div>
             <div class="text-caption"><strong>Notas:</strong> {{ item.notes || '-' }}</div>
-          </v-timeline-item>
-        </v-timeline>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
+import ListView from '@/components/ListView.vue'
 import { formatDateTime as formatDate } from '@/utils/formatters'
 
 const router = useRouter()
@@ -191,6 +196,8 @@ const loadingClosures = ref(false)
 const closingPeriod = ref(false)
 const openingPeriod = ref(false)
 const closures = ref([])
+const closuresListPage = ref(1)
+const CLOSURES_LIST_PAGE_SIZE = 8
 
 const monthOptions = [
   { value: 1, title: '01 - Enero' },
@@ -239,6 +246,11 @@ const openPeriodElsewhere = computed(() => {
 
 const canCloseCurrentPeriod = computed(() => currentPeriodStatus.value.code === 'OPEN')
 const canOpenCurrentPeriod = computed(() => currentPeriodStatus.value.code !== 'OPEN' && !openPeriodElsewhere.value)
+const closuresTotalPages = computed(() => Math.max(1, Math.ceil(closures.value.length / CLOSURES_LIST_PAGE_SIZE)))
+const paginatedClosures = computed(() => {
+  const start = (closuresListPage.value - 1) * CLOSURES_LIST_PAGE_SIZE
+  return closures.value.slice(start, start + CLOSURES_LIST_PAGE_SIZE)
+})
 
 const loadClosures = async () => {
   if (!tenantId.value) return
@@ -307,6 +319,18 @@ const goBackToAccounting = () => {
   const tab = String(route.query.tab || 'compliance')
   router.push({ path: '/accounting', query: { tab } })
 }
+
+const onClosuresListPage = ({ page }) => {
+  closuresListPage.value = Number(page || 1)
+}
+
+watch(() => closures.value.length, () => {
+  closuresListPage.value = 1
+})
+
+watch(closuresTotalPages, (total) => {
+  if (closuresListPage.value > total) closuresListPage.value = total
+})
 
 onMounted(loadClosures)
 </script>

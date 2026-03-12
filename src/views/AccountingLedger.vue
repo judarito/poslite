@@ -174,54 +174,49 @@
         </v-table>
       </v-card-text>
       <v-card-text v-else>
-        <v-alert
-          v-if="!ledger || ledger.movements.length === 0"
-          type="info"
-          variant="tonal"
-          density="comfortable"
+        <ListView
+          title="Movimientos del Mayor"
+          icon="mdi-book-multiple"
+          :items="paginatedLedgerMovements"
+          :total-items="ledgerMovements.length"
+          :loading="loading"
+          :page-size="LEDGER_LIST_PAGE_SIZE"
+          item-key="line_id"
+          title-field="entry_number"
+          avatar-icon="mdi-book-account-outline"
+          avatar-color="indigo"
+          empty-message="Selecciona una cuenta y consulta para ver el libro mayor."
+          :searchable="false"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          @load-page="onLedgerListPage"
         >
-          Selecciona una cuenta y consulta para ver el libro mayor.
-        </v-alert>
-        <v-list v-else lines="three" density="compact" class="py-0">
-          <template v-for="(line, idx) in paginatedLedgerMovements" :key="line.line_id">
-            <v-list-item class="px-0">
-              <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
-                <div>
-                  <strong>{{ formatDate(line.entry_date) }}</strong>
-                  <span class="ml-2">#{{ line.entry_number }} · L{{ line.line_number }}</span>
-                </div>
-                <v-chip size="x-small" color="primary">{{ line.source_module }}</v-chip>
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                <div>{{ line.line_description || line.entry_description || '-' }}</div>
-                <div class="mt-1">
-                  <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
-                  <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
-                </div>
-                <div class="mt-1">
-                  <strong>Movimiento:</strong>
-                  <span :class="line.delta >= 0 ? 'text-success' : 'text-error'">
-                    {{ line.delta >= 0 ? '+' : '' }}{{ formatMoney(line.delta) }}
-                  </span>
-                  |
-                  <strong>Saldo:</strong> {{ formatMoney(line.running_balance) }}
-                </div>
-              </v-list-item-subtitle>
-            </v-list-item>
-            <v-divider v-if="idx < paginatedLedgerMovements.length - 1" />
+          <template #title="{ item: line }">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+              <div>
+                <strong>{{ formatDate(line.entry_date) }}</strong>
+                <span class="ml-2">#{{ line.entry_number }} · L{{ line.line_number }}</span>
+              </div>
+              <v-chip size="x-small" color="primary">{{ line.source_module }}</v-chip>
+            </div>
           </template>
-        </v-list>
-        <div v-if="ledgerListTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-          <v-pagination
-            v-model="ledgerListPage"
-            :length="ledgerListTotalPages"
-            :total-visible="$vuetify.display.xs ? 5 : 7"
-            size="small"
-          />
-          <div class="text-caption text-medium-emphasis">
-            Mostrando {{ ledgerListRangeLabel }}
-          </div>
-        </div>
+          <template #content="{ item: line }">
+            <div class="text-caption">{{ line.line_description || line.entry_description || '-' }}</div>
+            <div class="text-caption mt-1">
+              <strong>Débito:</strong> {{ formatMoney(line.debit_amount) }} |
+              <strong>Crédito:</strong> {{ formatMoney(line.credit_amount) }}
+            </div>
+            <div class="text-caption mt-1">
+              <strong>Movimiento:</strong>
+              <span :class="line.delta >= 0 ? 'text-success' : 'text-error'">
+                {{ line.delta >= 0 ? '+' : '' }}{{ formatMoney(line.delta) }}
+              </span>
+              |
+              <strong>Saldo:</strong> {{ formatMoney(line.running_balance) }}
+            </div>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
   </div>
@@ -235,6 +230,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
+import ListView from '@/components/ListView.vue'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
 const router = useRouter()
@@ -289,12 +285,10 @@ const paginatedLedgerMovements = computed(() => {
   const start = (ledgerListPage.value - 1) * LEDGER_LIST_PAGE_SIZE
   return ledgerMovements.value.slice(start, start + LEDGER_LIST_PAGE_SIZE)
 })
-const ledgerListRangeLabel = computed(() => {
-  if (!ledgerMovements.value.length) return '0 de 0 registros'
-  const start = (ledgerListPage.value - 1) * LEDGER_LIST_PAGE_SIZE + 1
-  const end = Math.min(ledgerListPage.value * LEDGER_LIST_PAGE_SIZE, ledgerMovements.value.length)
-  return `${start} - ${end} de ${ledgerMovements.value.length} registros`
-})
+
+const onLedgerListPage = ({ page }) => {
+  ledgerListPage.value = Number(page || 1)
+}
 
 const sanitizeForExport = (value) => {
   if (value === null || value === undefined) return ''

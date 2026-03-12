@@ -246,44 +246,42 @@
               </v-table>
             </v-card-text>
             <v-card-text v-else>
-              <v-alert
-                v-if="trialBalance.length === 0"
-                type="info"
-                variant="tonal"
-                density="comfortable"
+              <ListView
+                title="Balanza de Comprobación"
+                icon="mdi-scale-balance"
+                :items="paginatedTrialBalance"
+                :total-items="trialBalance.length"
+                :loading="loading"
+                :page-size="LIST_PAGE_SIZE.trialBalance"
+                item-key="account_code"
+                title-field="account_name"
+                avatar-icon="mdi-calculator-variant-outline"
+                avatar-color="indigo"
+                empty-message="No hay datos para el período seleccionado."
+                :searchable="false"
+                :show-create-button="false"
+                :editable="false"
+                :deletable="false"
+                @load-page="onTrialBalanceListPage"
               >
-                No hay datos para el período seleccionado.
-              </v-alert>
-              <v-row v-else>
-                <v-col v-for="row in paginatedTrialBalance" :key="row.account_code" cols="12" md="6" lg="4">
-                  <v-card variant="outlined" class="h-100">
-                    <v-card-text>
-                      <div class="d-flex align-center justify-space-between">
-                        <code>{{ row.account_code }}</code>
-                        <v-chip size="x-small" color="indigo">{{ row.natural_side }}</v-chip>
-                      </div>
-                      <div class="text-subtitle-2 font-weight-bold mt-2">{{ row.account_name }}</div>
-                      <div class="text-caption">{{ row.account_type }}</div>
-                      <div class="text-caption mt-2">Débitos: {{ formatMoney(row.debit_total) }}</div>
-                      <div class="text-caption">Créditos: {{ formatMoney(row.credit_total) }}</div>
-                      <div class="text-body-2 font-weight-bold mt-2" :class="Number(row.balance || 0) < 0 ? 'text-error' : ''">
-                        Saldo: {{ formatMoney(row.balance) }}
-                      </div>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
-              <div v-if="trialBalanceTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-                <v-pagination
-                  v-model="trialBalancePage"
-                  :length="trialBalanceTotalPages"
-                  :total-visible="$vuetify.display.xs ? 5 : 7"
-                  size="small"
-                />
-                <div class="text-caption text-medium-emphasis">
-                  Mostrando {{ trialBalanceRangeLabel }}
-                </div>
-              </div>
+                <template #title="{ item: row }">
+                  <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                    <div>
+                      <code>{{ row.account_code }}</code>
+                      <span class="ml-2 font-weight-medium">{{ row.account_name }}</span>
+                    </div>
+                    <v-chip size="x-small" color="indigo">{{ row.natural_side }}</v-chip>
+                  </div>
+                </template>
+                <template #content="{ item: row }">
+                  <div class="text-caption">{{ row.account_type }}</div>
+                  <div class="text-caption mt-1">Débitos: {{ formatMoney(row.debit_total) }}</div>
+                  <div class="text-caption">Créditos: {{ formatMoney(row.credit_total) }}</div>
+                  <div class="text-body-2 font-weight-bold mt-1" :class="Number(row.balance || 0) < 0 ? 'text-error' : ''">
+                    Saldo: {{ formatMoney(row.balance) }}
+                  </div>
+                </template>
+              </ListView>
             </v-card-text>
           </v-card>
 
@@ -327,49 +325,44 @@
               </v-table>
             </v-card-text>
             <v-card-text v-else>
-              <v-alert
-                v-if="recentEntries.length === 0"
-                type="info"
-                variant="tonal"
-                density="comfortable"
+              <ListView
+                title="Últimos Asientos"
+                icon="mdi-book-open-page-variant"
+                :items="paginatedRecentEntries"
+                :total-items="recentEntries.length"
+                :loading="loading"
+                :page-size="LIST_PAGE_SIZE.recentEntries"
+                item-key="entry_id"
+                title-field="entry_number"
+                avatar-icon="mdi-book-open-page-variant"
+                avatar-color="primary"
+                empty-message="No hay asientos recientes."
+                :searchable="false"
+                :show-create-button="false"
+                :editable="false"
+                :deletable="false"
+                @load-page="onRecentEntriesListPage"
               >
-                No hay asientos recientes.
-              </v-alert>
-              <v-list v-else lines="three" density="compact" class="py-0">
-                <template v-for="(entry, idx) in paginatedRecentEntries" :key="entry.entry_id">
-                  <v-list-item class="px-0">
-                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
-                      <div>
-                        <strong>#{{ entry.entry_number }}</strong>
-                        <span class="ml-2">{{ formatDate(entry.entry_date) }}</span>
-                      </div>
-                      <v-chip
-                        size="x-small"
-                        :color="entry.status === 'POSTED' ? 'success' : (entry.status === 'VOIDED' ? 'error' : 'warning')"
-                      >
-                        {{ entry.status }}
-                      </v-chip>
-                    </v-list-item-title>
-                    <v-list-item-subtitle>
-                      <div><strong>Módulo:</strong> {{ entry.source_module }}</div>
-                      <div class="text-caption">{{ entry.description || '-' }}</div>
-                      <div class="text-caption text-medium-emphasis">Creado: {{ formatDate(entry.created_at) }}</div>
-                    </v-list-item-subtitle>
-                  </v-list-item>
-                  <v-divider v-if="idx < paginatedRecentEntries.length - 1" />
+                <template #title="{ item: entry }">
+                  <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                    <div>
+                      <strong>#{{ entry.entry_number }}</strong>
+                      <span class="ml-2">{{ formatDate(entry.entry_date) }}</span>
+                    </div>
+                    <v-chip
+                      size="x-small"
+                      :color="entry.status === 'POSTED' ? 'success' : (entry.status === 'VOIDED' ? 'error' : 'warning')"
+                    >
+                      {{ entry.status }}
+                    </v-chip>
+                  </div>
                 </template>
-              </v-list>
-              <div v-if="recentEntriesTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-                <v-pagination
-                  v-model="recentEntriesPage"
-                  :length="recentEntriesTotalPages"
-                  :total-visible="$vuetify.display.xs ? 5 : 7"
-                  size="small"
-                />
-                <div class="text-caption text-medium-emphasis">
-                  Mostrando {{ recentEntriesRangeLabel }}
-                </div>
-              </div>
+                <template #content="{ item: entry }">
+                  <div class="text-caption"><strong>Módulo:</strong> {{ entry.source_module }}</div>
+                  <div class="text-caption">{{ entry.description || '-' }}</div>
+                  <div class="text-caption text-medium-emphasis">Creado: {{ formatDate(entry.created_at) }}</div>
+                </template>
+              </ListView>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -614,53 +607,49 @@
               </v-table>
             </v-card-text>
             <v-card-text v-else>
-              <v-alert
-                v-if="(compliance.obligations || []).length === 0"
-                type="info"
-                variant="tonal"
-                density="comfortable"
+              <ListView
+                title="Checklist contable y DIAN"
+                icon="mdi-clipboard-check-outline"
+                :items="paginatedObligations"
+                :total-items="obligationsItems.length"
+                :loading="loadingCompliance"
+                :page-size="LIST_PAGE_SIZE.obligations"
+                item-key="key"
+                title-field="name"
+                avatar-icon="mdi-clipboard-check-outline"
+                avatar-color="indigo"
+                empty-message="Sin obligaciones para mostrar."
+                :searchable="false"
+                :show-create-button="false"
+                :editable="false"
+                :deletable="false"
+                @load-page="onObligationsListPage"
               >
-                Sin obligaciones para mostrar.
-              </v-alert>
-              <v-row v-else>
-                <v-col v-for="item in paginatedObligations" :key="item.key" cols="12" md="6">
-                  <v-card variant="outlined" class="h-100">
-                    <v-card-text>
-                      <div class="d-flex align-center justify-space-between flex-wrap ga-2">
-                        <div class="font-weight-bold">{{ item.name }}</div>
-                        <v-chip size="x-small" :color="getComplianceStatusColor(item.status)">
-                          {{ getComplianceStatusLabel(item.status) }}
-                        </v-chip>
-                      </div>
-                      <div class="text-caption mt-2"><strong>Frecuencia:</strong> {{ item.frequency }}</div>
-                      <div class="text-caption mt-1">{{ item.meaning }}</div>
-                      <div class="text-caption mt-2"><strong>Evidencia:</strong> {{ item.evidence || '-' }}</div>
-                      <div class="mt-3">
-                        <v-btn
-                          size="small"
-                          variant="tonal"
-                          color="primary"
-                          :disabled="!item.route"
-                          @click="openComplianceItem(item)"
-                        >
-                          Abrir
-                        </v-btn>
-                      </div>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
-              <div v-if="obligationsTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-                <v-pagination
-                  v-model="obligationsPage"
-                  :length="obligationsTotalPages"
-                  :total-visible="$vuetify.display.xs ? 5 : 7"
-                  size="small"
-                />
-                <div class="text-caption text-medium-emphasis">
-                  Mostrando {{ obligationsRangeLabel }}
-                </div>
-              </div>
+                <template #title="{ item }">
+                  <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                    <div class="font-weight-medium">{{ item.name }}</div>
+                    <v-chip size="x-small" :color="getComplianceStatusColor(item.status)">
+                      {{ getComplianceStatusLabel(item.status) }}
+                    </v-chip>
+                  </div>
+                </template>
+                <template #content="{ item }">
+                  <div class="text-caption mt-1"><strong>Frecuencia:</strong> {{ item.frequency }}</div>
+                  <div class="text-caption">{{ item.meaning }}</div>
+                  <div class="text-caption mt-1"><strong>Evidencia:</strong> {{ item.evidence || '-' }}</div>
+                </template>
+                <template #actions="{ item }">
+                  <v-btn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    :disabled="!item.route"
+                    @click.stop="openComplianceItem(item)"
+                  >
+                    Abrir
+                  </v-btn>
+                </template>
+              </ListView>
             </v-card-text>
           </v-card>
 
@@ -759,44 +748,39 @@
               </v-table>
             </v-card-text>
             <v-card-text v-else>
-              <v-alert
-                v-if="eventQueue.length === 0"
-                type="info"
-                variant="tonal"
-                density="comfortable"
+              <ListView
+                title="Cola de Integración POS → Contabilidad"
+                icon="mdi-queue-first-in-last-out"
+                :items="paginatedQueueEvents"
+                :total-items="eventQueue.length"
+                :loading="loading || processingQueue"
+                :page-size="LIST_PAGE_SIZE.queue"
+                item-key="event_id"
+                title-field="event_type"
+                avatar-icon="mdi-queue-first-in-last-out"
+                avatar-color="warning"
+                empty-message="No hay eventos en la cola."
+                :searchable="false"
+                :show-create-button="false"
+                :editable="false"
+                :deletable="false"
+                @load-page="onQueueListPage"
               >
-                No hay eventos en la cola.
-              </v-alert>
-              <v-list v-else lines="three" density="compact" class="py-0">
-                <template v-for="(event, idx) in paginatedQueueEvents" :key="event.event_id">
-                  <v-list-item class="px-0">
-                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
-                      <div>{{ event.source_module }} · {{ event.event_type }}</div>
-                      <v-chip size="x-small" :color="getQueueStatusColor(event.status)">
-                        {{ event.status }}
-                      </v-chip>
-                    </v-list-item-title>
-                    <v-list-item-subtitle>
-                      <div><strong>Creado:</strong> {{ formatDate(event.created_at) }}</div>
-                      <div><strong>Referencia:</strong> <code>{{ event.source_id }}</code></div>
-                      <div><strong>Intentos:</strong> {{ event.attempts }}</div>
-                      <div class="text-caption text-error"><strong>Error:</strong> {{ event.last_error || '-' }}</div>
-                    </v-list-item-subtitle>
-                  </v-list-item>
-                  <v-divider v-if="idx < paginatedQueueEvents.length - 1" />
+                <template #title="{ item: event }">
+                  <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                    <div>{{ event.source_module }} · {{ event.event_type }}</div>
+                    <v-chip size="x-small" :color="getQueueStatusColor(event.status)">
+                      {{ event.status }}
+                    </v-chip>
+                  </div>
                 </template>
-              </v-list>
-              <div v-if="queueTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-                <v-pagination
-                  v-model="queuePage"
-                  :length="queueTotalPages"
-                  :total-visible="$vuetify.display.xs ? 5 : 7"
-                  size="small"
-                />
-                <div class="text-caption text-medium-emphasis">
-                  Mostrando {{ queueRangeLabel }}
-                </div>
-              </div>
+                <template #content="{ item: event }">
+                  <div class="text-caption"><strong>Creado:</strong> {{ formatDate(event.created_at) }}</div>
+                  <div class="text-caption"><strong>Referencia:</strong> <code>{{ event.source_id }}</code></div>
+                  <div class="text-caption"><strong>Intentos:</strong> {{ event.attempts }}</div>
+                  <div class="text-caption text-error"><strong>Error:</strong> {{ event.last_error || '-' }}</div>
+                </template>
+              </ListView>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -861,43 +845,42 @@
                   </tr>
                 </tbody>
               </v-table>
-              <v-list
+              <ListView
                 v-else-if="aiResult.entry?.lines?.length"
-                lines="three"
-                density="compact"
-                class="py-0"
+                title="Líneas sugeridas por IA"
+                icon="mdi-robot-outline"
+                :items="paginatedAiLines"
+                :total-items="aiLinesItems.length"
+                :loading="aiLoading"
+                :page-size="LIST_PAGE_SIZE.aiLines"
+                item-key="_list_key"
+                title-field="account_name"
+                avatar-icon="mdi-robot-outline"
+                avatar-color="secondary"
+                empty-message="Sin líneas sugeridas por IA."
+                :searchable="false"
+                :show-create-button="false"
+                :editable="false"
+                :deletable="false"
+                @load-page="onAiLinesListPage"
               >
-                <template v-for="(line, idx) in paginatedAiLines" :key="`ai-line-${idx}`">
-                  <v-list-item class="px-0">
-                    <v-list-item-title class="d-flex align-center justify-space-between flex-wrap ga-2">
-                      <div>
-                        <code>{{ line.account_code }}</code>
-                        <span class="ml-2">{{ line.account_name }}</span>
-                      </div>
-                      <div>
-                        <strong>D:</strong> {{ formatMoney(line.debit_amount || 0) }}
-                        <span class="mx-1">|</span>
-                        <strong>C:</strong> {{ formatMoney(line.credit_amount || 0) }}
-                      </div>
-                    </v-list-item-title>
-                    <v-list-item-subtitle class="text-caption">
-                      {{ line.reason || '-' }}
-                    </v-list-item-subtitle>
-                  </v-list-item>
-                  <v-divider v-if="idx < paginatedAiLines.length - 1" />
+                <template #title="{ item: line }">
+                  <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                    <div>
+                      <code>{{ line.account_code }}</code>
+                      <span class="ml-2">{{ line.account_name }}</span>
+                    </div>
+                    <div class="text-caption">
+                      <strong>D:</strong> {{ formatMoney(line.debit_amount || 0) }}
+                      <span class="mx-1">|</span>
+                      <strong>C:</strong> {{ formatMoney(line.credit_amount || 0) }}
+                    </div>
+                  </div>
                 </template>
-              </v-list>
-              <div v-if="aiLinesTotalPages > 1" class="d-flex flex-column align-center mt-3 ga-2">
-                <v-pagination
-                  v-model="aiLinesPage"
-                  :length="aiLinesTotalPages"
-                  :total-visible="$vuetify.display.xs ? 5 : 7"
-                  size="small"
-                />
-                <div class="text-caption text-medium-emphasis">
-                  Mostrando {{ aiLinesRangeLabel }}
-                </div>
-              </div>
+                <template #content="{ item: line }">
+                  <div class="text-caption">{{ line.reason || '-' }}</div>
+                </template>
+              </ListView>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -914,6 +897,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
 import accountingService from '@/services/accounting.service'
+import ListView from '@/components/ListView.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -982,35 +966,48 @@ const getPaginatedItems = (items, page, pageSize) => {
   return list.slice(start, start + pageSize)
 }
 
-const getRangeLabel = (items, page, pageSize) => {
-  const list = Array.isArray(items) ? items : []
-  if (list.length === 0) return '0 de 0 registros'
-  const start = (page - 1) * pageSize + 1
-  const end = Math.min(page * pageSize, list.length)
-  return `${start} - ${end} de ${list.length} registros`
-}
-
 const trialBalanceTotalPages = computed(() => Math.max(1, Math.ceil((trialBalance.value || []).length / LIST_PAGE_SIZE.trialBalance)))
 const paginatedTrialBalance = computed(() => getPaginatedItems(trialBalance.value, trialBalancePage.value, LIST_PAGE_SIZE.trialBalance))
-const trialBalanceRangeLabel = computed(() => getRangeLabel(trialBalance.value, trialBalancePage.value, LIST_PAGE_SIZE.trialBalance))
 
 const recentEntriesTotalPages = computed(() => Math.max(1, Math.ceil((recentEntries.value || []).length / LIST_PAGE_SIZE.recentEntries)))
 const paginatedRecentEntries = computed(() => getPaginatedItems(recentEntries.value, recentEntriesPage.value, LIST_PAGE_SIZE.recentEntries))
-const recentEntriesRangeLabel = computed(() => getRangeLabel(recentEntries.value, recentEntriesPage.value, LIST_PAGE_SIZE.recentEntries))
 
 const obligationsItems = computed(() => compliance.value?.obligations || [])
 const obligationsTotalPages = computed(() => Math.max(1, Math.ceil(obligationsItems.value.length / LIST_PAGE_SIZE.obligations)))
 const paginatedObligations = computed(() => getPaginatedItems(obligationsItems.value, obligationsPage.value, LIST_PAGE_SIZE.obligations))
-const obligationsRangeLabel = computed(() => getRangeLabel(obligationsItems.value, obligationsPage.value, LIST_PAGE_SIZE.obligations))
 
 const queueTotalPages = computed(() => Math.max(1, Math.ceil((eventQueue.value || []).length / LIST_PAGE_SIZE.queue)))
 const paginatedQueueEvents = computed(() => getPaginatedItems(eventQueue.value, queuePage.value, LIST_PAGE_SIZE.queue))
-const queueRangeLabel = computed(() => getRangeLabel(eventQueue.value, queuePage.value, LIST_PAGE_SIZE.queue))
 
-const aiLinesItems = computed(() => aiResult.value?.entry?.lines || [])
+const aiLinesItems = computed(() => {
+  const lines = aiResult.value?.entry?.lines || []
+  return lines.map((line, index) => ({
+    ...line,
+    _list_key: `ai-line-${index}`
+  }))
+})
 const aiLinesTotalPages = computed(() => Math.max(1, Math.ceil(aiLinesItems.value.length / LIST_PAGE_SIZE.aiLines)))
 const paginatedAiLines = computed(() => getPaginatedItems(aiLinesItems.value, aiLinesPage.value, LIST_PAGE_SIZE.aiLines))
-const aiLinesRangeLabel = computed(() => getRangeLabel(aiLinesItems.value, aiLinesPage.value, LIST_PAGE_SIZE.aiLines))
+
+const onTrialBalanceListPage = ({ page }) => {
+  trialBalancePage.value = Number(page || 1)
+}
+
+const onRecentEntriesListPage = ({ page }) => {
+  recentEntriesPage.value = Number(page || 1)
+}
+
+const onObligationsListPage = ({ page }) => {
+  obligationsPage.value = Number(page || 1)
+}
+
+const onQueueListPage = ({ page }) => {
+  queuePage.value = Number(page || 1)
+}
+
+const onAiLinesListPage = ({ page }) => {
+  aiLinesPage.value = Number(page || 1)
+}
 
 const isEnabled = computed(() => settings.value.accounting_enabled)
 const pendingQueueCount = computed(() => Number(summary.value?.pending_events || 0))

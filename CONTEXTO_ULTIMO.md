@@ -1,8 +1,8 @@
 # CONTEXTO_ULTIMO
 
-Fecha de actualizacion: 2026-03-11
+Fecha de actualizacion: 2026-03-12
 Owner: Equipo POSLite
-Ultimo cambio registrado: Listview contable con separadores y paginacion estilo catalogo
+Ultimo cambio registrado: Migracion del modulo contable al componente generico `<ListView>` en modo LIST
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -53,10 +53,21 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 
 - Nuevo modo de visualizacion compartido: `LIST` / `TABLE` con persistencia local (`localStorage`).
 - Composable: `src/composables/useAccountingViewMode.js`.
+- Regla UI obligatoria (centralizacion de listas):
+  - Toda lista nueva o modificada en la app debe usar el componente generico `src/components/ListView.vue`.
+  - En contabilidad, el modo `LIST` debe renderizarse con `<ListView>`; `TABLE` se mantiene para grillas densas.
+  - No se permiten implementaciones nuevas de listas manuales con `v-list`/`v-expansion-panels`/`v-timeline` si el caso aplica a listado.
 - Vistas ajustadas para doble modo:
   - `src/views/Accounting.vue`
   - `src/views/AccountingAutomation.vue`
   - `src/views/AccountingWithholdings.vue`
+  - `src/views/AccountingJournal.vue`
+  - `src/views/AccountingLedger.vue`
+  - `src/views/AccountingClosing.vue`
+- Vistas contables migradas a `<ListView>` en modo `LIST`:
+  - `src/views/Accounting.vue` (balanza, asientos recientes, obligaciones, cola, lineas IA)
+  - `src/views/AccountingAutomation.vue` (reglas, excepciones)
+  - `src/views/AccountingWithholdings.vue` (estimacion, configuracion)
   - `src/views/AccountingJournal.vue`
   - `src/views/AccountingLedger.vue`
   - `src/views/AccountingClosing.vue`
