@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-03-12
 Owner: Equipo POSLite
-Ultimo cambio registrado: Implementacion de 8 capacidades contables de producto + rutas/menu y regla obligatoria de `<ListView>`
+Ultimo cambio registrado: Refactor UX del carrito POS a `<ListView>` con controles organizados (cantidad/precio/subtotal/descuento) + fix de icono en menu `Control IA`
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -161,6 +161,20 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 - `/accounting/conciliacion`
 - `/accounting/control-ia`
 
+### Ajustes recientes POS/menus (2026-03-12)
+
+1. POS - lista de items de venta (desktop)
+- Archivo: `src/views/PointOfSale.vue`
+- Mejora: reemplazo de tabla/cards por render unificado con `<ListView>` para items del carrito.
+- Estructura de cada item: encabezado (producto + variante + SKU + total) y grilla de controles (cantidad, precio, subtotal y descuento para admin).
+- Resultado esperado: menos apilamiento visual, mejor lectura y edicion de lineas de venta.
+
+2. Menu contable `Control IA` (icono)
+- Se estandarizo icono a `mdi-robot-outline`.
+- Migraciones relacionadas:
+  - `migrations/ADD_ACCOUNTING_PHASE2_PRODUCT_MENUS.sql` (definicion corregida)
+  - `migrations/FIX_ACCOUNTING_CONTROL_IA_ICON.sql` (fix para entornos ya desplegados)
+
 ## Contexto mas antiguo (resumen historico)
 
 Este bloque conserva el contexto previo a la expansion contable, para no perder continuidad funcional del producto:
@@ -196,6 +210,7 @@ Nota: este resumen historico se debe mantener y actualizar en cada nuevo `CONTEX
 6. `migrations/ADD_ACCOUNTING_COMPETITIVE_CORE.sql`
 7. `migrations/ENFORCE_ACCOUNTING_SINGLE_OPEN_PERIOD.sql`
 8. `migrations/ADD_ACCOUNTING_PHASE2_PRODUCT_MENUS.sql`
+9. `migrations/FIX_ACCOUNTING_CONTROL_IA_ICON.sql`
 
 ## Nota operativa
 

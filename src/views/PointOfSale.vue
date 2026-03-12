@@ -106,102 +106,89 @@
           <!-- Líneas del carrito -->
           <v-divider></v-divider>
           
-          <!-- Vista Desktop: Tabla -->
-          <div v-if="cart.length > 0" class="d-none d-md-block" style="width: 100%; overflow-x: auto;">
-            <v-table density="compact" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th class="text-center" style="width:80px">Cant.</th>
-                  <th class="text-right" style="width:100px">Precio</th>
-                  <th class="text-right" style="width:100px">Subtotal</th>
-                  <th v-if="isAdmin" class="text-center" style="width:150px">Descuento</th>
-                  <th class="text-right" style="width:100px">Total</th>
-                  <th style="width:40px"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(line, i) in cart" :key="i">
-                  <td>
-                    <div class="text-body-2">
-                      {{ line.productName }}
-                      <v-chip v-if="line.price_includes_tax" size="x-small" color="primary" variant="tonal" class="ml-1">IVA incl.</v-chip>
-                    </div>
-                    <div class="text-caption text-grey">{{ line.variantName }} — {{ line.sku }}</div>
-                  </td>
-                  <td class="text-center">
-                    <v-text-field v-model.number="line.quantity" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="1" @update:model-value="recalculate"></v-text-field>
-                  </td>
-                  <td class="text-right">{{ formatMoney(line.unit_price) }}</td>
-                  <td class="text-right text-grey">{{ formatMoney(line.quantity * line.unit_price) }}</td>
-                  <td v-if="isAdmin" class="text-center">
-                    <div class="d-flex align-center gap-1">
-                      <v-btn-toggle v-model="line.discount_line_type" mandatory density="compact" variant="outlined" divided style="height: 32px;">
+          <div v-if="cart.length > 0" class="pa-2">
+            <ListView
+              class="pos-cart-list"
+              title="Items de venta"
+              icon="mdi-cart-outline"
+              :items="paginatedCart"
+              :total-items="cart.length"
+              :page-size="CART_LIST_PAGE_SIZE"
+              item-key="variant_id"
+              title-field="productName"
+              empty-message="No hay items en la venta."
+              :searchable="false"
+              :show-create-button="false"
+              :editable="false"
+              :deletable="false"
+              @load-page="onCartListPage"
+            >
+              <template #title="{ item: line }">
+                <div class="d-flex align-center justify-space-between flex-wrap ga-2 w-100">
+                  <div class="d-flex align-center ga-2 flex-wrap">
+                    <span class="text-body-2 font-weight-medium">{{ line.productName }}</span>
+                    <v-chip v-if="line.price_includes_tax" size="x-small" color="primary" variant="tonal">IVA incl.</v-chip>
+                    <span class="text-caption text-medium-emphasis">{{ line.variantName || '-' }}</span>
+                    <span class="text-caption text-medium-emphasis">SKU: {{ line.sku || '-' }}</span>
+                  </div>
+                  <span class="text-body-1 font-weight-bold">{{ formatMoney(line.line_total) }}</span>
+                </div>
+              </template>
+              <template #content="{ item: line }">
+                <div class="pos-cart-line-grid" :class="{ 'pos-cart-line-grid--admin': isAdmin }">
+                  <div class="pos-cart-field">
+                    <div class="pos-cart-field__label">Cant.</div>
+                    <v-text-field
+                      v-model.number="line.quantity"
+                      type="number"
+                      variant="outlined"
+                      density="compact"
+                      hide-details
+                      min="1"
+                      class="pos-cart-input-qty"
+                      @update:model-value="recalculate"
+                    />
+                  </div>
+                  <div class="pos-cart-field">
+                    <div class="pos-cart-field__label">Precio</div>
+                    <div class="pos-cart-field__value">{{ formatMoney(line.unit_price) }}</div>
+                  </div>
+                  <div class="pos-cart-field">
+                    <div class="pos-cart-field__label">Subtotal</div>
+                    <div class="pos-cart-field__value">{{ formatMoney(line.quantity * line.unit_price) }}</div>
+                  </div>
+                  <div v-if="isAdmin" class="pos-cart-field">
+                    <div class="pos-cart-field__label">Descuento</div>
+                    <div class="d-flex align-center ga-1">
+                      <v-btn-toggle v-model="line.discount_line_type" mandatory density="compact" variant="outlined" divided class="pos-cart-discount-type">
                         <v-btn value="AMOUNT" size="x-small" @click="recalculate">$</v-btn>
                         <v-btn value="PERCENT" size="x-small" @click="recalculate">%</v-btn>
                       </v-btn-toggle>
-                      <v-text-field v-model.number="line.discount_line" type="number" variant="outlined" density="compact" hide-details style="width:70px" min="0" :max="line.discount_line_type === 'PERCENT' ? 100 : undefined" @update:model-value="recalculate"></v-text-field>
+                      <v-text-field
+                        v-model.number="line.discount_line"
+                        type="number"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                        min="0"
+                        :max="line.discount_line_type === 'PERCENT' ? 100 : undefined"
+                        class="pos-cart-discount-value"
+                        @update:model-value="recalculate"
+                      />
                     </div>
-                  </td>
-                  <td class="text-right font-weight-bold">{{ formatMoney(line.line_total) }}</td>
-                  <td><v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn></td>
-                </tr>
-              </tbody>
-            </v-table>
-          </div>
-
-          <!-- Vista Mobile: Cards -->
-          <div v-if="cart.length > 0" class="d-md-none">
-            <v-card v-for="(line, i) in cart" :key="i" class="ma-2" variant="outlined">
-              <v-card-text class="pa-2">
-                <div class="d-flex justify-space-between align-start mb-2">
-                  <div style="flex: 1;">
-                    <div class="text-body-2 font-weight-medium">
-                      {{ line.productName }}
-                      <v-chip v-if="line.price_includes_tax" size="x-small" color="primary" variant="tonal" class="ml-1">IVA incl.</v-chip>
-                    </div>
-                    <div class="text-caption text-grey">{{ line.variantName }}</div>
-                    <div class="text-caption text-grey">SKU: {{ line.sku }}</div>
-                  </div>
-                  <v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removeFromCart(i)"></v-btn>
-                </div>
-                <div class="d-flex justify-space-between align-center gap-2">
-                  <v-text-field 
-                    v-model.number="line.quantity" 
-                    type="number" 
-                    variant="outlined" 
-                    density="compact" 
-                    hide-details 
-                    style="max-width:80px" 
-                    min="1" 
-                    label="Cant."
-                    @update:model-value="recalculate"
-                  ></v-text-field>
-                  <div v-if="isAdmin" class="d-flex flex-column gap-1" style="max-width:120px">
-                    <v-btn-toggle v-model="line.discount_line_type" mandatory density="compact" variant="outlined" divided>
-                      <v-btn value="AMOUNT" size="x-small" @click="recalculate">$</v-btn>
-                      <v-btn value="PERCENT" size="x-small" @click="recalculate">%</v-btn>
-                    </v-btn-toggle>
-                    <v-text-field 
-                      v-model.number="line.discount_line" 
-                      type="number" 
-                      variant="outlined" 
-                      density="compact" 
-                      hide-details 
-                      min="0" 
-                      label="Desc."
-                      :max="line.discount_line_type === 'PERCENT' ? 100 : undefined"
-                      @update:model-value="recalculate"
-                    ></v-text-field>
-                  </div>
-                  <div class="text-right">
-                    <div class="text-caption text-grey">{{ formatMoney(line.unit_price) }} c/u</div>
-                    <div class="text-caption text-grey">Subtotal: {{ formatMoney(line.quantity * line.unit_price) }}</div>
-                    <div class="text-body-1 font-weight-bold">{{ formatMoney(line.line_total) }}</div>
                   </div>
                 </div>
-              </v-card-text>
-            </v-card>
+              </template>
+              <template #actions="{ item: line }">
+                <v-btn
+                  icon="mdi-close"
+                  size="small"
+                  variant="text"
+                  color="error"
+                  @click.stop="removeLineFromCart(line)"
+                />
+              </template>
+            </ListView>
           </div>
 
           <v-card-text v-if="cart.length === 0" class="text-center text-grey py-8">
@@ -553,6 +540,7 @@ import paymentMethodsService from '@/services/paymentMethods.service'
 import taxesService from '@/services/taxes.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import creditService from '@/services/credit.service'
+import ListView from '@/components/ListView.vue'
 import { calculateDiscount } from '@/utils/discountCalculator'
 import { formatMoney } from '@/utils/formatters'
 import { applyLineTaxes } from '@/utils/taxCalculator'
@@ -567,6 +555,8 @@ const MAX_HOLD_SALES = 20
 const searchTerm = ref('')
 const searchResults = ref([])
 const cart = ref([])
+const cartListPage = ref(1)
+const CART_LIST_PAGE_SIZE = 8
 const selectedCustomer = ref(null)
 const customerResults = ref([])
 const searchingCustomer = ref(false)
@@ -686,6 +676,16 @@ const totals = computed(() => {
   
   return { subtotal, discountLine, discountGlobal, discount, tax, taxLabel, taxDetails, total }
 })
+
+const cartTotalPages = computed(() => Math.max(1, Math.ceil(cart.value.length / CART_LIST_PAGE_SIZE)))
+const paginatedCart = computed(() => {
+  const start = (cartListPage.value - 1) * CART_LIST_PAGE_SIZE
+  return cart.value.slice(start, start + CART_LIST_PAGE_SIZE)
+})
+
+const onCartListPage = ({ page }) => {
+  cartListPage.value = Number(page || 1)
+}
 
 const paidTotal = computed(() => payments.value.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0))
 const change = computed(() => Math.max(0, paidTotal.value - totals.value.total))
@@ -823,6 +823,11 @@ const recalculateTaxes = async (line) => {
 }
 
 const removeFromCart = (i) => { cart.value.splice(i, 1); recalcPayments() }
+const removeLineFromCart = (line) => {
+  const index = cart.value.indexOf(line)
+  if (index < 0) return
+  removeFromCart(index)
+}
 
 const recalculate = async () => {
   for (const line of cart.value) {
@@ -1282,6 +1287,14 @@ const clearSale = () => {
   searchResults.value = []
 }
 
+watch(() => cart.value.length, () => {
+  cartListPage.value = 1
+})
+
+watch(cartTotalPages, (total) => {
+  if (cartListPage.value > total) cartListPage.value = total
+})
+
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 
 // Inicialización
@@ -1443,6 +1456,53 @@ const handleKeyboardShortcuts = (e) => {
   border-color: rgba(98, 139, 255, 0.3) !important;
 }
 
+.pos-cart-list :deep(.ofir-list-view__title) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.pos-cart-list :deep(.ofir-list-view__item) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.pos-cart-line-grid {
+  display: grid;
+  grid-template-columns: minmax(86px, 110px) minmax(90px, 1fr) minmax(100px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.pos-cart-line-grid--admin {
+  grid-template-columns: minmax(86px, 110px) minmax(90px, 1fr) minmax(100px, 1fr) minmax(190px, 220px);
+}
+
+.pos-cart-field__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  opacity: 0.86;
+  margin-bottom: 4px;
+}
+
+.pos-cart-field__value {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pos-cart-input-qty {
+  max-width: 90px;
+}
+
+.pos-cart-discount-type {
+  min-width: 76px;
+}
+
+.pos-cart-discount-value {
+  max-width: 92px;
+}
+
 /* Total sticky en desktop */
 @media (min-width: 960px) {
   .totals-sticky {
@@ -1467,6 +1527,17 @@ const handleKeyboardShortcuts = (e) => {
 @media (max-width: 600px) {
   .held-sale-card :deep(.v-btn) {
     flex: 1;
+  }
+}
+
+@media (max-width: 959px) {
+  .pos-cart-line-grid,
+  .pos-cart-line-grid--admin {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pos-cart-line-grid--admin .pos-cart-field:last-child {
+    grid-column: 1 / -1;
   }
 }
 </style>
