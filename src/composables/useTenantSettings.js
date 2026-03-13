@@ -79,6 +79,8 @@ export function useTenantSettings() {
   const maxDiscountWithoutAuth = computed(() => settings.value?.max_discount_without_auth || 5)
   const roundingMethod = computed(() => settings.value?.rounding_method || 'normal')
   const roundingMultiple = computed(() => settings.value?.rounding_multiple || 100)
+  const posAllowManualSaleDatetime = computed(() => settings.value?.pos_allow_manual_sale_datetime === true)
+  const posMaxBackdateHours = computed(() => settings.value?.pos_max_backdate_hours || 24)
 
   // Configuración de Facturación
   const invoicePrefix = computed(() => settings.value?.invoice_prefix || 'FAC')
@@ -183,6 +185,8 @@ export function useTenantSettings() {
     maxDiscountWithoutAuth,
     roundingMethod,
     roundingMultiple,
+    posAllowManualSaleDatetime,
+    posMaxBackdateHours,
     applyRounding,
 
     // Facturación

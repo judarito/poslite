@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const DASHBOARD_SUMMARY_TTL_MS = 60 * 1000
 
 class ReportsService {
   constructor() {
@@ -1038,25 +1041,41 @@ class ReportsService {
   // Dashboard resumen principal — KPIs + gráficas
   async getDashboardSummary(tenantId, locationId = null) {
     try {
-      const { data, error } = await supabaseService.client.rpc('fn_reports_dashboard_summary', {
-        p_tenant_id: tenantId,
-        p_location_id: locationId || null
-      })
+      return await queryCache.getOrLoad(
+        `reports:dashboard-summary:${locationId || 'all'}`,
+        async () => {
+          const { data, error } = await supabaseService.client.rpc('fn_reports_dashboard_summary', {
+            p_tenant_id: tenantId,
+            p_location_id: locationId || null
+          })
 
-      if (!error && data?.success) {
-        return {
-          success: true,
-          kpis: data.kpis || null,
-          dailySeries: data.daily_series || [],
-          topProducts: data.top_products || [],
-          paymentMethods: data.payment_methods || []
+          if (error) throw error
+          if (!data?.success) {
+            throw new Error('La RPC fn_reports_dashboard_summary no devolvió una respuesta válida.')
+          }
+
+          return {
+            success: true,
+            kpis: data.kpis || null,
+            dailySeries: data.daily_series || [],
+            topProducts: data.top_products || [],
+            paymentMethods: data.payment_methods || []
+          }
+        },
+        {
+          tenantId,
+          ttlMs: DASHBOARD_SUMMARY_TTL_MS,
+          storage: 'session',
+          tags: ['reports', 'dashboard-summary'],
+          shouldCache: (result) => result?.success === true
         }
+      )
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message || 'No se pudo cargar el dashboard resumido.'
       }
-    } catch (_rpcError) {
-      // Fallback legacy mientras se despliega la migración.
     }
-
-    return this.getDashboardSummaryLegacy(tenantId, locationId)
   }
 
   async getDashboardSummaryLegacy(tenantId, locationId = null) {

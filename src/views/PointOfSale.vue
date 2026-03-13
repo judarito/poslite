@@ -9,18 +9,46 @@
           <span class="text-subtitle-1 d-sm-none">POS</span>
         </div>
         <v-spacer class="d-none d-sm-flex"></v-spacer>
-        <v-chip v-if="currentSession" :color="sessionExpired ? 'error' : 'success'" size="small" :prepend-icon="sessionExpired ? 'mdi-clock-alert' : 'mdi-cash-register'">
-          <span class="d-none d-sm-inline">{{ currentSession.cash_register?.name || 'Caja' }}{{ sessionExpired ? ' (⚠️ '+sessionAgeHours+'h)' : '' }}</span>
-          <span class="d-sm-none">{{ currentSession.cash_register?.name?.substring(0, 10) || 'Caja' }}{{ sessionExpired ? ' !' : '' }}</span>
-        </v-chip>
-        <v-chip v-else color="warning" size="small" prepend-icon="mdi-alert">
-          <span class="d-none d-sm-inline">Sin caja abierta</span>
-          <span class="d-sm-none">Sin caja</span>
-        </v-chip>
+        <div class="pos-header-actions">
+          <v-btn
+            class="pos-header-actions__charge"
+            color="primary"
+            prepend-icon="mdi-check-circle"
+            :loading="processing"
+            :disabled="cart.length === 0 || remaining > 0 || sessionExpired"
+            @click="processSale"
+          >
+            Cobrar {{ formatMoney(totals.total) }}
+          </v-btn>
+          <v-btn
+            class="pos-header-actions__clear"
+            variant="tonal"
+            color="error"
+            prepend-icon="mdi-trash-can"
+            :disabled="cart.length === 0"
+            @click="clearSale"
+          >
+            Limpiar
+          </v-btn>
+          <v-chip
+            v-if="currentSession"
+            class="pos-header-status"
+            :color="sessionExpired ? 'error' : 'success'"
+            size="small"
+            :prepend-icon="sessionExpired ? 'mdi-clock-alert' : 'mdi-cash-register'"
+          >
+            <span class="d-none d-sm-inline">{{ currentSession.cash_register?.name || 'Caja' }}{{ sessionExpired ? ' (⚠️ '+sessionAgeHours+'h)' : '' }}</span>
+            <span class="d-sm-none">{{ currentSession.cash_register?.name?.substring(0, 10) || 'Caja' }}{{ sessionExpired ? ' !' : '' }}</span>
+          </v-chip>
+          <v-chip v-else class="pos-header-status" color="warning" size="small" prepend-icon="mdi-alert">
+            <span class="d-none d-sm-inline">Sin caja abierta</span>
+            <span class="d-sm-none">Sin caja</span>
+          </v-chip>
+        </div>
       </v-card-title>
     </v-card>
 
-    <v-row no-gutters>
+    <v-row no-gutters align="start" class="pos-main-row">
       <!-- Panel Izquierdo: Búsqueda de productos -->
       <v-col cols="12" md="7" class="pr-md-2">
         <v-card class="pos-panel">
@@ -85,20 +113,37 @@
             <v-alert
               v-if="chatOrderSummary"
               class="mt-2"
-              :type="chatOrderSummary.matchedCount > 0 ? 'success' : 'warning'"
+              :type="chatOrderSummary.matchedCount > 0 && chatOrderSummary.reviewCount === 0 && chatOrderSummary.unmatchedCount === 0 ? 'success' : 'warning'"
               variant="tonal"
               density="compact"
             >
               <div class="text-body-2">
                 Cargados: <strong>{{ chatOrderSummary.matchedCount }}</strong>
                 <span class="ml-2">Sin match: <strong>{{ chatOrderSummary.unmatchedCount }}</strong></span>
-                <span class="ml-2">Confianza IA: <strong>{{ chatOrderSummary.confidencePercent }}%</strong></span>
+                <span class="ml-2">Revisar: <strong>{{ chatOrderSummary.reviewCount || 0 }}</strong></span>
+                <span class="ml-2">Parser: <strong>{{ chatOrderSummary.parserLabel }}</strong></span>
+                <span class="ml-2">Confianza: <strong>{{ chatOrderSummary.confidencePercent }}%</strong></span>
                 <span v-if="chatOrderSummary.customerSuggestion" class="ml-2">
                   Cliente sugerido: <strong>{{ chatOrderSummary.customerSuggestion.full_name }}</strong>
                 </span>
                 <span v-if="chatOrderSummary.cacheHit" class="ml-2">
                   (cache)
                 </span>
+              </div>
+              <div v-if="chatOrderSummary.reviewLines?.length" class="text-body-2 mt-2">
+                <strong>Sugerencias para revisar:</strong>
+                <div
+                  v-for="(reviewLine, index) in chatOrderSummary.reviewLines"
+                  :key="`review-line-${index}`"
+                  class="mt-1"
+                >
+                  {{ reviewLine.rawName }}:
+                  <strong>{{ reviewLine.candidates.join(' / ') }}</strong>
+                </div>
+              </div>
+              <div v-if="chatOrderSummary.unmatchedLines?.length" class="text-body-2 mt-2">
+                <strong>No identificados:</strong>
+                {{ chatOrderSummary.unmatchedLines.join(' / ') }}
               </div>
             </v-alert>
           </v-card-text>
@@ -135,7 +180,7 @@
                 </div>
               </template>
               <template #content="{ item: line }">
-                <div class="pos-cart-line-grid" :class="{ 'pos-cart-line-grid--admin': isAdmin }">
+                <div class="pos-cart-line-grid" :class="{ 'pos-cart-line-grid--admin': canManageDiscounts }">
                   <div class="pos-cart-field">
                     <div class="pos-cart-field__label">Cant.</div>
                     <v-text-field
@@ -157,9 +202,9 @@
                     <div class="pos-cart-field__label">Subtotal</div>
                     <div class="pos-cart-field__value">{{ formatMoney(line.quantity * line.unit_price) }}</div>
                   </div>
-                  <div v-if="isAdmin" class="pos-cart-field">
+                  <div v-if="canManageDiscounts" class="pos-cart-field">
                     <div class="pos-cart-field__label">Descuento</div>
-                    <div class="d-flex align-center ga-1">
+                    <div class="d-flex align-center ga-2 pos-cart-discount-controls">
                       <v-btn-toggle v-model="line.discount_line_type" mandatory density="compact" variant="outlined" divided class="pos-cart-discount-type">
                         <v-btn value="AMOUNT" size="x-small" @click="recalculate">$</v-btn>
                         <v-btn value="PERCENT" size="x-small" @click="recalculate">%</v-btn>
@@ -199,8 +244,8 @@
       </v-col>
 
       <!-- Panel Derecho: Totales y Pago -->
-      <v-col cols="12" md="5" class="pl-md-2 mt-2 mt-md-0">
-        <v-card class="pos-panel">
+      <v-col cols="12" md="5" class="pl-md-2 mt-2 mt-md-0 pos-summary-col">
+        <v-card class="pos-panel pos-summary-card">
           <!-- Cliente -->
           <v-card-text class="pa-2">
             <v-autocomplete
@@ -326,8 +371,8 @@
 
           <v-divider></v-divider>
 
-          <!-- Botón Descuento Global (solo admin) -->
-          <v-card-text v-if="isAdmin && cart.length > 0" class="pa-2 pb-0">
+          <!-- Botón Descuento Global -->
+          <v-card-text v-if="canManageDiscounts && cart.length > 0" class="pa-2 pb-0">
             <div class="d-flex gap-1">
               <v-btn 
                 size="small" 
@@ -441,6 +486,18 @@
           </v-card-text>
 
           <v-card-text class="pa-2 pa-sm-3">
+            <v-text-field
+              v-if="canSelectSaleDateTime"
+              v-model="saleDateTimeInput"
+              type="datetime-local"
+              label="Fecha y hora de la venta"
+              variant="outlined"
+              density="compact"
+              hide-details="auto"
+              class="mb-2"
+              :error-messages="saleDateTimeError ? [saleDateTimeError] : []"
+            ></v-text-field>
+
             <v-textarea 
               v-model="saleNote" 
               label="Nota (opcional)" 
@@ -449,6 +506,16 @@
               density="compact" 
               hide-details
             ></v-textarea>
+
+            <div class="text-caption text-medium-emphasis mt-2">
+              <template v-if="canSelectSaleDateTime">
+                Si no cambias este campo, la venta usará la fecha y hora actual al momento de cobrar.
+                La retrofecha máxima permitida es de {{ posMaxBackdateHours }} hora(s).
+              </template>
+              <template v-else>
+                La venta se registra con la fecha y hora actual al momento de cobrar. El POS no permite cambiarla manualmente.
+              </template>
+            </div>
           </v-card-text>
 
           <!-- Alerta sesión expirada -->
@@ -459,32 +526,6 @@
             </v-alert>
           </v-card-text>
 
-          <v-card-actions class="pa-2 pa-sm-3">
-            <v-btn 
-              block 
-              color="primary" 
-              :size="$vuetify.display.xs ? 'default' : 'large'" 
-              prepend-icon="mdi-check-circle" 
-              :loading="processing" 
-              :disabled="cart.length === 0 || remaining > 0 || sessionExpired" 
-              @click="processSale"
-            >
-              Cobrar {{ formatMoney(totals.total) }}
-            </v-btn>
-          </v-card-actions>
-
-          <v-card-actions class="px-2 px-sm-3 pb-2 pb-sm-3 pt-0">
-            <v-btn 
-              block 
-              variant="tonal" 
-              color="error" 
-              prepend-icon="mdi-trash-can" 
-              :disabled="cart.length === 0" 
-              @click="clearSale"
-            >
-              Limpiar
-            </v-btn>
-          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>
@@ -533,7 +574,12 @@ const { t } = useI18n()
 import productsService from '@/services/products.service'
 import customersService from '@/services/customers.service'
 import thirdPartiesService from '@/services/thirdParties.service'
-import { analyzeChatOrderText, matchChatLinesToCatalog, findBestCustomerMatch } from '@/services/chatOrderAgent.service'
+import {
+  analyzeChatOrderText,
+  matchChatLinesToCatalog,
+  findBestCustomerMatch,
+  suggestCatalogMatchesFromChatText
+} from '@/services/chatOrderAgent.service'
 import salesService from '@/services/sales.service'
 import cashService from '@/services/cash.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
@@ -548,7 +594,14 @@ import { useI18n } from '@/i18n'
 
 const { tenantId } = useTenant()
 const { userProfile } = useAuth()
-const { maxDiscountWithoutAuth, applyRounding, electronicInvoicingEnabled, cashSessionMaxHours } = useTenantSettings()
+const {
+  maxDiscountWithoutAuth,
+  applyRounding,
+  electronicInvoicingEnabled,
+  cashSessionMaxHours,
+  posAllowManualSaleDatetime,
+  posMaxBackdateHours
+} = useTenantSettings()
 const POS_HOLD_SALES_STORAGE_PREFIX = 'ofirone_pos_hold_sales'
 const MAX_HOLD_SALES = 20
 
@@ -565,6 +618,9 @@ const chatOrderText = ref('')
 const processingChatOrder = ref(false)
 const chatOrderSummary = ref(null)
 const heldSales = ref([])
+const CUSTOMER_AUTOLOAD_MIN_SCORE = 0.82
+const saleDateTime = ref('')
+const saleDateTimeTouched = ref(false)
 
 // Cargar info de crédito cuando cambie el cliente
 watch(selectedCustomer, async (customer) => {
@@ -607,7 +663,7 @@ const creditError = computed(() => {
   return null
 })
 
-// Descuentos (solo admin)
+// Descuentos en POS
 const showGlobalDiscountDialog = ref(false)
 const globalDiscountType = ref('percentage')
 const globalDiscountValue = ref(0)
@@ -617,9 +673,68 @@ const searchInput = ref(null)
 const selectedVariant = ref(null)
 const searchingProduct = ref(false)
 
-// Verificar si el usuario es administrador
-const isAdmin = computed(() => {
-  return userProfile.value?.roles?.some(role => role.name === 'ADMINISTRADOR') || false
+// Descuentos en POS: permitidos para administrador y gerente.
+const canManageDiscounts = computed(() => {
+  const roles = userProfile.value?.roles?.map((role) => role.name) || []
+  return roles.includes('ADMINISTRADOR') || roles.includes('GERENTE')
+})
+const canSelectSaleDateTime = computed(() => canManageDiscounts.value && posAllowManualSaleDatetime.value)
+
+const getCurrentSaleDateTimeLocal = () => {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+  const year = now.getFullYear()
+  const month = pad(now.getMonth() + 1)
+  const day = pad(now.getDate())
+  const hours = pad(now.getHours())
+  const minutes = pad(now.getMinutes())
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const parseSaleDateTimeValue = (value) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const selectedSaleDate = computed(() => {
+  if (!canSelectSaleDateTime.value) return null
+  const sourceValue = saleDateTimeTouched.value ? saleDateTime.value : getCurrentSaleDateTimeLocal()
+  return parseSaleDateTimeValue(sourceValue)
+})
+
+const saleDateTimeInput = computed({
+  get: () => (saleDateTimeTouched.value ? saleDateTime.value : getCurrentSaleDateTimeLocal()),
+  set: (value) => {
+    saleDateTimeTouched.value = true
+    saleDateTime.value = value
+  }
+})
+
+const saleDateTimeError = computed(() => {
+  if (!canSelectSaleDateTime.value) return ''
+
+  const selected = selectedSaleDate.value
+  if (!selected) return 'Selecciona una fecha/hora válida'
+
+  const now = new Date()
+  if (selected.getTime() > now.getTime()) {
+    return 'La fecha/hora de venta no puede estar en el futuro'
+  }
+
+  const maxBackMs = Number(posMaxBackdateHours.value || 24) * 60 * 60 * 1000
+  if ((now.getTime() - selected.getTime()) > maxBackMs) {
+    return `La retrofecha máxima permitida es de ${posMaxBackdateHours.value} hora(s)`
+  }
+
+  if (currentSession.value?.opened_at) {
+    const sessionOpenedAt = new Date(currentSession.value.opened_at)
+    if (!Number.isNaN(sessionOpenedAt.getTime()) && selected.getTime() < sessionOpenedAt.getTime()) {
+      return 'La fecha/hora de venta no puede ser anterior a la apertura de la caja'
+    }
+  }
+
+  return ''
 })
 
 const holdSalesStorageKey = computed(() => {
@@ -788,16 +903,39 @@ const addToCart = async (variant, quantity = 1) => {
   if (payments.value.length === 1) payments.value[0].amount = totals.value.total
 }
 
-const listCatalogForChatMatching = async () => {
-  const r = await productsService.getActiveVariants(tenantId.value, 3500)
-  if (!r.success) return r
+const buildChatCatalogSearchTerms = (chatText, lineItems = []) => {
+  const rawTerms = []
 
-  const filtered = (r.data || []).filter(v => {
-    const effectiveIsComponent = v.is_component !== null ? v.is_component : (v.product?.is_component || false)
-    return !effectiveIsComponent
+  for (const line of Array.isArray(lineItems) ? lineItems : []) {
+    if (line?.sku) rawTerms.push(String(line.sku))
+    if (line?.raw_name) rawTerms.push(String(line.raw_name))
+    if (line?.raw_name && line?.unit_hint) rawTerms.push(`${line.raw_name} ${line.unit_hint}`)
+  }
+
+  const rawSegments = String(chatText || '')
+    .split(/[\n,;]+/)
+    .map((segment) => String(segment || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  rawTerms.push(...rawSegments)
+
+  return [...new Set(
+    rawTerms
+      .map((term) => String(term || '').trim().toLowerCase().replace(/\s+/g, ' '))
+      .filter((term) => term.length >= 2)
+  )].slice(0, 12)
+}
+
+const listCatalogForChatMatching = async (lineItems = []) => {
+  const searchTerms = buildChatCatalogSearchTerms(chatOrderText.value, lineItems)
+  if (!searchTerms.length) {
+    return { success: false, error: 'No pude extraer términos útiles del chat para buscar en el catálogo.', data: [] }
+  }
+
+  return productsService.getVariantsForChatMatching(tenantId.value, searchTerms, {
+    perTermLimit: 14,
+    maxItems: 180
   })
-
-  return { success: true, data: filtered }
 }
 
 const recalculateTaxes = async (line) => {
@@ -830,9 +968,7 @@ const removeLineFromCart = (line) => {
 }
 
 const recalculate = async () => {
-  for (const line of cart.value) {
-    await recalculateTaxes(line)
-  }
+  await Promise.all(cart.value.map((line) => recalculateTaxes(line)))
   recalcPayments()
 }
 
@@ -842,8 +978,8 @@ const recalcPayments = () => {
 
 // Aplicar descuento global
 const applyGlobalDiscount = async () => {
-  if (!isAdmin.value) {
-    showMsg('Solo administradores pueden aplicar descuentos', 'error')
+  if (!canManageDiscounts.value) {
+    showMsg('Solo administradores o gerentes pueden aplicar descuentos', 'error')
     return
   }
   
@@ -876,7 +1012,7 @@ const applyGlobalDiscount = async () => {
     const globalDiscountAmount = totalBeforeGlobalDiscount * (globalDiscountValue.value / 100)
     
     // Distribuir proporcionalmente
-    for (const line of cart.value) {
+    await Promise.all(cart.value.map(async (line) => {
       const lineSubtotal = line.quantity * line.unit_price
       const lineDiscountAmount = calculateDiscount(
         lineSubtotal,
@@ -887,10 +1023,10 @@ const applyGlobalDiscount = async () => {
       const proportion = lineAfterDiscount / totalBeforeGlobalDiscount
       line.discount_global = Math.round(globalDiscountAmount * proportion)
       await recalculateTaxes(line)
-    }
+    }))
   } else {
     // Distribuir monto fijo proporcionalmente
-    for (const line of cart.value) {
+    await Promise.all(cart.value.map(async (line) => {
       const lineSubtotal = line.quantity * line.unit_price
       const lineDiscountAmount = calculateDiscount(
         lineSubtotal,
@@ -901,7 +1037,7 @@ const applyGlobalDiscount = async () => {
       const proportion = lineAfterDiscount / totalBeforeGlobalDiscount
       line.discount_global = Math.round(globalDiscountValue.value * proportion)
       await recalculateTaxes(line)
-    }
+    }))
   }
   
   // Forzar actualización reactiva
@@ -914,10 +1050,10 @@ const applyGlobalDiscount = async () => {
 
 // Remover descuento global
 const removeGlobalDiscount = async () => {
-  for (const line of cart.value) {
+  await Promise.all(cart.value.map(async (line) => {
     line.discount_global = 0
     await recalculateTaxes(line)
-  }
+  }))
   cart.value = [...cart.value]
   showMsg('Descuento global removido')
 }
@@ -935,24 +1071,75 @@ const parseChatOrderWithAgent = async () => {
   }
 
   processingChatOrder.value = true
+  let shouldClearChatInput = false
   try {
-    const catalogResult = await listCatalogForChatMatching()
-    if (!catalogResult.success || !catalogResult.data?.length) {
-      showMsg(catalogResult.error || 'No hay catálogo disponible para matching.', 'error')
-      return
-    }
-
-    const aiResult = await analyzeChatOrderText({
+    let aiResult = await analyzeChatOrderText({
       tenantId: tenantId.value,
       chatText: chatOrderText.value
     })
 
+    let catalogResult = await listCatalogForChatMatching(aiResult.success ? aiResult.data?.line_items : [])
+
+    if (aiResult.success && aiResult.data?.cache_hit) {
+      const cachedAttempt = matchChatLinesToCatalog(aiResult.data.line_items, catalogResult.data)
+      if (cachedAttempt.matched.length === 0) {
+        const refreshedResult = await analyzeChatOrderText({
+          tenantId: tenantId.value,
+          chatText: chatOrderText.value,
+          forceCloud: true,
+          forceRefresh: true
+        })
+
+        if (refreshedResult.success) {
+          aiResult = refreshedResult
+          catalogResult = await listCatalogForChatMatching(aiResult.data?.line_items || [])
+        }
+      }
+    }
+
     if (!aiResult.success) {
+      if (!catalogResult.success || !catalogResult.data?.length) {
+        showMsg(aiResult.error || catalogResult.error || 'No fue posible convertir el chat.', 'error')
+        return
+      }
+
+      const rawSuggestions = suggestCatalogMatchesFromChatText(chatOrderText.value, catalogResult.data)
+      if (rawSuggestions.length > 0) {
+        chatOrderSummary.value = {
+          matchedCount: 0,
+          unmatchedCount: 0,
+          reviewCount: rawSuggestions.length,
+          confidencePercent: 0,
+          customerSuggestion: null,
+          customerAutoloaded: false,
+          notes: null,
+          cacheHit: false,
+          parserLabel: 'Fallback local',
+          reviewLines: rawSuggestions.map((entry) => ({
+            rawName: entry.line?.raw_name || 'Item sin nombre',
+            candidates: (entry.candidates || []).map((candidate) => {
+              const productName = candidate.variant?.product?.name || 'Producto'
+              const variantName = candidate.variant?.variant_name ? ` ${candidate.variant.variant_name}` : ''
+              const sku = candidate.variant?.sku ? ` [${candidate.variant.sku}]` : ''
+              return `${productName}${variantName}${sku}`
+            })
+          })),
+          unmatchedLines: []
+        }
+        showMsg('El parser no produjo ítems válidos, pero encontré sugerencias desde el texto del chat.', 'warning')
+        return
+      }
+
       showMsg(aiResult.error || 'No fue posible convertir el chat.', 'error')
       return
     }
 
-    const { matched, unmatched } = matchChatLinesToCatalog(aiResult.data.line_items, catalogResult.data)
+    if (!catalogResult.success || !catalogResult.data?.length) {
+      showMsg(catalogResult.error || 'No encontré un catálogo operativo para hacer matching del chat.', 'error')
+      return
+    }
+
+    const { matched, review, unmatched } = matchChatLinesToCatalog(aiResult.data.line_items, catalogResult.data)
 
     const customerName = String(aiResult?.data?.order?.customer_name || '').trim()
     let customerSuggestion = null
@@ -963,32 +1150,57 @@ const parseChatOrderWithAgent = async () => {
       const bestCustomer = findBestCustomerMatch(customerName, customerList)
       if (bestCustomer?.customer) {
         customerSuggestion = bestCustomer.customer
-        if (!selectedCustomer.value?.customer_id) {
+        if (!selectedCustomer.value?.customer_id && Number(bestCustomer.score || 0) >= CUSTOMER_AUTOLOAD_MIN_SCORE) {
           selectedCustomer.value = bestCustomer.customer
           customerAutoloaded = true
+        } else if (!selectedCustomer.value?.customer_id && customerList.length) {
+          customerResults.value = customerList.slice(0, 6)
         }
       } else if (!selectedCustomer.value?.customer_id && customerList.length) {
         customerResults.value = customerList.slice(0, 6)
       }
     }
 
+    const reviewLines = (review || []).map((entry) => ({
+      rawName: entry.line?.raw_name || 'Item sin nombre',
+      candidates: (entry.candidates || []).map((candidate) => {
+        const productName = candidate.variant?.product?.name || 'Producto'
+        const variantName = candidate.variant?.variant_name ? ` ${candidate.variant.variant_name}` : ''
+        const sku = candidate.variant?.sku ? ` [${candidate.variant.sku}]` : ''
+        return `${productName}${variantName}${sku}`
+      })
+    }))
+
+    const unmatchedLines = (unmatched || []).map((entry) => entry?.raw_name || entry?.name).filter(Boolean)
+    const parserName = aiResult?.data?.parser === 'deterministic' ? 'Local' : 'Cloud IA'
+
     if (!matched.length) {
       chatOrderSummary.value = {
         matchedCount: 0,
         unmatchedCount: unmatched.length,
+        reviewCount: review.length,
         confidencePercent: Math.round(Number(aiResult?.data?.order?.confidence || 0) * 100),
         customerSuggestion,
         customerAutoloaded,
         notes: aiResult?.data?.order?.notes || null,
-        cacheHit: Boolean(aiResult?.data?.cache_hit)
+        cacheHit: Boolean(aiResult?.data?.cache_hit),
+        parserLabel: parserName,
+        reviewLines,
+        unmatchedLines
       }
-      showMsg('La IA entendió el chat pero no encontró coincidencias en tu catálogo.', 'warning')
+      showMsg(
+        review.length > 0
+          ? 'Se encontraron sugerencias, pero no hubo coincidencias suficientemente confiables para cargar al carrito.'
+          : 'No se encontraron coincidencias confiables en tu catálogo.',
+        'warning'
+      )
       return
     }
 
     for (const item of matched) {
       await addToCart(item.variant, item.line.quantity || 1)
     }
+    shouldClearChatInput = true
 
     const aiNotes = String(aiResult?.data?.order?.notes || '').trim()
     if (aiNotes) {
@@ -1000,17 +1212,28 @@ const parseChatOrderWithAgent = async () => {
     chatOrderSummary.value = {
       matchedCount: matched.length,
       unmatchedCount: unmatched.length,
+      reviewCount: review.length,
       confidencePercent: Math.round(Number(aiResult?.data?.order?.confidence || 0) * 100),
       customerSuggestion,
       customerAutoloaded,
       notes: aiResult?.data?.order?.notes || null,
-      cacheHit: Boolean(aiResult?.data?.cache_hit)
+      cacheHit: Boolean(aiResult?.data?.cache_hit),
+      parserLabel: parserName,
+      reviewLines,
+      unmatchedLines
     }
 
-    showMsg(`Chat convertido: ${matched.length} item(s) cargados${unmatched.length ? `, ${unmatched.length} sin match` : ''}${aiResult?.data?.cache_hit ? ' (cache)' : ''}.`)
+    showMsg(
+      `Chat convertido: ${matched.length} item(s) cargados` +
+      `${review.length ? `, ${review.length} para revisar` : ''}` +
+      `${unmatched.length ? `, ${unmatched.length} sin match` : ''}` +
+      `${aiResult?.data?.cache_hit ? ' (cache)' : ''}.`
+    )
   } finally {
     processingChatOrder.value = false
-    chatOrderText.value = ''
+    if (shouldClearChatInput) {
+      chatOrderText.value = ''
+    }
   }
 }
 
@@ -1115,6 +1338,7 @@ const saveSaleOnHold = () => {
       method: payment.method,
       amount: Number(payment.amount) || 0
     })),
+    saleDateTime: saleDateTimeTouched.value ? saleDateTime.value : '',
     saleNote: saleNote.value || '',
     itemsCount: cart.value.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0)
   }
@@ -1147,6 +1371,8 @@ const resumeHeldSale = async (heldSaleId) => {
   payments.value = (held.payments && held.payments.length)
     ? held.payments.map(payment => ({ method: payment.method, amount: Number(payment.amount) || 0 }))
     : [{ method: paymentMethods.value[0]?.code || '', amount: 0 }]
+  saleDateTimeTouched.value = Boolean(held.saleDateTime)
+  saleDateTime.value = held.saleDateTime || ''
   saleNote.value = held.saleNote || ''
   chatOrderText.value = ''
   chatOrderSummary.value = null
@@ -1185,6 +1411,11 @@ const processSale = async () => {
     snackbarMessage.value = `La sesión lleva ${sessionAgeHours.value}h abierta. Cierra y reabre la caja.`
     snackbarColor.value = 'error'
     snackbar.value = true
+    return
+  }
+
+  if (saleDateTimeError.value) {
+    showMsg(saleDateTimeError.value, 'error')
     return
   }
 
@@ -1227,6 +1458,7 @@ const processSale = async () => {
       customer_id:     selectedCustomer.value?.customer_id     || null,
       third_party_id:  selectedThirdParty.value?.third_party_id || null,
       sold_by: userProfile.value.user_id,
+      sold_at: selectedSaleDate.value ? selectedSaleDate.value.toISOString() : null,
       lines,
       payments: paymentsList,
       note: saleNote.value || null
@@ -1280,6 +1512,8 @@ const clearSale = () => {
   selectedCustomer.value = null
   selectedThirdParty.value = null
   payments.value = [{ method: paymentMethods.value[0]?.code || '', amount: 0 }]
+  saleDateTime.value = ''
+  saleDateTimeTouched.value = false
   saleNote.value = ''
   chatOrderText.value = ''
   chatOrderSummary.value = null
@@ -1397,6 +1631,10 @@ const handleKeyboardShortcuts = (e) => {
   height: 100%;
 }
 
+.pos-main-row {
+  align-items: flex-start;
+}
+
 .pos-header-card {
   border: 1px solid rgba(94, 132, 244, 0.26);
   background: linear-gradient(115deg, rgba(12, 20, 41, 0.92), rgba(11, 18, 35, 0.86)) !important;
@@ -1405,6 +1643,37 @@ const handleKeyboardShortcuts = (e) => {
 .pos-panel {
   border: 1px solid rgba(94, 132, 244, 0.22);
   background: linear-gradient(145deg, rgba(14, 22, 43, 0.9), rgba(9, 16, 31, 0.92)) !important;
+}
+
+.pos-summary-col {
+  display: flex;
+  align-items: flex-start;
+}
+
+.pos-summary-card {
+  width: 100%;
+}
+
+.pos-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.pos-header-actions__charge,
+.pos-header-actions__clear {
+  min-height: 38px;
+}
+
+.pos-header-actions__charge {
+  min-width: 190px;
+}
+
+.pos-header-status {
+  flex-shrink: 0;
 }
 
 :global(.ofir-shell--light) .pos-header-card {
@@ -1474,7 +1743,7 @@ const handleKeyboardShortcuts = (e) => {
 }
 
 .pos-cart-line-grid--admin {
-  grid-template-columns: minmax(86px, 110px) minmax(90px, 1fr) minmax(100px, 1fr) minmax(190px, 220px);
+  grid-template-columns: minmax(86px, 110px) minmax(90px, 1fr) minmax(100px, 1fr) minmax(240px, 300px);
 }
 
 .pos-cart-field__label {
@@ -1497,10 +1766,17 @@ const handleKeyboardShortcuts = (e) => {
 
 .pos-cart-discount-type {
   min-width: 76px;
+  flex-shrink: 0;
+}
+
+.pos-cart-discount-controls {
+  width: 100%;
 }
 
 .pos-cart-discount-value {
-  max-width: 92px;
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 170px;
 }
 
 /* Total sticky en desktop */
@@ -1528,6 +1804,23 @@ const handleKeyboardShortcuts = (e) => {
   .held-sale-card :deep(.v-btn) {
     flex: 1;
   }
+
+  .pos-header-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+
+  .pos-header-status {
+    order: -1;
+    justify-self: start;
+  }
+
+  .pos-header-actions__charge,
+  .pos-header-actions__clear {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 959px) {
@@ -1538,6 +1831,29 @@ const handleKeyboardShortcuts = (e) => {
 
   .pos-cart-line-grid--admin .pos-cart-field:last-child {
     grid-column: 1 / -1;
+  }
+
+  .pos-cart-discount-value {
+    max-width: none;
+  }
+
+  .pos-header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    align-items: center;
+  }
+
+  .pos-header-actions__charge,
+  .pos-header-actions__clear {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .pos-header-status {
+    grid-column: 1 / -1;
+    order: -1;
+    justify-self: start;
   }
 }
 </style>

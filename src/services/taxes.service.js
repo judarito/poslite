@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const TAX_INFO_TTL_MS = 5 * 60 * 1000
 
 class TaxesService {
   constructor() {
@@ -13,7 +16,7 @@ class TaxesService {
 
       let query = supabaseService.client
         .from(this.table)
-        .select('*', { count: 'exact' })
+        .select('tax_id, code, name, rate, is_active, created_at, updated_at', { count: 'exact' })
         .eq('tenant_id', tenantId)
         .order('name', { ascending: true })
         .range(from, to)
@@ -56,6 +59,7 @@ class TaxesService {
         is_active: tax.is_active !== false
       })
       if (error) throw error
+      queryCache.invalidateByTags(['taxes', 'tax-info'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -71,6 +75,7 @@ class TaxesService {
         is_active: updates.is_active
       }, { tenant_id: tenantId, tax_id: taxId })
       if (error) throw error
+      queryCache.invalidateByTags(['taxes', 'tax-info'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -83,6 +88,7 @@ class TaxesService {
         tenant_id: tenantId, tax_id: taxId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['taxes', 'tax-info'], { tenantId })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -125,6 +131,7 @@ class TaxesService {
         is_active: rule.is_active !== false
       })
       if (error) throw error
+      queryCache.invalidateByTags(['taxes', 'tax-rules', 'tax-info'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -137,6 +144,7 @@ class TaxesService {
         tenant_id: tenantId, tax_rule_id: taxRuleId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['taxes', 'tax-rules', 'tax-info'], { tenantId })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -163,29 +171,40 @@ class TaxesService {
   // Obtener información completa del impuesto para una variante
   async getTaxInfoForVariant(tenantId, variantId) {
     try {
-      const { data, error } = await supabaseService.client
-        .rpc('fn_get_tax_info_for_variant', {
-          p_tenant: tenantId,
-          p_variant: variantId
-        })
-      
-      if (error) throw error
-      
-      // data es un objeto JSON: { rate, code, name }
-      return { 
-        success: true, 
-        rate: data?.rate || 0,
-        code: data?.code || null,
-        name: data?.name || null
-      }
+      return await queryCache.getOrLoad(
+        `taxes:variant-info:${variantId}`,
+        async () => {
+          const { data, error } = await supabaseService.client
+            .rpc('fn_get_tax_info_for_variant', {
+              p_tenant: tenantId,
+              p_variant: variantId
+            })
+
+          if (error) throw error
+
+          return {
+            success: true,
+            rate: data?.rate || 0,
+            code: data?.code || null,
+            name: data?.name || null
+          }
+        },
+        {
+          tenantId,
+          ttlMs: TAX_INFO_TTL_MS,
+          storage: 'memory',
+          tags: ['taxes', 'tax-info'],
+          shouldCache: (result) => result?.success === true
+        }
+      )
     } catch (error) {
       console.warn('Error getting tax info:', error)
-      return { 
-        success: false, 
-        rate: 0, 
-        code: null, 
-        name: null, 
-        error: error.message 
+      return {
+        success: false,
+        rate: 0,
+        code: null,
+        name: null,
+        error: error.message
       }
     }
   }

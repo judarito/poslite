@@ -389,6 +389,12 @@ async function loadKPIs() {
     dailySeries.value    = res.dailySeries
     topProducts.value    = res.topProducts
     paymentMethods.value = res.paymentMethods
+  } else {
+    console.warn('Dashboard summary RPC no disponible:', res.error)
+    kpis.value = null
+    dailySeries.value = []
+    topProducts.value = []
+    paymentMethods.value = []
   }
   kpiLoading.value = false
 }

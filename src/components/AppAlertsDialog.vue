@@ -109,13 +109,13 @@
 
           <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
-            <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="stockAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
             </div>
             <v-card
               v-else
-              v-for="alert in stockAlerts"
+              v-for="alert in stockAlertsPageItems"
               :key="alert.alert_id"
               class="mb-2 alerts-mobile-item"
               :color="getStockAlertColor(alert.alert_level) + '-lighten-5'"
@@ -151,7 +151,7 @@
 
           <v-card-text v-else class="pa-0 alerts-table-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="primary"></v-progress-linear>
-            <div v-else-if="stockAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="stockAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noStockAlerts') }}</p>
             </div>
@@ -168,7 +168,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in stockAlerts" :key="alert.alert_id">
+                <tr v-for="alert in stockAlertsPageItems" :key="alert.alert_id">
                   <td>
                     <v-chip :color="getStockAlertColor(alert.alert_level)" size="small" label>
                       <v-icon start size="small">{{ getStockAlertIcon(alert.alert_level) }}</v-icon>
@@ -188,6 +188,15 @@
               </tbody>
             </v-table>
           </v-card-text>
+
+          <v-card-actions v-if="stockAlertsCount > ALERTS_PAGE_SIZE" class="alerts-modal__pager">
+            <v-pagination
+              v-model="stockPage"
+              :length="stockTotalPages"
+              :total-visible="5"
+              density="comfortable"
+            ></v-pagination>
+          </v-card-actions>
 
           <v-divider></v-divider>
 
@@ -247,13 +256,13 @@
 
           <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-            <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="expirationAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
             </div>
             <v-card
               v-else
-              v-for="alert in expirationAlerts"
+              v-for="alert in expirationAlertsPageItems"
               :key="alert.alert_id"
               class="mb-2 alerts-mobile-item"
               :color="getExpirationAlertColor(alert.alert_level) + '-lighten-5'"
@@ -305,7 +314,7 @@
 
           <v-card-text v-else class="pa-0 alerts-table-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-            <div v-else-if="expirationAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="expirationAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noExpirationAlerts') }}</p>
             </div>
@@ -324,7 +333,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in expirationAlerts" :key="alert.alert_id">
+                <tr v-for="alert in expirationAlertsPageItems" :key="alert.alert_id">
                   <td>
                     <v-chip :color="getExpirationAlertColor(alert.alert_level)" size="small" label>
                       <v-icon start size="small">{{ getExpirationAlertIcon(alert.alert_level) }}</v-icon>
@@ -354,6 +363,15 @@
               </tbody>
             </v-table>
           </v-card-text>
+
+          <v-card-actions v-if="expirationAlertsCount > ALERTS_PAGE_SIZE" class="alerts-modal__pager">
+            <v-pagination
+              v-model="expirationPage"
+              :length="expirationTotalPages"
+              :total-visible="5"
+              density="comfortable"
+            ></v-pagination>
+          </v-card-actions>
 
           <v-divider></v-divider>
 
@@ -401,13 +419,13 @@
 
           <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-            <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="layawayAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
             </div>
             <v-card
               v-else
-              v-for="alert in filteredLayawayAlerts"
+              v-for="alert in layawayAlertsPageItems"
               :key="alert.alert_id"
               class="mb-2 alerts-mobile-item"
               :color="getLayawayAlertColor(alert.alert_level) + '-lighten-5'"
@@ -440,7 +458,7 @@
 
           <v-card-text v-else class="pa-0 alerts-table-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-            <div v-else-if="filteredLayawayAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="layawayAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noLayawayAlerts') }}</p>
             </div>
@@ -458,7 +476,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in filteredLayawayAlerts" :key="alert.alert_id">
+                <tr v-for="alert in layawayAlertsPageItems" :key="alert.alert_id">
                   <td>
                     <v-chip :color="getLayawayAlertColor(alert.alert_level)" size="small" label>
                       <v-icon start size="small">{{ getLayawayAlertIcon(alert.alert_level) }}</v-icon>
@@ -489,6 +507,15 @@
               </tbody>
             </v-table>
           </v-card-text>
+
+          <v-card-actions v-if="layawayAlertsCount > ALERTS_PAGE_SIZE" class="alerts-modal__pager">
+            <v-pagination
+              v-model="layawayPage"
+              :length="layawayTotalPages"
+              :total-visible="5"
+              density="comfortable"
+            ></v-pagination>
+          </v-card-actions>
 
           <v-divider></v-divider>
 
@@ -536,13 +563,13 @@
 
           <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-            <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="payableAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
             </div>
             <v-card
               v-else
-              v-for="alert in payableAlerts"
+              v-for="alert in payableAlertsPageItems"
               :key="alert.alert_id"
               class="mb-2 alerts-mobile-item"
               :color="getPayableAlertColor(alert.alert_level) + '-lighten-5'"
@@ -575,7 +602,7 @@
 
           <v-card-text v-else class="pa-0 alerts-table-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="error"></v-progress-linear>
-            <div v-else-if="payableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="payableAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noPayableAlerts') }}</p>
             </div>
@@ -592,7 +619,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in payableAlerts" :key="alert.alert_id">
+                <tr v-for="alert in payableAlertsPageItems" :key="alert.alert_id">
                   <td>
                     <v-chip :color="getPayableAlertColor(alert.alert_level)" size="small" label>
                       <v-icon start size="small">{{ getPayableAlertIcon(alert.alert_level) }}</v-icon>
@@ -613,6 +640,15 @@
               </tbody>
             </v-table>
           </v-card-text>
+
+          <v-card-actions v-if="payableAlertsCount > ALERTS_PAGE_SIZE" class="alerts-modal__pager">
+            <v-pagination
+              v-model="payablePage"
+              :length="payableTotalPages"
+              :total-visible="5"
+              density="comfortable"
+            ></v-pagination>
+          </v-card-actions>
 
           <v-divider></v-divider>
 
@@ -660,13 +696,13 @@
 
           <v-card-text v-if="isMobile" class="pa-2 alerts-mobile-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-            <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="receivableAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
             </div>
             <v-card
               v-else
-              v-for="alert in receivableAlerts"
+              v-for="alert in receivableAlertsPageItems"
               :key="alert.alert_id"
               class="mb-2 alerts-mobile-item"
               :color="getReceivableAlertColor(alert.alert_level) + '-lighten-5'"
@@ -697,7 +733,7 @@
 
           <v-card-text v-else class="pa-0 alerts-table-wrap">
             <v-progress-linear v-if="loadingAlerts" indeterminate color="warning"></v-progress-linear>
-            <div v-else-if="receivableAlerts.length === 0" class="text-center pa-8 text-grey alerts-empty-state">
+            <div v-else-if="receivableAlertsCount === 0" class="text-center pa-8 text-grey alerts-empty-state">
               <v-icon size="64" color="grey-lighten-1">mdi-check-circle</v-icon>
               <p class="mt-4">{{ t('app.noReceivableAlerts') }}</p>
             </div>
@@ -713,7 +749,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in receivableAlerts" :key="alert.alert_id">
+                <tr v-for="alert in receivableAlertsPageItems" :key="alert.alert_id">
                   <td>
                     <v-chip :color="getReceivableAlertColor(alert.alert_level)" size="small" label>
                       <v-icon start size="small">{{ getReceivableAlertIcon(alert.alert_level) }}</v-icon>
@@ -729,6 +765,15 @@
               </tbody>
             </v-table>
           </v-card-text>
+
+          <v-card-actions v-if="receivableAlertsCount > ALERTS_PAGE_SIZE" class="alerts-modal__pager">
+            <v-pagination
+              v-model="receivablePage"
+              :length="receivableTotalPages"
+              :total-visible="5"
+              density="comfortable"
+            ></v-pagination>
+          </v-card-actions>
 
           <v-divider></v-divider>
 
@@ -750,7 +795,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { useAppAlerts } from '@/composables/useAppAlerts'
@@ -769,6 +814,7 @@ const router = useRouter()
 const { mobile: isMobile } = useDisplay()
 const { t } = useI18n()
 const alertsTab = ref('stock')
+const ALERTS_PAGE_SIZE = 20
 
 const {
   loadingAlerts,
@@ -821,6 +867,45 @@ const dialogModel = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 })
+
+const stockPage = ref(1)
+const expirationPage = ref(1)
+const layawayPage = ref(1)
+const payablePage = ref(1)
+const receivablePage = ref(1)
+
+const paginateAlerts = (itemsRef, pageRef) => computed(() => {
+  const start = (pageRef.value - 1) * ALERTS_PAGE_SIZE
+  return itemsRef.value.slice(start, start + ALERTS_PAGE_SIZE)
+})
+
+const getTotalPages = (itemsRef) => computed(() => (
+  Math.max(1, Math.ceil(itemsRef.value.length / ALERTS_PAGE_SIZE))
+))
+
+const stockAlertsPageItems = paginateAlerts(stockAlerts, stockPage)
+const expirationAlertsPageItems = paginateAlerts(expirationAlerts, expirationPage)
+const layawayAlertsPageItems = paginateAlerts(filteredLayawayAlerts, layawayPage)
+const payableAlertsPageItems = paginateAlerts(payableAlerts, payablePage)
+const receivableAlertsPageItems = paginateAlerts(receivableAlerts, receivablePage)
+
+const stockTotalPages = getTotalPages(stockAlerts)
+const expirationTotalPages = getTotalPages(expirationAlerts)
+const layawayTotalPages = getTotalPages(filteredLayawayAlerts)
+const payableTotalPages = getTotalPages(payableAlerts)
+const receivableTotalPages = getTotalPages(receivableAlerts)
+
+watch(() => stockAlerts.value.length, () => { stockPage.value = 1 })
+watch(() => expirationAlerts.value.length, () => { expirationPage.value = 1 })
+watch(() => filteredLayawayAlerts.value.length, () => { layawayPage.value = 1 })
+watch(() => payableAlerts.value.length, () => { payablePage.value = 1 })
+watch(() => receivableAlerts.value.length, () => { receivablePage.value = 1 })
+
+watch(stockTotalPages, (total) => { if (stockPage.value > total) stockPage.value = total })
+watch(expirationTotalPages, (total) => { if (expirationPage.value > total) expirationPage.value = total })
+watch(layawayTotalPages, (total) => { if (layawayPage.value > total) layawayPage.value = total })
+watch(payableTotalPages, (total) => { if (payablePage.value > total) payablePage.value = total })
+watch(receivableTotalPages, (total) => { if (receivablePage.value > total) receivablePage.value = total })
 
 const goTo = (path) => {
   dialogModel.value = false
@@ -951,6 +1036,11 @@ onMounted(() => {
 .alerts-modal__actions {
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.alerts-modal__pager {
+  justify-content: center;
+  padding: 10px 14px;
 }
 
 .alerts-modal__actions :deep(.v-btn) {

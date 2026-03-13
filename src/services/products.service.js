@@ -1,10 +1,83 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const VARIANT_SEARCH_TTL_MS = 45 * 1000
+const ACTIVE_VARIANTS_TTL_MS = 2 * 60 * 1000
+const CHAT_MATCHING_VARIANTS_TTL_MS = 90 * 1000
+const SIZE_TOKEN_SET = new Set(['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', '2xl', '3xl', '4xl'])
+const CHAT_SEARCH_STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para', 'por', 'con', 'sin'])
+
+const normalizeSearchTerm = (value) => String(value || '').trim().toLowerCase()
+
+const normalizeChatSearchPhrase = (value) => normalizeSearchTerm(value)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9\s]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+
+const stripSizeHints = (value) => normalizeChatSearchPhrase(value)
+  .replace(/\btalla\s+(xs|s|m|l|xl|xxl|xxxl|2xl|3xl|4xl)\b/g, ' ')
+  .replace(/\b(?:xs|s|m|l|xl|xxl|xxxl|2xl|3xl|4xl)\b/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+
+const buildChatSearchVariants = (term) => {
+  const normalized = normalizeChatSearchPhrase(term)
+  if (!normalized) return []
+
+  const variants = new Set([normalized])
+  const withoutSize = stripSizeHints(normalized)
+  if (withoutSize) variants.add(withoutSize)
+
+  const baseTokens = (withoutSize || normalized).split(' ').filter(Boolean)
+  const strongTokens = baseTokens.filter((token) => token.length >= 3 && !CHAT_SEARCH_STOPWORDS.has(token))
+
+  if (strongTokens.length >= 2) {
+    variants.add(strongTokens.join(' '))
+
+    for (let windowSize = Math.min(4, strongTokens.length); windowSize >= 2; windowSize -= 1) {
+      for (let index = 0; index <= strongTokens.length - windowSize; index += 1) {
+        variants.add(strongTokens.slice(index, index + windowSize).join(' '))
+      }
+    }
+  }
+
+  for (const token of strongTokens) {
+    if (!SIZE_TOKEN_SET.has(token) && token.length >= 4) {
+      variants.add(token)
+    }
+  }
+
+  return Array.from(variants).filter((entry) => entry.length >= 2)
+}
+
+const dedupeVariants = (variants, maxItems = Number.POSITIVE_INFINITY) => {
+  const map = new Map()
+
+  for (const variant of Array.isArray(variants) ? variants : []) {
+    if (!variant?.variant_id || map.has(variant.variant_id)) continue
+    map.set(variant.variant_id, variant)
+    if (map.size >= maxItems) break
+  }
+
+  return Array.from(map.values())
+}
 
 class ProductsService {
   constructor() {
     this.table = 'products'
     this.variantsTable = 'product_variants'
     this.barcodesTable = 'product_barcodes'
+  }
+
+  buildVariantSearchCacheKey(search, limit, locationId, includeStock) {
+    return `products:variant-search:${JSON.stringify({
+      search: normalizeSearchTerm(search),
+      limit: Number(limit || 20),
+      locationId: locationId || null,
+      includeStock: includeStock !== false
+    })}`
   }
 
   async getProducts(tenantId, page = 1, pageSize = 10, search = '', filters = {}) {
@@ -150,9 +223,11 @@ class ProductsService {
       // Retornar producto con sus variantes
       const productWithVariants = await this.getProductById(tenantId, data[0].product_id)
       if (productWithVariants.success) {
+        queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
         return { success: true, data: productWithVariants.data }
       }
       
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -192,6 +267,7 @@ class ProductsService {
         })
       }
       
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -204,6 +280,7 @@ class ProductsService {
         tenant_id: tenantId, product_id: productId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -232,6 +309,7 @@ class ProductsService {
         requires_expiration: variant.requires_expiration !== undefined ? variant.requires_expiration : null
       })
       if (error) throw error
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -257,6 +335,7 @@ class ProductsService {
         requires_expiration: updates.requires_expiration !== undefined ? updates.requires_expiration : null
       }, { tenant_id: tenantId, variant_id: variantId })
       if (error) throw error
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -269,6 +348,7 @@ class ProductsService {
         tenant_id: tenantId, variant_id: variantId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -329,74 +409,88 @@ class ProductsService {
   }
 
   // Buscar variantes por texto (para POS autocomplete)
-  async searchVariants(tenantId, search, limit = 20, locationId = null) {
+  async searchVariants(tenantId, search, limit = 20, locationId = null, options = {}) {
     try {
-      // Buscar por SKU o nombre de variante (EXCLUIR COMPONENTES)
-      // Nota: is_component puede ser NULL en variantes (hereda del producto), por lo que usamos OR
-      const { data: byVariant, error: e1 } = await supabaseService.client
-        .from(this.variantsTable)
-        .select(`
-          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
-          product:product_id(product_id, name, is_component)
-        `)
-        .eq('tenant_id', tenantId)
-        .eq('is_active', true)
-        .or('is_component.is.null,is_component.eq.false')
-        .or(`sku.ilike.%${search}%,variant_name.ilike.%${search}%`)
-        .limit(limit)
-
-      if (e1) throw e1
-
-      // Buscar por nombre de producto (EXCLUIR COMPONENTES)
-      const { data: byProduct, error: e2 } = await supabaseService.client
-        .from(this.variantsTable)
-        .select(`
-          variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
-          product:product_id!inner(product_id, name, is_component)
-        `)
-        .eq('tenant_id', tenantId)
-        .eq('is_active', true)
-        .or('is_component.is.null,is_component.eq.false')
-        .ilike('product.name', `%${search}%`)
-        .limit(limit)
-
-      if (e2) throw e2
-
-      // Combinar y deduplicar por variant_id
-      const map = new Map()
-      ;[...(byVariant || []), ...(byProduct || [])].forEach(v => {
-        // Filtro adicional JS: Excluir si la variante es componente o si el producto padre es componente
-        // Lógica: effective_is_component = COALESCE(variant.is_component, product.is_component, false)
-        const effectiveIsComponent = v.is_component !== null ? v.is_component : (v.product?.is_component || false)
-        if (!effectiveIsComponent) {
-          if (!map.has(v.variant_id)) map.set(v.variant_id, v)
-        }
-      })
-
-      let results = Array.from(map.values()).slice(0, limit)
-
-      // Obtener stock de cada variante si se proporciona locationId
-      if (locationId && results.length > 0) {
-        const variantIds = results.map(v => v.variant_id)
-        const { data: stockData, error: stockError } = await supabaseService.client
-          .from('stock_balances')
-          .select('variant_id, on_hand, reserved')
-          .eq('tenant_id', tenantId)
-          .eq('location_id', locationId)
-          .in('variant_id', variantIds)
-
-        if (!stockError && stockData) {
-          const stockMap = new Map(stockData.map(s => [s.variant_id, s]))
-          results = results.map(v => ({
-            ...v,
-            stock_on_hand: stockMap.get(v.variant_id)?.on_hand || 0,
-            stock_reserved: stockMap.get(v.variant_id)?.reserved || 0,
-            stock_available: (stockMap.get(v.variant_id)?.on_hand || 0) - (stockMap.get(v.variant_id)?.reserved || 0)
-          }))
-        }
+      const normalizedSearch = String(search || '').trim()
+      if (!tenantId || !normalizedSearch) {
+        return { success: true, data: [] }
       }
 
-      return { success: true, data: results }
+      const includeStock = options.includeStock !== false
+      const cacheKey = this.buildVariantSearchCacheKey(normalizedSearch, limit, locationId, includeStock)
+
+      return await queryCache.getOrLoad(
+        cacheKey,
+        async () => {
+          // Buscar por SKU o nombre de variante (EXCLUIR COMPONENTES)
+          const { data: byVariant, error: e1 } = await supabaseService.client
+            .from(this.variantsTable)
+            .select(`
+              variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+              product:product_id(product_id, name, is_component)
+            `)
+            .eq('tenant_id', tenantId)
+            .eq('is_active', true)
+            .or('is_component.is.null,is_component.eq.false')
+            .or(`sku.ilike.%${normalizedSearch}%,variant_name.ilike.%${normalizedSearch}%`)
+            .limit(limit)
+
+          if (e1) throw e1
+
+          // Buscar por nombre de producto (EXCLUIR COMPONENTES)
+          const { data: byProduct, error: e2 } = await supabaseService.client
+            .from(this.variantsTable)
+            .select(`
+              variant_id, sku, variant_name, cost, price, price_includes_tax, is_active, is_component,
+              product:product_id!inner(product_id, name, is_component)
+            `)
+            .eq('tenant_id', tenantId)
+            .eq('is_active', true)
+            .or('is_component.is.null,is_component.eq.false')
+            .ilike('product.name', `%${normalizedSearch}%`)
+            .limit(limit)
+
+          if (e2) throw e2
+
+          let results = dedupeVariants([...(byVariant || []), ...(byProduct || [])], limit)
+            .filter((variant) => {
+              const effectiveIsComponent = variant.is_component !== null
+                ? variant.is_component
+                : (variant.product?.is_component || false)
+              return !effectiveIsComponent
+            })
+
+          if (includeStock && locationId && results.length > 0) {
+            const variantIds = results.map((variant) => variant.variant_id)
+            const { data: stockData, error: stockError } = await supabaseService.client
+              .from('stock_balances')
+              .select('variant_id, on_hand, reserved')
+              .eq('tenant_id', tenantId)
+              .eq('location_id', locationId)
+              .in('variant_id', variantIds)
+
+            if (!stockError && stockData) {
+              const stockMap = new Map(stockData.map((stock) => [stock.variant_id, stock]))
+              results = results.map((variant) => ({
+                ...variant,
+                stock_on_hand: stockMap.get(variant.variant_id)?.on_hand || 0,
+                stock_reserved: stockMap.get(variant.variant_id)?.reserved || 0,
+                stock_available: (stockMap.get(variant.variant_id)?.on_hand || 0) - (stockMap.get(variant.variant_id)?.reserved || 0)
+              }))
+            }
+          }
+
+          return { success: true, data: results }
+        },
+        {
+          tenantId,
+          ttlMs: VARIANT_SEARCH_TTL_MS,
+          storage: 'memory',
+          tags: ['products', 'product-variants'],
+          forceRefresh: options.forceRefresh === true,
+          shouldCache: (result) => result?.success === true
+        }
+      )
     } catch (error) {
       return { success: false, error: error.message, data: [] }
     }
@@ -407,31 +501,87 @@ class ProductsService {
    */
   async getActiveVariants(tenantId, limit = 500) {
     try {
-      const { data, error } = await supabaseService.client
-        .from(this.variantsTable)
-        .select(`
-          variant_id,
-          sku,
-          variant_name,
-          cost,
-          price,
-          is_active,
-          is_component,
-          requires_expiration,
-          product:product_id(
-            product_id,
-            name,
-            requires_expiration,
-            is_component
-          )
-        `)
-        .eq('tenant_id', tenantId)
-        .eq('is_active', true)
-        .order('sku', { ascending: true })
-        .limit(limit)
+      return await queryCache.getOrLoad(
+        `products:active-variants:${Number(limit || 500)}`,
+        async () => {
+          const { data, error } = await supabaseService.client
+            .from(this.variantsTable)
+            .select(`
+              variant_id,
+              sku,
+              variant_name,
+              cost,
+              price,
+              is_active,
+              is_component,
+              requires_expiration,
+              product:product_id(
+                product_id,
+                name,
+                requires_expiration,
+                is_component
+              )
+            `)
+            .eq('tenant_id', tenantId)
+            .eq('is_active', true)
+            .order('sku', { ascending: true })
+            .limit(limit)
 
-      if (error) throw error
-      return { success: true, data: data || [] }
+          if (error) throw error
+          return { success: true, data: data || [] }
+        },
+        {
+          tenantId,
+          ttlMs: ACTIVE_VARIANTS_TTL_MS,
+          storage: 'session',
+          tags: ['products', 'product-variants'],
+          shouldCache: (result) => result?.success === true
+        }
+      )
+    } catch (error) {
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  async getVariantsForChatMatching(tenantId, searchTerms = [], options = {}) {
+    try {
+      const normalizedTerms = [...new Set(
+        (Array.isArray(searchTerms) ? searchTerms : [])
+          .flatMap((term) => buildChatSearchVariants(term))
+          .filter((term) => term.length >= 2)
+      )]
+
+      if (!tenantId || normalizedTerms.length === 0) {
+        return { success: true, data: [] }
+      }
+
+      const perTermLimit = Math.max(4, Number(options.perTermLimit || 14))
+      const maxItems = Math.max(perTermLimit, Number(options.maxItems || 180))
+      const selectedTerms = normalizedTerms.slice(0, 24)
+
+      return await queryCache.getOrLoad(
+        `products:chat-matching:${JSON.stringify({ terms: selectedTerms, perTermLimit, maxItems })}`,
+        async () => {
+          const results = await Promise.all(
+            selectedTerms.map((term) => this.searchVariants(tenantId, term, perTermLimit, null, { includeStock: false }))
+          )
+
+          const merged = dedupeVariants(
+            results.flatMap((result) => result.success ? (result.data || []) : []),
+            maxItems
+          )
+
+          return { success: true, data: merged }
+        },
+        {
+          tenantId,
+          ttlMs: CHAT_MATCHING_VARIANTS_TTL_MS,
+          storage: 'memory',
+          tags: ['products', 'product-variants'],
+          forceRefresh: options.forceRefresh === true,
+          shouldCache: (result) => result?.success === true
+        }
+      )
     } catch (error) {
       return { success: false, error: error.message, data: [] }
     }

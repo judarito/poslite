@@ -18,6 +18,20 @@ const loadingAlerts = ref(false)
 const locations = ref([])
 let alertsChannel = null
 
+const ALERT_TYPES = ['STOCK', 'EXPIRATION', 'LAYAWAY', 'PAYABLE', 'RECEIVABLE']
+const ALERTS_PER_TYPE_LIMIT = 80
+const MAX_ALERTS_IN_MEMORY = ALERT_TYPES.length * ALERTS_PER_TYPE_LIMIT
+
+const sortAlertsByCreatedAt = (alerts) => (
+  [...(Array.isArray(alerts) ? alerts : [])].sort((left, right) => {
+    const leftDate = new Date(left?.created_at || 0).getTime()
+    const rightDate = new Date(right?.created_at || 0).getTime()
+    return rightDate - leftDate
+  })
+)
+
+const trimAlerts = (alerts) => sortAlertsByCreatedAt(alerts).slice(0, MAX_ALERTS_IN_MEMORY)
+
 const stockFilters = ref({ alert_level: null, location_id: null, search: '' })
 const expirationFilters = ref({ alert_level: null, location_id: null, search: '' })
 const layawayFilters = ref({ alert_level: null, search: '' })
@@ -171,10 +185,12 @@ export function useAppAlerts() {
     if (!tenantId.value) return
     loadingAlerts.value = true
     try {
-      const result = await alertsService.getAlerts(tenantId.value)
-      if (result.success) {
-        allAlerts.value = result.data || []
-      }
+      const results = await Promise.all(
+        ALERT_TYPES.map((type) => alertsService.getAlertsByType(tenantId.value, type, { limit: ALERTS_PER_TYPE_LIMIT }))
+      )
+
+      const merged = results.flatMap((result) => result.success ? (result.data || []) : [])
+      allAlerts.value = trimAlerts(merged)
     } catch (error) {
       console.error('Error loading alerts:', error)
     } finally {
@@ -200,14 +216,15 @@ export function useAppAlerts() {
     if (eventType === 'INSERT') {
       const exists = allAlerts.value.find(a => a.alert_id === newRecord.alert_id)
       if (!exists) {
-        allAlerts.value.unshift(newRecord)
+        allAlerts.value = trimAlerts([newRecord, ...allAlerts.value])
       }
     } else if (eventType === 'UPDATE') {
       const index = allAlerts.value.findIndex(a => a.alert_id === newRecord.alert_id)
       if (index !== -1) {
         allAlerts.value[index] = newRecord
+        allAlerts.value = sortAlertsByCreatedAt(allAlerts.value)
       } else {
-        allAlerts.value.unshift(newRecord)
+        allAlerts.value = trimAlerts([newRecord, ...allAlerts.value])
       }
     } else if (eventType === 'DELETE') {
       allAlerts.value = allAlerts.value.filter(a => a.alert_id !== oldRecord.alert_id)

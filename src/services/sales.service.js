@@ -1,5 +1,6 @@
 import supabaseService from './supabase.service'
 import salesForecastService from './sales-forecast.service'
+import queryCache from '@/utils/queryCache'
 
 class SalesService {
   constructor() {
@@ -10,22 +11,63 @@ class SalesService {
     this.returnLinesTable = 'sale_return_lines'
   }
 
+  isManualSaleDatetimeRpcError(error) {
+    const message = String(error?.message || error || '').toLowerCase()
+    return message.includes('p_sold_at') || (
+      message.includes('sp_create_sale') &&
+      message.includes('schema cache')
+    )
+  }
+
+  invalidateOperationalCaches(tenantId) {
+    queryCache.invalidateByTags(['reports', 'dashboard-summary', 'sales'], { tenantId })
+  }
+
   // Crear venta usando SP atómico
   async createSale(tenantId, saleData) {
     try {
-      const { data, error } = await supabaseService.client.rpc('sp_create_sale', {
-        p_tenant:       tenantId,
-        p_location:     saleData.location_id,
-        p_cash_session: saleData.cash_session_id  || null,
-        p_customer:     saleData.customer_id      || null,
-        p_sold_by:      saleData.sold_by,
-        p_lines:        saleData.lines,
-        p_payments:     saleData.payments,
-        p_note:         saleData.note             || null,
-        p_third_party:  saleData.third_party_id   || null   // v6.0: receptor fiscal FE
-      })
+      const soldAt = saleData?.sold_at ? new Date(saleData.sold_at) : null
+      const normalizedSoldAt = soldAt && !Number.isNaN(soldAt.getTime())
+        ? soldAt.toISOString()
+        : null
 
-      if (error) throw error
+      const buildRpcPayload = (includeSoldAt = true) => {
+        const payload = {
+          p_tenant: tenantId,
+          p_location: saleData.location_id,
+          p_cash_session: saleData.cash_session_id || null,
+          p_customer: saleData.customer_id || null,
+          p_sold_by: saleData.sold_by,
+          p_lines: saleData.lines,
+          p_payments: saleData.payments,
+          p_note: saleData.note || null,
+          p_third_party: saleData.third_party_id || null
+        }
+
+        if (includeSoldAt) {
+          payload.p_sold_at = normalizedSoldAt
+        }
+
+        return payload
+      }
+
+      const executeCreateSale = async (payload) => {
+        const { data, error } = await supabaseService.client.rpc('sp_create_sale', payload)
+        if (error) throw error
+        return data
+      }
+
+      let data
+      try {
+        data = await executeCreateSale(buildRpcPayload(true))
+      } catch (error) {
+        if (!this.isManualSaleDatetimeRpcError(error)) throw error
+
+        console.warn('[sales] sp_create_sale legacy sin p_sold_at; creando venta sin fecha manual')
+        data = await executeCreateSale(buildRpcPayload(false))
+      }
+
+      this.invalidateOperationalCaches(tenantId)
       return { success: true, data: { sale_id: data } }
     } catch (error) {
       return { success: false, error: error.message }
@@ -41,7 +83,8 @@ class SalesService {
       let query = supabaseService.client
         .from(this.table)
         .select(`
-          *,
+          sale_id, sale_number, location_id, customer_id, sold_by, third_party_id,
+          subtotal, discount_total, tax_total, total, status, sold_at, created_at,
           location:location_id(name),
           customer:customer_id(full_name, document),
           sold_by_user:sold_by(full_name),
@@ -105,6 +148,7 @@ class SalesService {
       }, { tenant_id: tenantId, sale_id: saleId })
 
       if (error) throw error
+      this.invalidateOperationalCaches(tenantId)
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -127,6 +171,7 @@ class SalesService {
       })
 
       if (error) throw error
+      this.invalidateOperationalCaches(tenantId)
       return { success: true, data: { return_id: data } }
     } catch (error) {
       return { success: false, error: error.message }
@@ -145,6 +190,7 @@ class SalesService {
       })
 
       if (error) throw error
+      this.invalidateOperationalCaches(tenantId)
       return { success: true, data: { return_id: data } }
     } catch (error) {
       return { success: false, error: error.message }
@@ -160,7 +206,7 @@ class SalesService {
       const { data, error, count } = await supabaseService.client
         .from(this.returnsTable)
         .select(`
-          *,
+          return_id, sale_id, location_id, created_by, refund_total, reason, created_at,
           sale:sales!sale_returns_sale_id_fkey(sale_number, total),
           location:locations!sale_returns_location_id_fkey(name),
           created_by_user:users!sale_returns_created_by_fkey(full_name)

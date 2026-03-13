@@ -35,6 +35,12 @@ export function useAICache() {
     return count;
   };
 
+  const clearByService = (service, tenantId = null) => {
+    const count = AICacheManager.clearByService(service, tenantId);
+    refreshStats();
+    return count;
+  };
+
   /**
    * Estadísticas computadas
    */
@@ -71,6 +77,7 @@ export function useAICache() {
     // Métodos
     refreshStats,
     clearAll,
-    clearExpired
+    clearExpired,
+    clearByService
   };
 }

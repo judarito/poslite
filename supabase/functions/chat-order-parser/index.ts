@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
   const model = String(body.model || 'deepseek-chat');
   const temperature = Number(body.temperature ?? 0.1);
   const maxTokens = Number(body.max_tokens ?? 1800);
+  const forceRefresh = body.force_refresh === true || String(body.force_refresh || '').toLowerCase() === 'true';
   const clippedChat = chatText.slice(0, 10000);
   const normalizedChat = normalizeForCache(clippedChat);
   const chatHash = await sha256Hex(normalizedChat);
@@ -125,35 +126,37 @@ Deno.serve(async (req) => {
   const maxCacheItemsRaw = Number(Deno.env.get('CHAT_ORDER_CACHE_MAX_ITEMS') || 500);
   const maxCacheItems = Number.isFinite(maxCacheItemsRaw) ? Math.max(50, Math.floor(maxCacheItemsRaw)) : 500;
 
-  try {
-    const { data: cacheHit } = await supabase
-      .from('chat_order_ai_cache')
-      .select('cache_id, response_payload, use_count')
-      .eq('tenant_id', tenantId)
-      .eq('chat_hash', chatHash)
-      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-      .maybeSingle();
-
-    const cachedPayload = (cacheHit?.response_payload || null) as Record<string, unknown> | null;
-    const cachedLines = Array.isArray(cachedPayload?.line_items)
-      ? (cachedPayload?.line_items as Array<Record<string, unknown>>)
-      : [];
-    if (cachedPayload && cachedLines.length) {
-      await supabase
+  if (!forceRefresh) {
+    try {
+      const { data: cacheHit } = await supabase
         .from('chat_order_ai_cache')
-        .update({
-          use_count: Number(cacheHit?.use_count || 0) + 1,
-          last_used_at: nowIso,
-        })
-        .eq('cache_id', cacheHit?.cache_id || '');
+        .select('cache_id, response_payload, use_count')
+        .eq('tenant_id', tenantId)
+        .eq('chat_hash', chatHash)
+        .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+        .maybeSingle();
 
-      return jsonResponse({
-        ...(cachedPayload || {}),
-        cache_hit: true,
-      });
+      const cachedPayload = (cacheHit?.response_payload || null) as Record<string, unknown> | null;
+      const cachedLines = Array.isArray(cachedPayload?.line_items)
+        ? (cachedPayload?.line_items as Array<Record<string, unknown>>)
+        : [];
+      if (cachedPayload && cachedLines.length) {
+        await supabase
+          .from('chat_order_ai_cache')
+          .update({
+            use_count: Number(cacheHit?.use_count || 0) + 1,
+            last_used_at: nowIso,
+          })
+          .eq('cache_id', cacheHit?.cache_id || '');
+
+        return jsonResponse({
+          ...(cachedPayload || {}),
+          cache_hit: true,
+        });
+      }
+    } catch (_cacheReadError) {
+      // Cache best-effort; continue with IA call.
     }
-  } catch (_cacheReadError) {
-    // Cache best-effort; continue with IA call.
   }
 
   const upstreamPayload = {

@@ -361,7 +361,7 @@
             <v-window-item value="sales">
               <div class="text-h6 mb-4">Configuración de Ventas y Precios</div>
               <v-alert type="info" variant="tonal" class="mb-4">
-                <strong>Nota:</strong> Los descuentos están habilitados para el rol ADMINISTRADOR.
+                <strong>Nota:</strong> Descuentos y retrofecha de venta en POS deben restringirse a personal de confianza.
               </v-alert>
               <v-row>
                 <v-col cols="12" sm="6">
@@ -410,6 +410,28 @@
                     min="1"
                     max="720"
                     hint="Sesiones de caja abiertas más de estas horas se marcan como vencidas (ej: 24)"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-switch
+                    v-model="settings.pos_allow_manual_sale_datetime"
+                    label="Permitir fecha manual en POS"
+                    color="warning"
+                    hint="Habilita selector de fecha/hora de venta para administradores y gerentes"
+                    persistent-hint
+                  ></v-switch>
+                </v-col>
+                <v-col cols="12" sm="6" v-if="settings.pos_allow_manual_sale_datetime">
+                  <v-text-field
+                    v-model.number="settings.pos_max_backdate_hours"
+                    type="number"
+                    label="Máximo de retrofecha POS (horas)"
+                    variant="outlined"
+                    prepend-inner-icon="mdi-calendar-clock"
+                    min="1"
+                    max="720"
+                    hint="Límite para registrar ventas con fecha/hora anterior"
                     persistent-hint
                   ></v-text-field>
                 </v-col>
@@ -868,6 +890,8 @@ const settings = ref({
   max_discount_without_auth: 5,
   rounding_method: 'normal',
   rounding_multiple: 100,
+  pos_allow_manual_sale_datetime: false,
+  pos_max_backdate_hours: 24,
   
   // Facturación
   invoice_prefix: 'FAC',
@@ -979,6 +1003,8 @@ const loadData = async () => {
       max_discount_without_auth: data.max_discount_without_auth || 5,
       rounding_method: data.rounding_method || 'normal',
       rounding_multiple: data.rounding_multiple || 100,
+      pos_allow_manual_sale_datetime: data.pos_allow_manual_sale_datetime === true,
+      pos_max_backdate_hours: data.pos_max_backdate_hours || 24,
       
       // Facturación
       invoice_prefix: data.invoice_prefix || 'FAC',

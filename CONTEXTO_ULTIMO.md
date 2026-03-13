@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-03-13
 Owner: Equipo POSLite
-Ultimo cambio registrado: Fase 1 de cache transversal implementada para lecturas seguras (`queryCache` con memory + sessionStorage) en menus, `tenant_settings`, ubicaciones, metodos de pago, categorias y unidades; limpieza por tenant/sesion e invalidacion por mutaciones
+Ultimo cambio registrado: endurecimiento de rendimiento app/POS/alertas/dashboard, hardening retrocompatible de fecha manual POS mientras se despliega migracion, y reubicacion responsive de acciones `Cobrar`/`Limpiar` al header del POS
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -237,6 +237,136 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
   - guard del router y monitor de sesion reutilizan la misma capa;
   - `ListView` soporta `autoLoad=false` para listas locales/paginadas en memoria.
 - Efecto: menos checks duplicados, menos requests redundantes y mas control sobre listas que no necesitan autoload.
+
+### Politica operativa de fecha de venta POS (vigente)
+
+- Por defecto, el POS registra la venta con la fecha/hora actual del servidor al momento de cobrar.
+- La fecha manual solo puede habilitarse por tenant y solo para `ADMINISTRADOR` / `GERENTE`.
+- `sales.service.js` solo envia `sold_at` cuando la funcionalidad esta habilitada y la fecha supera validaciones de UI.
+- `sp_create_sale` debe validar que la fecha no sea futura y que no sea anterior a la apertura de la caja.
+- La retrofecha debe permanecer restringida, auditada y con limite temporal; no debe convertirse en campo libre para todos los roles.
+
+### Fecha manual de venta POS (implementacion 2026-03-13)
+
+- Archivos: `src/views/PointOfSale.vue`, `src/views/TenantConfig.vue`, `src/services/sales.service.js`, `migrations/ADD_POS_MANUAL_SALE_DATETIME.sql`
+- Regla funcional:
+  - el selector de fecha/hora solo aparece si el tenant lo habilita;
+  - ademas, solo lo pueden usar `ADMINISTRADOR` y `GERENTE`;
+  - no permite fechas futuras;
+  - no permite fecha/hora anterior a la apertura de la caja;
+  - respeta un maximo de retrofecha configurable en horas.
+- Configuracion tenant:
+  - `pos_allow_manual_sale_datetime`
+  - `pos_max_backdate_hours`
+- Persistencia:
+  - `salesService.createSale()` ya envia `p_sold_at`;
+  - la migracion extiende `sp_create_sale` para propagar esa fecha efectiva a `sales`, `inventory_moves` y `sale_payments`.
+
+### Compatibilidad transitoria de fecha manual POS (hotfix 2026-03-13)
+
+- Archivos: `src/services/tenantSettings.service.js`, `src/services/sales.service.js`
+- Problema resuelto:
+  - algunos entornos aun no tienen en Supabase las columnas `pos_allow_manual_sale_datetime`, `pos_max_backdate_hours` ni el parametro RPC `p_sold_at`;
+  - eso provocaba errores de schema cache al guardar configuracion o cobrar ventas.
+- Solucion aplicada:
+  - `tenantSettings.service.js` detecta error de esquema y reintenta con payload legacy sin esos campos;
+  - `sales.service.js` detecta RPC legacy sin `p_sold_at` y reintenta la venta sin fecha manual.
+- Regla operativa:
+  - la app no se rompe mientras falta la migracion;
+  - pero la fecha manual solo queda funcional de extremo a extremo cuando se aplica `migrations/ADD_POS_MANUAL_SALE_DATETIME.sql`.
+
+### Pedido por chat IA POS (endurecido)
+
+- Archivos: `src/services/chatOrderAgent.service.js`, `src/views/PointOfSale.vue`
+- Cambio de estrategia:
+  - parser deterministico local primero;
+  - solo si el parser local no alcanza umbral suficiente, se invoca el LLM cloud;
+  - el matching a catalogo ahora distingue entre `match confiable`, `sugerencia para revisar` y `sin match`.
+- Regla operativa:
+  - si la identificacion del item no es suficientemente confiable, no se agrega al carrito;
+  - en ese caso se muestran sugerencias de productos candidatos para revision del usuario.
+- Cliente sugerido:
+  - solo se autoselecciona si el match del cliente es alto;
+  - si no, se deja como sugerencia sin cargarlo automaticamente.
+- Invalidez / refresh de cache IA:
+  - el parser cloud de chat soporta `force_refresh` para saltarse cache server-side y reescribir la respuesta;
+  - en POS, si una respuesta vino desde cache y no logra ningun match confiable, se reintenta una vez forzando refresh;
+  - el cache IA local ahora soporta limpieza por servicio (`forecast`, `purchase`, `pricing`, etc.) ademas de limpieza total.
+
+### Rendimiento app v3 (implementado 2026-03-13)
+
+1. POS autocomplete y matching IA mas livianos
+- Archivos: `src/services/products.service.js`, `src/views/PointOfSale.vue`
+- Cambio:
+  - `searchVariants()` ahora usa cache corta en memoria por termino/sede;
+  - se agrego `getVariantsForChatMatching()` para construir un pool acotado de candidatos desde terminos del chat;
+  - el POS deja de bajar `3500` variantes para matching IA y arma un catalogo reducido a partir del parser/texto del chat.
+- Efecto:
+  - menos roundtrips repetidos;
+  - menos payload transferido;
+  - menor costo de matching del pedido por chat.
+
+2. Cache de impuestos por variante en POS
+- Archivos: `src/services/taxes.service.js`, `src/views/PointOfSale.vue`
+- Cambio:
+  - `getTaxInfoForVariant()` ahora usa cache en memoria por `tenant + variant_id`;
+  - invalidacion por cambios en impuestos o reglas fiscales;
+  - los recalculos del carrito (`cantidad`, descuento linea/global) ahora pueden reutilizar tax info ya resuelta.
+- Efecto:
+  - menos RPCs repetidas durante una venta;
+  - mejor respuesta en carritos con varias lineas o ajustes frecuentes.
+
+3. Alertas con carga acotada y paginacion UI
+- Archivos: `src/services/alerts.service.js`, `src/composables/useAppAlerts.js`, `src/components/AppAlertsDialog.vue`
+- Cambio:
+  - el servicio ya no hace `select('*')` indiscriminado;
+  - la carga inicial se hace por tipo (`STOCK`, `EXPIRATION`, `LAYAWAY`, `PAYABLE`, `RECEIVABLE`) con limite operativo;
+  - el composable mantiene una ventana acotada en memoria;
+  - el modal de alertas pagina el render por tab.
+- Efecto:
+  - menos memoria usada en frontend;
+  - menos trabajo reactivo y de render cuando hay muchas alertas;
+  - mejor escalabilidad del centro de alertas.
+
+4. Dashboard Home en modo RPC-only
+- Archivos: `src/services/reports.service.js`, `src/views/Home.vue`
+- Cambio:
+  - `getDashboardSummary()` deja de usar fallback legacy y depende de `fn_reports_dashboard_summary`;
+  - respuesta cacheada por corto plazo;
+  - `Home.vue` maneja fallo de RPC sin romper layout.
+- Efecto:
+  - se elimina el camino costoso de multiples consultas + agregacion JS;
+  - rendimiento mas consistente en Home.
+- Nota operativa:
+  - este comportamiento exige que la migracion/RPC del dashboard este desplegada en el entorno.
+
+5. Invalidacion de dashboard al cambiar ventas
+- Archivo: `src/services/sales.service.js`
+- Cambio:
+  - crear venta, anular venta y crear devolucion invalidan tags de `reports/dashboard-summary`.
+- Efecto:
+  - el cache nuevo no deja KPIs de Home desactualizados despues de operaciones comerciales.
+
+6. Recorte de payloads en listas calientes
+- Archivos: `src/services/sales.service.js`, `src/services/taxes.service.js`, `src/services/alerts.service.js`
+- Cambio:
+  - varias consultas que usaban `select('*')` pasaron a columnas explicitas en ventas, devoluciones, impuestos y alertas.
+- Efecto:
+  - menor ancho de respuesta;
+  - menos datos serializados y procesados en cliente.
+
+### UX reciente POS header (implementado 2026-03-13)
+
+- Archivo: `src/views/PointOfSale.vue`
+- Cambio:
+  - se eliminaron intentos de barra flotante inferior para `Cobrar` / `Limpiar`;
+  - ambas acciones quedaron en el header superior del POS junto al estado de caja;
+  - layout responsive:
+    - desktop: acciones en linea;
+    - tablet: dos columnas para botones y estado de caja en fila separada;
+    - movil pequeno: stack en una sola columna.
+- Motivo:
+  - evitar conflictos con scroll, scrollbar overlay y perdida visual de acciones.
 
 ## Contexto mas antiguo (resumen historico)
 

@@ -107,6 +107,36 @@ class AICacheManager {
   }
 
   /**
+   * Limpia caché de un servicio IA específico, opcionalmente por tenant.
+   * @param {string} service - forecast, purchase, pricing, etc.
+   * @param {string|null} tenantId - tenant opcional para acotar limpieza
+   */
+  static clearByService(service, tenantId = null) {
+    try {
+      const keys = Object.keys(localStorage);
+      let count = 0;
+      const marker = `${service}_`;
+      const tenantMarker = tenantId ? `_${tenantId}_` : null;
+
+      keys.forEach(key => {
+        if (!key.startsWith(CACHE_PREFIX)) return;
+        const cacheKey = key.replace(CACHE_PREFIX, '');
+        if (!cacheKey.startsWith(marker)) return;
+        if (tenantMarker && !cacheKey.includes(tenantMarker)) return;
+
+        localStorage.removeItem(key);
+        count++;
+      });
+
+      console.log(`🗑️ ${count} entradas de caché eliminadas para servicio ${service}${tenantId ? ` tenant ${tenantId}` : ''}`);
+      return count;
+    } catch (error) {
+      console.error('Error limpiando caché por servicio:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Limpia entradas expiradas del caché
    */
   static clearExpired() {
