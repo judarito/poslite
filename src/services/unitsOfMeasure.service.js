@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const UNITS_CACHE_TTL_MS = 10 * 60 * 1000
 
 class UnitsOfMeasureService {
   constructor() {
@@ -15,37 +18,48 @@ class UnitsOfMeasureService {
    */
   async getUnits(tenantId, page = 1, pageSize = 50, search = '') {
     try {
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
+      const normalizedSearch = String(search || '').trim().toLowerCase()
+      return await queryCache.getOrLoad(
+        `units:list:${JSON.stringify({ page, pageSize, search: normalizedSearch })}`,
+        async () => {
+          const from = (page - 1) * pageSize
+          const to = from + pageSize - 1
 
-      let query = supabaseService.client
-        .from(this.table)
-        .select('*', { count: 'exact' })
-        .order('is_system', { ascending: false })  // Sistema primero
-        .order('name', { ascending: true })
-        .range(from, to)
+          let query = supabaseService.client
+            .from(this.table)
+            .select('*', { count: 'exact' })
+            .order('is_system', { ascending: false })
+            .order('name', { ascending: true })
+            .range(from, to)
 
-      // Filtrar por tenant (incluir sistema tenant_id NULL)
-      if (tenantId) {
-        query = query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
-      }
+          if (tenantId) {
+            query = query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+          }
 
-      // Búsqueda
-      if (search && search.length > 0) {
-        query = query.or(
-          `code.ilike.%${search}%,name.ilike.%${search}%,description.ilike.%${search}%,dian_code.ilike.%${search}%`
-        )
-      }
+          if (normalizedSearch) {
+            query = query.or(
+              `code.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%,description.ilike.%${normalizedSearch}%,dian_code.ilike.%${normalizedSearch}%`
+            )
+          }
 
-      const { data, error, count } = await query
+          const { data, error, count } = await query
 
-      if (error) throw error
+          if (error) throw error
 
-      return {
-        success: true,
-        data: data || [],
-        total: count || 0
-      }
+          return {
+            success: true,
+            data: data || [],
+            total: count || 0
+          }
+        },
+        {
+          tenantId,
+          ttlMs: UNITS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['units'],
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       console.error('Error getUnits:', error)
       return {
@@ -71,6 +85,7 @@ class UnitsOfMeasureService {
         .single()
 
       if (error) throw error
+      queryCache.invalidateByTags(['units'], { tenantId })
 
       return {
         success: true,
@@ -111,6 +126,7 @@ class UnitsOfMeasureService {
         .single()
 
       if (error) throw error
+      queryCache.invalidateByTags(['units'], { tenantId })
 
       return {
         success: true,
@@ -197,6 +213,7 @@ class UnitsOfMeasureService {
         .eq('is_system', false)      // Seguridad: no eliminar sistema
 
       if (error) throw error
+      queryCache.invalidateByTags(['units'], { tenantId })
 
       return { success: true }
     } catch (error) {
@@ -267,26 +284,37 @@ class UnitsOfMeasureService {
    */
   async getActiveUnits(tenantId) {
     try {
-      let query = supabaseService.client
-        .from(this.table)
-        .select('unit_id, code, name, dian_code, is_system')
-        .eq('is_active', true)
-        .order('is_system', { ascending: false })  // Sistema primero
-        .order('name', { ascending: true })
+      return await queryCache.getOrLoad(
+        'units:active',
+        async () => {
+          let query = supabaseService.client
+            .from(this.table)
+            .select('unit_id, code, name, dian_code, is_system')
+            .eq('is_active', true)
+            .order('is_system', { ascending: false })
+            .order('name', { ascending: true })
 
-      // Incluir sistema + tenant
-      if (tenantId) {
-        query = query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
-      }
+          if (tenantId) {
+            query = query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+          }
 
-      const { data, error } = await query
+          const { data, error } = await query
 
-      if (error) throw error
+          if (error) throw error
 
-      return {
-        success: true,
-        data: data || []
-      }
+          return {
+            success: true,
+            data: data || []
+          }
+        },
+        {
+          tenantId,
+          ttlMs: UNITS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['units'],
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       console.error('Error getActiveUnits:', error)
       return {

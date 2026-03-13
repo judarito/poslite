@@ -3,6 +3,7 @@ import { supabase } from '@/plugins/supabase'
 import supabaseService from '@/services/supabase.service'
 import router from '@/router'
 import { useTenant } from './useTenant'
+import queryCache from '@/utils/queryCache'
 
 // Estado global de autenticación
 const user = ref(null)
@@ -127,6 +128,7 @@ function handleSessionExpired() {
   user.value = null
   userProfile.value = null
   session.value = null
+  queryCache.clearAll()
   
   const { clearTenant } = useTenant()
   clearTenant()
@@ -229,6 +231,7 @@ export const useAuth = () => {
       session.value = null
       user.value = null
       userProfile.value = null
+      queryCache.clearAll()
 
       const { clearTenant } = useTenant()
       clearTenant()

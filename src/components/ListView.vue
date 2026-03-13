@@ -157,6 +157,7 @@ const props = defineProps({
   titleField: { type: String, default: 'name' },
   subtitleField: { type: String, default: '' },
   pageSize: { type: Number, default: 10 },
+  autoLoad: { type: Boolean, default: true },
   loading: { type: Boolean, default: false },
   searchable: { type: Boolean, default: true },
   clickable: { type: Boolean, default: false },
@@ -215,14 +216,14 @@ const debouncedSearch = () => {
 
 // Recargar cuando cambia el tenant
 watch(() => tenantId.value, () => {
-  if (tenantId.value) {
+  if (props.autoLoad && tenantId.value) {
     currentPage.value = 1
     loadPage(1)
   }
 })
 
 onMounted(() => {
-  if (tenantId.value) {
+  if (props.autoLoad && tenantId.value) {
     loadPage(1)
   }
 })

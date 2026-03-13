@@ -1,64 +1,61 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { supabase } from '@/plugins/supabase'
 import { canManageTenants } from '@/utils/superAdmin'
-import Home from '@/views/Home.vue'
-import About from '@/views/About.vue'
-import Settings from '@/views/Settings.vue'
-import Users from '@/views/Users.vue'
-import Login from '@/views/Login.vue'
-import PaymentMethods from '@/views/PaymentMethods.vue'
-import Locations from '@/views/Locations.vue'
-import Categories from '@/views/Categories.vue'
-import UnitsOfMeasure from '@/views/UnitsOfMeasure.vue'
-import Products from '@/views/Products.vue'
-import BulkImports from '@/views/BulkImports.vue'
-import Customers from '@/views/Customers.vue'
-import ThirdParties from '@/views/ThirdParties.vue'
-import Taxes from '@/views/Taxes.vue'
-import TaxRules from '@/views/TaxRules.vue'
-import PricingRules from '@/views/PricingRules.vue'
-import Roles from '@/views/Roles.vue'
-import CashSessions from '@/views/CashSessions.vue'
-import CashRegisters from '@/views/CashRegisters.vue'
-import PointOfSale from '@/views/PointOfSale.vue'
-import Sales from '@/views/Sales.vue'
-import Inventory from '@/views/Inventory.vue'
-import BatchManagement from '@/views/BatchManagement.vue'
-import ReportsHub from '@/views/ReportsHub.vue'
-import SalesReport from '@/views/SalesReport.vue'
-import InventoryReport from '@/views/InventoryReport.vue'
-import ProductionReport from '@/views/ProductionReport.vue'
-import CashReport from '@/views/CashReport.vue'
-import FinancialReport from '@/views/FinancialReport.vue'
-import TenantConfig from '@/views/TenantConfig.vue'
-import TenantManagement from '@/views/TenantManagement.vue'
-import LayawayContracts from '@/views/LayawayContracts.vue'
-import LayawayDetail from '@/views/LayawayDetail.vue'
-import CashRegisterAssignments from '@/views/CashRegisterAssignments.vue'
-import Purchases from '@/views/Purchases.vue'
-import ProductionOrders from '@/views/ProductionOrders.vue'
-import BOMs from '@/views/BOMs.vue'
-import Cartera from '@/views/Cartera.vue'
-import Accounting from '@/views/Accounting.vue'
-import AccountingJournal from '@/views/AccountingJournal.vue'
-import AccountingLedger from '@/views/AccountingLedger.vue'
-import AccountingWithholdings from '@/views/AccountingWithholdings.vue'
-import AccountingClosing from '@/views/AccountingClosing.vue'
-import AccountingAutomation from '@/views/AccountingAutomation.vue'
-import AccountingManualEntries from '@/views/AccountingManualEntries.vue'
-import AccountingChartOfAccounts from '@/views/AccountingChartOfAccounts.vue'
-import AccountingStatements from '@/views/AccountingStatements.vue'
-import AccountingTaxCenter from '@/views/AccountingTaxCenter.vue'
-import AccountingReconciliation from '@/views/AccountingReconciliation.vue'
-import AccountingAIControl from '@/views/AccountingAIControl.vue'
-import SetupWizard from '@/components/SetupWizard.vue'
+import rolesService from '@/services/roles.service'
+import supabaseService from '@/services/supabase.service'
 
-const MENU_ROUTES_CACHE_TTL_MS = 60 * 1000
-const menuRoutesCache = {
-  authUserId: null,
-  routes: null,
-  loadedAt: 0,
-}
+const Login = () => import('@/views/Login.vue')
+const Home = () => import('@/views/Home.vue')
+const About = () => import('@/views/About.vue')
+const Settings = () => import('@/views/Settings.vue')
+const Users = () => import('@/views/Users.vue')
+const PaymentMethods = () => import('@/views/PaymentMethods.vue')
+const Locations = () => import('@/views/Locations.vue')
+const Categories = () => import('@/views/Categories.vue')
+const UnitsOfMeasure = () => import('@/views/UnitsOfMeasure.vue')
+const Products = () => import('@/views/Products.vue')
+const BulkImports = () => import('@/views/BulkImports.vue')
+const Customers = () => import('@/views/Customers.vue')
+const ThirdParties = () => import('@/views/ThirdParties.vue')
+const Taxes = () => import('@/views/Taxes.vue')
+const TaxRules = () => import('@/views/TaxRules.vue')
+const PricingRules = () => import('@/views/PricingRules.vue')
+const Roles = () => import('@/views/Roles.vue')
+const CashSessions = () => import('@/views/CashSessions.vue')
+const CashRegisters = () => import('@/views/CashRegisters.vue')
+const PointOfSale = () => import('@/views/PointOfSale.vue')
+const Sales = () => import('@/views/Sales.vue')
+const Inventory = () => import('@/views/Inventory.vue')
+const BatchManagement = () => import('@/views/BatchManagement.vue')
+const ReportsHub = () => import('@/views/ReportsHub.vue')
+const SalesReport = () => import('@/views/SalesReport.vue')
+const InventoryReport = () => import('@/views/InventoryReport.vue')
+const ProductionReport = () => import('@/views/ProductionReport.vue')
+const CashReport = () => import('@/views/CashReport.vue')
+const FinancialReport = () => import('@/views/FinancialReport.vue')
+const TenantConfig = () => import('@/views/TenantConfig.vue')
+const TenantManagement = () => import('@/views/TenantManagement.vue')
+const LayawayContracts = () => import('@/views/LayawayContracts.vue')
+const LayawayDetail = () => import('@/views/LayawayDetail.vue')
+const CashRegisterAssignments = () => import('@/views/CashRegisterAssignments.vue')
+const Purchases = () => import('@/views/Purchases.vue')
+const ProductionOrders = () => import('@/views/ProductionOrders.vue')
+const BOMs = () => import('@/views/BOMs.vue')
+const Cartera = () => import('@/views/Cartera.vue')
+const Accounting = () => import('@/views/Accounting.vue')
+const AccountingJournal = () => import('@/views/AccountingJournal.vue')
+const AccountingLedger = () => import('@/views/AccountingLedger.vue')
+const AccountingWithholdings = () => import('@/views/AccountingWithholdings.vue')
+const AccountingClosing = () => import('@/views/AccountingClosing.vue')
+const AccountingAutomation = () => import('@/views/AccountingAutomation.vue')
+const AccountingManualEntries = () => import('@/views/AccountingManualEntries.vue')
+const AccountingChartOfAccounts = () => import('@/views/AccountingChartOfAccounts.vue')
+const AccountingStatements = () => import('@/views/AccountingStatements.vue')
+const AccountingTaxCenter = () => import('@/views/AccountingTaxCenter.vue')
+const AccountingReconciliation = () => import('@/views/AccountingReconciliation.vue')
+const AccountingAIControl = () => import('@/views/AccountingAIControl.vue')
+const SetupWizard = () => import('@/components/SetupWizard.vue')
+
 function isRouteAlwaysAllowed(path) {
   return path === '/' || path === '/about'
 }
@@ -81,26 +78,13 @@ async function getAllowedMenuRoutes(authUserId) {
 }
 
 async function getAllowedMenuRoutesWithOptions(authUserId, options = {}) {
-  const force = options?.force === true
-  const now = Date.now()
-  if (
-    !force &&
-    menuRoutesCache.authUserId === authUserId &&
-    Array.isArray(menuRoutesCache.routes) &&
-    now - menuRoutesCache.loadedAt <= MENU_ROUTES_CACHE_TTL_MS
-  ) {
-    return menuRoutesCache.routes
-  }
   try {
-    const { data, error } = await supabase.rpc('fn_get_user_menus', { p_auth_user_id: authUserId })
-    if (error) {
-      console.warn('No se pudo validar acceso por menu (fn_get_user_menus):', error.message)
+    const result = await rolesService.getUserMenus(authUserId, { force: options?.force === true })
+    if (!result.success) {
+      console.warn('No se pudo validar acceso por menu (fn_get_user_menus):', result.error)
       return null
     }
-    const routes = [...new Set((data || []).map((item) => item.route).filter(Boolean))]
-    menuRoutesCache.authUserId = authUserId
-    menuRoutesCache.routes = routes
-    menuRoutesCache.loadedAt = now
+    const routes = [...new Set((result.flat || []).map((item) => item.route).filter(Boolean))]
     return routes
   } catch (error) {
     console.warn('Error al cargar menus para guard de rutas:', error.message)
@@ -501,19 +485,8 @@ const router = createRouter({
 // Guard de navegación
 router.beforeEach(async (to, from, next) => {
   try {
-    // getSession() lee la caché local — rápido y sin red
-    const { data: { session } } = await supabase.auth.getSession()
-    let isAuthenticated = !!session
-
-    // Si hay sesión pero el token ya expiró, intentar refrescar
-    if (session) {
-      const expiresAt = session.expires_at || 0
-      const now = Math.floor(Date.now() / 1000)
-      if (expiresAt <= now) {
-        const { data, error } = await supabase.auth.refreshSession()
-        isAuthenticated = !error && !!data.session
-      }
-    }
+    const session = await supabaseService.getValidSession({ redirectOnFail: false })
+    const isAuthenticated = !!session
 
     // Validación de autenticación
     if (to.meta.requiresAuth && !isAuthenticated) {

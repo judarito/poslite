@@ -1038,6 +1038,29 @@ class ReportsService {
   // Dashboard resumen principal — KPIs + gráficas
   async getDashboardSummary(tenantId, locationId = null) {
     try {
+      const { data, error } = await supabaseService.client.rpc('fn_reports_dashboard_summary', {
+        p_tenant_id: tenantId,
+        p_location_id: locationId || null
+      })
+
+      if (!error && data?.success) {
+        return {
+          success: true,
+          kpis: data.kpis || null,
+          dailySeries: data.daily_series || [],
+          topProducts: data.top_products || [],
+          paymentMethods: data.payment_methods || []
+        }
+      }
+    } catch (_rpcError) {
+      // Fallback legacy mientras se despliega la migración.
+    }
+
+    return this.getDashboardSummaryLegacy(tenantId, locationId)
+  }
+
+  async getDashboardSummaryLegacy(tenantId, locationId = null) {
+    try {
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()

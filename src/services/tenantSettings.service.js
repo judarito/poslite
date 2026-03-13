@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000
 
 class TenantSettingsService {
   constructor() {
@@ -7,32 +10,58 @@ class TenantSettingsService {
   }
 
   // Obtener configuración del tenant
-  async getSettings(tenantId) {
+  async getSettings(tenantId, options = {}) {
     try {
-      const { data, error } = await supabaseService.client
-        .from(this.table)
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .maybeSingle()
+      return await queryCache.getOrLoad(
+        'tenant-settings:settings',
+        async () => {
+          const { data, error } = await supabaseService.client
+            .from(this.table)
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .maybeSingle()
 
-      if (error) throw error
-      return { success: true, data: data || {} }
+          if (error) throw error
+          return { success: true, data: data || {} }
+        },
+        {
+          tenantId,
+          ttlMs: SETTINGS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['tenant-settings'],
+          forceRefresh: options.forceRefresh === true,
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       return { success: false, error: error.message }
     }
   }
 
   // Obtener datos del tenant
-  async getTenant(tenantId) {
+  async getTenant(tenantId, options = {}) {
     try {
-      const { data, error } = await supabaseService.client
-        .from(this.tenantsTable)
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .single()
+      return await queryCache.getOrLoad(
+        'tenant-settings:tenant',
+        async () => {
+          const { data, error } = await supabaseService.client
+            .from(this.tenantsTable)
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .single()
 
-      if (error) throw error
-      return { success: true, data }
+          if (error) throw error
+          return { success: true, data }
+        },
+        {
+          tenantId,
+          ttlMs: SETTINGS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['tenant-settings'],
+          forceRefresh: options.forceRefresh === true,
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       return { success: false, error: error.message }
     }
@@ -99,6 +128,13 @@ class TenantSettingsService {
         .select()
 
       if (error) throw error
+      queryCache.invalidateByTags(['tenant-settings'], { tenantId })
+      queryCache.prime('tenant-settings:settings', { success: true, data: data[0] || {} }, {
+        tenantId,
+        ttlMs: SETTINGS_CACHE_TTL_MS,
+        storage: 'session',
+        tags: ['tenant-settings'],
+      })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -130,6 +166,13 @@ class TenantSettingsService {
         city_code:             updates.city_code             || null
       }, { tenant_id: tenantId })
       if (error) throw error
+      queryCache.invalidateByTags(['tenant-settings'], { tenantId })
+      queryCache.prime('tenant-settings:tenant', { success: true, data: data[0] }, {
+        tenantId,
+        ttlMs: SETTINGS_CACHE_TTL_MS,
+        storage: 'session',
+        tags: ['tenant-settings'],
+      })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }

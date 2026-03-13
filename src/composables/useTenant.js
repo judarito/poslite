@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import queryCache from '@/utils/queryCache'
 
 // Estado global del tenant actual
 const currentTenant = ref(null)
@@ -30,8 +31,14 @@ export const useTenant = () => {
 
   // Limpiar tenant
   const clearTenant = () => {
+    const tenantId = currentTenant.value?.tenant_id || null
     currentTenant.value = null
     localStorage.removeItem(STORAGE_KEY)
+    if (tenantId) {
+      queryCache.clearTenantScope(tenantId)
+    } else {
+      queryCache.clearAll()
+    }
   }
 
   // Inicializar al cargar

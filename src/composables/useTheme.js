@@ -1,7 +1,7 @@
 import { ref, onMounted } from 'vue'
 import { useTheme as useVuetifyTheme } from 'vuetify'
-import supabaseService from '@/services/supabase.service'
 import { supabase } from '@/plugins/supabase'
+import tenantSettingsService from '@/services/tenantSettings.service'
 
 const THEME_STORAGE_KEY = 'ofirone_theme'
 const LEGACY_THEME_STORAGE_KEY = 'poslite_theme'
@@ -105,15 +105,10 @@ export function useTheme() {
         return true
       }
 
-      const { data, error } = await supabaseService.client
-        .from('tenant_settings')
-        .select('theme')
-        .eq('tenant_id', tenantId)
-        .maybeSingle()
+      const result = await tenantSettingsService.getSettings(tenantId)
+      if (!result.success) throw new Error(result.error)
 
-      if (error) throw error
-
-      const fallbackTheme = normalizeTheme(data?.theme) || getSystemTheme()
+      const fallbackTheme = normalizeTheme(result.data?.theme) || getSystemTheme()
       applyTheme(fallbackTheme)
       saveTheme(fallbackTheme, resolvedAuthUserId)
       return true

@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const MENUS_CACHE_TTL_MS = 10 * 60 * 1000
 
 class RolesService {
   constructor() {
@@ -40,6 +43,7 @@ class RolesService {
         name: role.name
       })
       if (error) throw error
+      queryCache.invalidateByTags(['menus'])
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -52,6 +56,7 @@ class RolesService {
         name: updates.name
       }, { tenant_id: tenantId, role_id: roleId })
       if (error) throw error
+      queryCache.invalidateByTags(['menus'])
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -64,6 +69,7 @@ class RolesService {
         tenant_id: tenantId, role_id: roleId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['menus'])
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -136,6 +142,7 @@ class RolesService {
 
         if (error) throw error
       }
+      queryCache.invalidateByTags(['menus'])
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
@@ -196,35 +203,45 @@ class RolesService {
    * Usa fn_get_user_menus (CTE recursivo) que auto-incluye grupos padre.
    * Retorna árbol listo para el sidebar: raíces con array children.
    */
-  async getUserMenus(authUserId) {
+  async getUserMenus(authUserId, options = {}) {
     try {
       if (!authUserId) throw new Error('authUserId es requerido')
+      return await queryCache.getOrLoad(
+        `menus:user:${authUserId}`,
+        async () => {
+          const { data, error } = await supabaseService.client
+            .rpc('fn_get_user_menus', { p_auth_user_id: authUserId })
 
-      const { data, error } = await supabaseService.client
-        .rpc('fn_get_user_menus', { p_auth_user_id: authUserId })
+          if (error) throw error
 
-      if (error) throw error
+          const items = data || []
+          const childrenMap = {}
+          items.forEach(item => {
+            if (item.parent_code) {
+              if (!childrenMap[item.parent_code]) childrenMap[item.parent_code] = []
+              childrenMap[item.parent_code].push(item)
+            }
+          })
 
-      const items = data || []
+          const tree = items
+            .filter(i => !i.parent_code)
+            .map(root => ({
+              ...root,
+              children: (childrenMap[root.code] || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            }))
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-      // Construir árbol: raíces (parent_code = null) + hijos agrupados
-      const childrenMap = {}
-      items.forEach(item => {
-        if (item.parent_code) {
-          if (!childrenMap[item.parent_code]) childrenMap[item.parent_code] = []
-          childrenMap[item.parent_code].push(item)
+          return { success: true, data: tree, flat: items }
+        },
+        {
+          tenantId: options.tenantId || null,
+          ttlMs: MENUS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['menus'],
+          forceRefresh: options.force === true,
+          shouldCache: (result) => result?.success === true,
         }
-      })
-
-      const tree = items
-        .filter(i => !i.parent_code)
-        .map(root => ({
-          ...root,
-          children: (childrenMap[root.code] || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-        }))
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-
-      return { success: true, data: tree, flat: items }
+      )
     } catch (error) {
       return { success: false, data: [], flat: [], error: error.message }
     }
@@ -275,6 +292,7 @@ class RolesService {
 
         if (error) throw error
       }
+      queryCache.invalidateByTags(['menus'])
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

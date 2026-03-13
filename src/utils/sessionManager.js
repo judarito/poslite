@@ -1,5 +1,5 @@
-import { supabase } from '@/plugins/supabase'
 import router from '@/router'
+import supabaseService from '@/services/supabase.service'
 
 let sessionCheckInterval = null
 let visibilityHandler = null
@@ -12,7 +12,11 @@ async function performSessionCheck() {
   isChecking = true
 
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const session = await supabaseService.getValidSession({
+      forceRefresh: true,
+      minValiditySeconds: 300,
+      redirectOnFail: false
+    })
 
     if (!session) {
       console.warn('Session check: No session found')
@@ -23,34 +27,7 @@ async function performSessionCheck() {
       return
     }
 
-    // Verificar si el token expiró o está próximo a expirar
-    const expiresAt = session.expires_at || 0
-    const now = Math.floor(Date.now() / 1000)
-    const timeLeft = expiresAt - now
-
-    if (timeLeft <= 0) {
-      // Token ya expirado — refrescar
-      console.log('Token expired, refreshing...')
-      const { error } = await supabase.auth.refreshSession()
-      if (error) {
-        console.warn('Session refresh failed:', error.message)
-        stopSessionMonitoring()
-        if (router.currentRoute.value.path !== '/login') {
-          router.push('/login')
-        }
-      } else {
-        console.log('Session refreshed after expiry')
-        // Invalidar caché del service
-        try {
-          const { default: svc } = await import('@/services/supabase.service')
-          svc.invalidateSessionCache()
-        } catch (_) {}
-      }
-    } else if (timeLeft < 300) {
-      // Próximo a expirar — refrescar preventivamente
-      console.log(`Token expires in ${timeLeft}s, refreshing...`)
-      await supabase.auth.refreshSession()
-    }
+    supabaseService.invalidateSessionCache()
   } catch (error) {
     console.error('Session check error:', error)
   } finally {
@@ -70,11 +47,7 @@ export function startSessionMonitoring() {
     visibilityHandler = async () => {
       if (document.visibilityState === 'visible') {
         console.log('Tab visible again, checking session...')
-        // Invalidar caché del service para forzar revalidación
-        try {
-          const { default: svc } = await import('@/services/supabase.service')
-          svc.invalidateSessionCache()
-        } catch (_) {}
+        supabaseService.invalidateSessionCache()
         performSessionCheck()
       }
     }
@@ -97,6 +70,10 @@ export function stopSessionMonitoring() {
 
 // Verificar sesión inmediatamente
 export async function checkSession() {
-  const { data: { session }, error } = await supabase.auth.getSession()
-  return { session, error }
+  try {
+    const session = await supabaseService.getValidSession({ redirectOnFail: false })
+    return { session, error: null }
+  } catch (error) {
+    return { session: null, error }
+  }
 }

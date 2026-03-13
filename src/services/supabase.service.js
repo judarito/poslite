@@ -7,22 +7,34 @@ class SupabaseService {
     this._sessionValid = false
     this._sessionCheckedAt = 0
     this._pendingValidation = null
+    this._lastSession = null
   }
 
   // Validar sesión antes de operaciones (con caché de 30s y lock de concurrencia)
   async validateSession() {
-    // Si validamos hace menos de 30s, usar caché
+    const session = await this.getValidSession()
+    return !!session
+  }
+
+  async getValidSession(options = {}) {
+    const forceRefresh = options.forceRefresh === true
+    const minValiditySeconds = Math.max(0, Number(options.minValiditySeconds || 0))
+    const redirectOnFail = options.redirectOnFail !== false
     const now = Date.now()
-    if (this._sessionValid && (now - this._sessionCheckedAt) < 30000) {
-      return true
+
+    if (!forceRefresh && this._sessionValid && this._lastSession && (now - this._sessionCheckedAt) < 30000) {
+      const expiresAt = Number(this._lastSession.expires_at || 0)
+      const nowSec = Math.floor(Date.now() / 1000)
+      if ((expiresAt - nowSec) > minValiditySeconds) {
+        return this._lastSession
+      }
     }
 
-    // Si ya hay una validación en curso, esperar esa misma
     if (this._pendingValidation) {
       return this._pendingValidation
     }
 
-    this._pendingValidation = this._doValidateSession()
+    this._pendingValidation = this._doGetValidSession({ redirectOnFail, minValiditySeconds })
     try {
       return await this._pendingValidation
     } finally {
@@ -30,39 +42,45 @@ class SupabaseService {
     }
   }
 
-  async _doValidateSession() {
+  async _doGetValidSession(options = {}) {
+    const redirectOnFail = options.redirectOnFail !== false
+    const minValiditySeconds = Math.max(0, Number(options.minValiditySeconds || 0))
+
     try {
       const { data: { session } } = await this.client.auth.getSession()
 
       if (!session) {
         this._sessionValid = false
-        this._redirectToLogin()
-        return false
+        this._lastSession = null
+        if (redirectOnFail) this._redirectToLogin()
+        return null
       }
 
-      // Verificar si el token expiró mirando expires_at
       const expiresAt = session.expires_at || 0
       const nowSec = Math.floor(Date.now() / 1000)
+      let nextSession = session
 
-      if (expiresAt <= nowSec) {
-        // Intentar refrescar antes de rendirse
-        console.log('Token expired, attempting refresh...')
+      if ((expiresAt - nowSec) <= minValiditySeconds) {
         const { data, error } = await this.client.auth.refreshSession()
         if (error || !data.session) {
           console.warn('Session refresh failed:', error?.message)
           this._sessionValid = false
-          this._redirectToLogin()
-          return false
+          this._lastSession = null
+          if (redirectOnFail) this._redirectToLogin()
+          return null
         }
+        nextSession = data.session
       }
 
       this._sessionValid = true
       this._sessionCheckedAt = Date.now()
-      return true
+      this._lastSession = nextSession
+      return nextSession
     } catch (error) {
       console.error('Error validating session:', error)
       this._sessionValid = false
-      return false
+      this._lastSession = null
+      return null
     }
   }
 
@@ -70,6 +88,7 @@ class SupabaseService {
   invalidateSessionCache() {
     this._sessionValid = false
     this._sessionCheckedAt = 0
+    this._lastSession = null
   }
 
   _redirectToLogin() {

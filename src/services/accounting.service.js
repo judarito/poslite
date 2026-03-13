@@ -1,5 +1,7 @@
 import { supabase } from '@/plugins/supabase'
 import supabaseService from './supabase.service'
+import tenantSettingsService from './tenantSettings.service'
+import queryCache from '@/utils/queryCache'
 
 const AI_EDGE_FUNCTION = 'deepseek-proxy'
 const AI_MODEL = import.meta.env.VITE_DEEPSEEK_TEXT_MODEL || 'deepseek-chat'
@@ -36,20 +38,12 @@ class AccountingService {
 
   async getSettings(tenantId) {
     try {
-      const { data, error } = await supabaseService.client
-        .from('tenant_settings')
-        .select(`
-          accounting_enabled,
-          accounting_mode,
-          accounting_ai_enabled,
-          accounting_auto_post_sales,
-          accounting_auto_post_purchases,
-          accounting_country_code
-        `)
-        .eq('tenant_id', tenantId)
-        .maybeSingle()
+      const result = await tenantSettingsService.getSettings(tenantId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
 
-      if (error) throw error
+      const data = result.data || {}
 
       return {
         success: true,
@@ -95,6 +89,7 @@ class AccountingService {
 
       if (updateError) throw updateError
       if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+        queryCache.invalidateByTags(['tenant-settings'], { tenantId })
         return { success: true, data: updatedRows[0] }
       }
 
@@ -119,6 +114,7 @@ class AccountingService {
           .single()
 
         if (!error) {
+          queryCache.invalidateByTags(['tenant-settings'], { tenantId })
           return { success: true, data }
         }
 

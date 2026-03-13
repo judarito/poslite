@@ -13,50 +13,47 @@ import { useTenant } from '@/composables/useTenant'
 import alertsService from '@/services/alerts.service'
 import locationsService from '@/services/locations.service'
 
+const allAlerts = ref([])
+const loadingAlerts = ref(false)
+const locations = ref([])
+let alertsChannel = null
+
+const stockFilters = ref({ alert_level: null, location_id: null, search: '' })
+const expirationFilters = ref({ alert_level: null, location_id: null, search: '' })
+const layawayFilters = ref({ alert_level: null, search: '' })
+const payableFilters = ref({ alert_level: null, search: '' })
+const receivableFilters = ref({ alert_level: null, search: '' })
+
+const stockAlertLevels = [
+  { title: 'Sin stock', value: 'OUT_OF_STOCK' },
+  { title: 'Stock bajo', value: 'LOW_STOCK' },
+  { title: 'Sin disponible', value: 'NO_AVAILABLE' },
+  { title: 'Disponible bajo', value: 'LOW_AVAILABLE' }
+]
+
+const expirationAlertLevels = [
+  { title: 'Vencido', value: 'EXPIRED' },
+  { title: 'Crítico', value: 'CRITICAL' },
+  { title: 'Advertencia', value: 'WARNING' }
+]
+
+const layawayAlertLevels = [
+  { title: 'Vencido', value: 'EXPIRED' },
+  { title: 'Próximo a vencer', value: 'DUE_SOON' }
+]
+
+const payableAlertLevels = [
+  { title: 'Vencida', value: 'OVERDUE' },
+  { title: 'Por vencer', value: 'DUE_SOON' }
+]
+
+const receivableAlertLevels = [
+  { title: 'Cupo excedido', value: 'OVER_LIMIT' },
+  { title: 'Con saldo', value: 'WITH_DEBT' }
+]
+
 export function useAppAlerts() {
   const { tenantId } = useTenant()
-
-  // ── Estado principal ──────────────────────────────────────────────────────
-  const allAlerts = ref([])
-  const loadingAlerts = ref(false)
-  const locations = ref([])
-  let alertsChannel = null
-
-  // ── Filtros ───────────────────────────────────────────────────────────────
-  const stockFilters = ref({ alert_level: null, location_id: null, search: '' })
-  const expirationFilters = ref({ alert_level: null, location_id: null, search: '' })
-  const layawayFilters = ref({ alert_level: null, search: '' })
-  const payableFilters = ref({ alert_level: null, search: '' })
-  const receivableFilters = ref({ alert_level: null, search: '' })
-
-  // ── Niveles de alerta (para <v-select> en template) ──────────────────────
-  const stockAlertLevels = [
-    { title: 'Sin stock', value: 'OUT_OF_STOCK' },
-    { title: 'Stock bajo', value: 'LOW_STOCK' },
-    { title: 'Sin disponible', value: 'NO_AVAILABLE' },
-    { title: 'Disponible bajo', value: 'LOW_AVAILABLE' }
-  ]
-
-  const expirationAlertLevels = [
-    { title: 'Vencido', value: 'EXPIRED' },
-    { title: 'Crítico', value: 'CRITICAL' },
-    { title: 'Advertencia', value: 'WARNING' }
-  ]
-
-  const layawayAlertLevels = [
-    { title: 'Vencido', value: 'EXPIRED' },
-    { title: 'Próximo a vencer', value: 'DUE_SOON' }
-  ]
-
-  const payableAlertLevels = [
-    { title: 'Vencida', value: 'OVERDUE' },
-    { title: 'Por vencer', value: 'DUE_SOON' }
-  ]
-
-  const receivableAlertLevels = [
-    { title: 'Cupo excedido', value: 'OVER_LIMIT' },
-    { title: 'Con saldo', value: 'WITH_DEBT' }
-  ]
 
   // ── Computeds filtrados ───────────────────────────────────────────────────
   const stockAlerts = computed(() => {
@@ -160,6 +157,14 @@ export function useAppAlerts() {
 
   // Alias de compatibilidad (deprecated)
   const filteredLayawayAlerts = computed(() => layawayAlerts.value)
+  const payableOverdueAlerts = computed(() => payableAlerts.value.filter((alert) => alert.alert_level === 'OVERDUE'))
+  const payableDueSoonAlerts = computed(() => payableAlerts.value.filter((alert) => alert.alert_level === 'DUE_SOON'))
+  const payableSummary = computed(() => ({
+    overdueCount: payableOverdueAlerts.value.length,
+    dueSoonCount: payableDueSoonAlerts.value.length,
+    overdueAmount: payableOverdueAlerts.value.reduce((acc, item) => acc + Number(item?.data?.balance || 0), 0),
+    dueSoonAmount: payableDueSoonAlerts.value.reduce((acc, item) => acc + Number(item?.data?.balance || 0), 0)
+  }))
 
   // ── Carga y realtime ──────────────────────────────────────────────────────
   const loadAlerts = async () => {
@@ -314,6 +319,9 @@ export function useAppAlerts() {
     receivableAlertsCount,
     totalAlertsCount,
     filteredLayawayAlerts,
+    payableOverdueAlerts,
+    payableDueSoonAlerts,
+    payableSummary,
     // Funciones
     loadAlerts,
     loadLocations,

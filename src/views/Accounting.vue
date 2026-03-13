@@ -253,6 +253,7 @@
                 :total-items="trialBalance.length"
                 :loading="loading"
                 :page-size="LIST_PAGE_SIZE.trialBalance"
+                :auto-load="false"
                 item-key="account_code"
                 title-field="account_name"
                 avatar-icon="mdi-calculator-variant-outline"
@@ -332,6 +333,7 @@
                 :total-items="recentEntries.length"
                 :loading="loading"
                 :page-size="LIST_PAGE_SIZE.recentEntries"
+                :auto-load="false"
                 item-key="entry_id"
                 title-field="entry_number"
                 avatar-icon="mdi-book-open-page-variant"
@@ -614,6 +616,7 @@
                 :total-items="obligationsItems.length"
                 :loading="loadingCompliance"
                 :page-size="LIST_PAGE_SIZE.obligations"
+                :auto-load="false"
                 item-key="key"
                 title-field="name"
                 avatar-icon="mdi-clipboard-check-outline"
@@ -755,6 +758,7 @@
                 :total-items="eventQueue.length"
                 :loading="loading || processingQueue"
                 :page-size="LIST_PAGE_SIZE.queue"
+                :auto-load="false"
                 item-key="event_id"
                 title-field="event_type"
                 avatar-icon="mdi-queue-first-in-last-out"
@@ -853,6 +857,7 @@
                 :total-items="aiLinesItems.length"
                 :loading="aiLoading"
                 :page-size="LIST_PAGE_SIZE.aiLines"
+                :auto-load="false"
                 item-key="_list_key"
                 title-field="account_name"
                 avatar-icon="mdi-robot-outline"
@@ -916,7 +921,7 @@ const exportingComplianceCsv = ref(false)
 
 const activeTab = ref('dashboard')
 
-const settings = ref({
+const createDefaultSettings = () => ({
   accounting_enabled: false,
   accounting_mode: 'ASYNC',
   accounting_ai_enabled: true,
@@ -925,11 +930,7 @@ const settings = ref({
   accounting_country_code: 'CO'
 })
 
-const summary = ref({})
-const trialBalance = ref([])
-const recentEntries = ref([])
-const eventQueue = ref([])
-const compliance = ref({
+const createEmptyComplianceState = () => ({
   period: accountingService.getDefaultPeriod(),
   kpis: {},
   fe_configuration: {},
@@ -939,12 +940,26 @@ const compliance = ref({
   readiness_max: 0
 })
 
+const settings = ref(createDefaultSettings())
+
+const summary = ref({})
+const trialBalance = ref([])
+const recentEntries = ref([])
+const eventQueue = ref([])
+const compliance = ref(createEmptyComplianceState())
+
 const filters = ref({
   ...accountingService.getDefaultPeriod()
 })
 
 const aiPrompt = ref('')
 const aiResult = ref(null)
+const loadedTabs = ref({
+  dashboard: false,
+  compliance: false,
+  queue: false,
+  ai: false
+})
 
 const LIST_PAGE_SIZE = {
   trialBalance: 12,
@@ -1150,6 +1165,24 @@ const buildComplianceChecklistExportRows = () => {
   return [...obligations, ...reports]
 }
 
+const resetLoadedTabs = () => {
+  loadedTabs.value = {
+    dashboard: false,
+    compliance: false,
+    queue: false,
+    ai: false
+  }
+}
+
+const resetDataState = () => {
+  summary.value = {}
+  trialBalance.value = []
+  recentEntries.value = []
+  eventQueue.value = []
+  compliance.value = createEmptyComplianceState()
+  aiResult.value = null
+}
+
 const loadSettings = async () => {
   if (!tenantId.value) return
   const result = await accountingService.getSettings(tenantId.value)
@@ -1208,37 +1241,53 @@ const loadCompliance = async () => {
   }
 }
 
-const loadAll = async () => {
-  if (!tenantId.value) return
+const ensureActiveTabData = async (tab, options = {}) => {
+  if (!tenantId.value || !isEnabled.value) return
 
+  const normalizedTab = ['dashboard', 'compliance', 'queue', 'ai'].includes(tab) ? tab : 'dashboard'
+  if (!options.force && loadedTabs.value[normalizedTab]) {
+    return
+  }
+
+  if (normalizedTab === 'dashboard') {
+    await Promise.all([
+      loadTrialBalance(),
+      loadRecentEntries()
+    ])
+  } else if (normalizedTab === 'compliance') {
+    await loadCompliance()
+  } else if (normalizedTab === 'queue') {
+    await loadQueue()
+  } else if (normalizedTab === 'ai') {
+    aiResult.value = aiResult.value || null
+  }
+
+  loadedTabs.value = {
+    ...loadedTabs.value,
+    [normalizedTab]: true
+  }
+}
+
+const loadAll = async () => {
   loading.value = true
   try {
-    await loadSettings()
-
-    if (!isEnabled.value) {
-      summary.value = {}
-      trialBalance.value = []
-      recentEntries.value = []
-      eventQueue.value = []
-      compliance.value = {
-        period: accountingService.getDefaultPeriod(),
-        kpis: {},
-        fe_configuration: {},
-        obligations: [],
-        required_reports: [],
-        readiness_score: 0,
-        readiness_max: 0
-      }
+    if (!tenantId.value) {
+      settings.value = createDefaultSettings()
+      resetLoadedTabs()
+      resetDataState()
       return
     }
 
-    await Promise.all([
-      loadSummary(),
-      loadTrialBalance(),
-      loadRecentEntries(),
-      loadQueue(),
-      loadCompliance()
-    ])
+    await loadSettings()
+    resetLoadedTabs()
+
+    if (!isEnabled.value) {
+      resetDataState()
+      return
+    }
+
+    await loadSummary()
+    await ensureActiveTabData(activeTab.value, { force: true })
   } finally {
     loading.value = false
   }
@@ -1303,6 +1352,11 @@ const reloadCompliance = async () => {
     loadCompliance(),
     loadTrialBalance()
   ])
+  loadedTabs.value = {
+    ...loadedTabs.value,
+    dashboard: true,
+    compliance: true
+  }
 }
 
 const exportTrialBalanceXlsx = async () => {
@@ -1386,12 +1440,26 @@ const processPendingQueue = async () => {
       'success'
     )
 
-    await Promise.all([
-      loadQueue(),
+    const refreshTasks = [
       loadSummary(),
-      loadRecentEntries(),
-      loadCompliance()
-    ])
+      loadQueue()
+    ]
+
+    if (loadedTabs.value.dashboard) {
+      refreshTasks.push(loadRecentEntries(), loadTrialBalance())
+    }
+
+    if (loadedTabs.value.compliance) {
+      refreshTasks.push(loadCompliance())
+    }
+
+    await Promise.all(refreshTasks)
+    loadedTabs.value = {
+      ...loadedTabs.value,
+      dashboard: loadedTabs.value.dashboard,
+      compliance: loadedTabs.value.compliance,
+      queue: true
+    }
   } finally {
     processingQueue.value = false
   }
@@ -1440,6 +1508,11 @@ watch(() => aiLinesItems.value.length, () => {
   aiLinesPage.value = 1
 })
 
+watch(activeTab, (nextTab, previousTab) => {
+  if (nextTab === previousTab) return
+  ensureActiveTabData(nextTab)
+})
+
 watch(trialBalanceTotalPages, (total) => {
   if (trialBalancePage.value > total) trialBalancePage.value = total
 })
@@ -1471,7 +1544,14 @@ watch(
     const nextTab = resolveTabFromRoute()
     if (activeTab.value !== nextTab) {
       activeTab.value = nextTab
+      return
     }
+    ensureActiveTabData(nextTab)
   }
 )
+
+watch(() => tenantId.value, (nextTenantId, previousTenantId) => {
+  if (nextTenantId === previousTenantId) return
+  loadAll()
+})
 </script>

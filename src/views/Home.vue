@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import VueApexCharts from 'vue3-apexcharts'
 import { useCashSession } from '@/composables/useCashSession'
@@ -268,11 +268,11 @@ import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
 import { useTenantSettings } from '@/composables/useTenantSettings'
+import { useAppAlerts } from '@/composables/useAppAlerts'
 import { useI18n } from '@/i18n'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
 import cashService from '@/services/cash.service'
-import alertsService from '@/services/alerts.service'
 import { formatMoney } from '@/utils/formatters'
 
 const apexchart = VueApexCharts
@@ -292,15 +292,15 @@ const dailySeries    = ref([])
 const topProducts    = ref([])
 const paymentMethods = ref([])
 const expiredSessions = ref([])
-let supplierPayablesAlertsChannel = null
-const supplierPayablesOverdueCount = ref(0)
-const supplierPayablesDueSoonCount = ref(0)
-const supplierPayablesOverdueAmount = ref(0)
-const supplierPayablesDueSoonAmount = ref(0)
+const { payableSummary } = useAppAlerts()
 const canViewSupplierPayables = computed(() => {
   const roles = (userProfile.value?.roles || []).map(r => r.name)
   return roles.includes('ADMINISTRADOR') || roles.includes('GERENTE')
 })
+const supplierPayablesOverdueCount = computed(() => payableSummary.value.overdueCount)
+const supplierPayablesDueSoonCount = computed(() => payableSummary.value.dueSoonCount)
+const supplierPayablesOverdueAmount = computed(() => payableSummary.value.overdueAmount)
+const supplierPayablesDueSoonAmount = computed(() => payableSummary.value.dueSoonAmount)
 const supplierPayablesAlertTitle = computed(() => {
   if (supplierPayablesOverdueCount.value > 0) {
     return `${supplierPayablesOverdueCount.value} CxP de proveedores vencidas`
@@ -393,46 +393,12 @@ async function loadKPIs() {
   kpiLoading.value = false
 }
 
-async function loadSupplierPayablesAlerts() {
-  if (!tenantId.value || !canViewSupplierPayables.value) return
-
-  const result = await alertsService.getAlertsByType(tenantId.value, 'PAYABLE')
-
-  if (!result.success) return
-
-  const rows = result.data || []
-  const overdue = rows.filter(r => r.alert_level === 'OVERDUE')
-  const dueSoon = rows.filter(r => r.alert_level === 'DUE_SOON')
-
-  supplierPayablesOverdueCount.value = overdue.length
-  supplierPayablesDueSoonCount.value = dueSoon.length
-  supplierPayablesOverdueAmount.value = overdue.reduce((acc, r) => acc + Number(r?.data?.balance || 0), 0)
-  supplierPayablesDueSoonAmount.value = dueSoon.reduce((acc, r) => acc + Number(r?.data?.balance || 0), 0)
-}
-
 onMounted(async () => {
   await loadPOSContext()
   await loadKPIs()
-  await loadSupplierPayablesAlerts()
   if (tenantId.value) {
     const r = await cashService.getExpiredSessions(tenantId.value, cashSessionMaxHours.value)
     if (r.success) expiredSessions.value = r.data
-  }
-
-  if (tenantId.value && canViewSupplierPayables.value) {
-    supplierPayablesAlertsChannel = alertsService.subscribeToAlerts(tenantId.value, (payload) => {
-      const alertType = payload?.new?.alert_type || payload?.old?.alert_type
-      if (alertType === 'PAYABLE') {
-        loadSupplierPayablesAlerts()
-      }
-    })
-  }
-})
-
-onBeforeUnmount(() => {
-  if (supplierPayablesAlertsChannel) {
-    alertsService.unsubscribe(supplierPayablesAlertsChannel)
-    supplierPayablesAlertsChannel = null
   }
 })
 

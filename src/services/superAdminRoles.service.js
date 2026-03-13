@@ -9,6 +9,7 @@
  * - Gestionar role_menu_templates (plantillas estándar por nombre de rol)
  */
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
 
 class SuperAdminRolesService {
   // ============================================================
@@ -365,6 +366,7 @@ class SuperAdminRolesService {
         if (insError) throw insError
       }
 
+      queryCache.invalidateByTags(['menus'])
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

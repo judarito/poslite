@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const PAYMENT_METHODS_CACHE_TTL_MS = 10 * 60 * 1000
 
 class PaymentMethodsService {
   constructor() {
@@ -8,40 +11,59 @@ class PaymentMethodsService {
   // Obtener métodos de pago con paginación
   async getPaymentMethods(tenantId, page = 1, pageSize = 10, search = '', options = {}) {
     try {
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
-
-      let query = supabaseService.client
-        .from(this.table)
-        .select('*', { count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .order('sort_order', { ascending: true })
-        .order('name', { ascending: true })
-        .range(from, to)
-
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      const normalizedSearch = String(search || '').trim().toLowerCase()
+      const cacheParams = {
+        page,
+        pageSize,
+        search: normalizedSearch,
+        activeOnly: Boolean(options.activeOnly),
+        excludeCodes: Array.isArray(options.excludeCodes) ? [...options.excludeCodes].sort() : [],
       }
 
-      // Filtrar métodos activos si se especifica
-      if (options.activeOnly) {
-        query = query.eq('is_active', true)
-      }
+      return await queryCache.getOrLoad(
+        `payment-methods:list:${JSON.stringify(cacheParams)}`,
+        async () => {
+          const from = (page - 1) * pageSize
+          const to = from + pageSize - 1
 
-      // Excluir códigos específicos (ej: LAYAWAY para dropdowns)
-      if (options.excludeCodes && Array.isArray(options.excludeCodes) && options.excludeCodes.length > 0) {
-        query = query.not('code', 'in', `(${options.excludeCodes.join(',')})`)
-      }
+          let query = supabaseService.client
+            .from(this.table)
+            .select('*', { count: 'exact' })
+            .eq('tenant_id', tenantId)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true })
+            .range(from, to)
 
-      const { data, error, count } = await query
+          if (normalizedSearch) {
+            query = query.or(`name.ilike.%${normalizedSearch}%,code.ilike.%${normalizedSearch}%`)
+          }
 
-      if (error) throw error
+          if (options.activeOnly) {
+            query = query.eq('is_active', true)
+          }
 
-      return {
-        success: true,
-        data: data || [],
-        total: count || 0
-      }
+          if (options.excludeCodes && Array.isArray(options.excludeCodes) && options.excludeCodes.length > 0) {
+            query = query.not('code', 'in', `(${options.excludeCodes.join(',')})`)
+          }
+
+          const { data, error, count } = await query
+
+          if (error) throw error
+
+          return {
+            success: true,
+            data: data || [],
+            total: count || 0
+          }
+        },
+        {
+          tenantId,
+          ttlMs: PAYMENT_METHODS_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['payment-methods'],
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       console.error('Error fetching payment methods:', error)
       return {
@@ -76,6 +98,7 @@ class PaymentMethodsService {
       })
 
       if (error) throw error
+      queryCache.invalidateByTags(['payment-methods'], { tenantId })
 
       return { success: true, data: data[0] }
     } catch (error) {
@@ -107,6 +130,7 @@ class PaymentMethodsService {
       )
 
       if (error) throw error
+      queryCache.invalidateByTags(['payment-methods'], { tenantId })
 
       return { success: true, data: data[0] }
     } catch (error) {
@@ -124,6 +148,7 @@ class PaymentMethodsService {
       })
 
       if (error) throw error
+      queryCache.invalidateByTags(['payment-methods'], { tenantId })
 
       return { success: true }
     } catch (error) {

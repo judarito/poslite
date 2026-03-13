@@ -1,4 +1,7 @@
 import supabaseService from './supabase.service'
+import queryCache from '@/utils/queryCache'
+
+const CATEGORIES_CACHE_TTL_MS = 10 * 60 * 1000
 
 class CategoriesService {
   constructor() {
@@ -7,24 +10,37 @@ class CategoriesService {
 
   async getCategories(tenantId, page = 1, pageSize = 10, search = '') {
     try {
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
+      const normalizedSearch = String(search || '').trim().toLowerCase()
+      return await queryCache.getOrLoad(
+        `categories:list:${JSON.stringify({ page, pageSize, search: normalizedSearch })}`,
+        async () => {
+          const from = (page - 1) * pageSize
+          const to = from + pageSize - 1
 
-      let query = supabaseService.client
-        .from(this.table)
-        .select('*, parent:parent_category_id(category_id, name)', { count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .order('name', { ascending: true })
-        .range(from, to)
+          let query = supabaseService.client
+            .from(this.table)
+            .select('*, parent:parent_category_id(category_id, name)', { count: 'exact' })
+            .eq('tenant_id', tenantId)
+            .order('name', { ascending: true })
+            .range(from, to)
 
-      if (search) {
-        query = query.ilike('name', `%${search}%`)
-      }
+          if (normalizedSearch) {
+            query = query.ilike('name', `%${normalizedSearch}%`)
+          }
 
-      const { data, error, count } = await query
-      if (error) throw error
+          const { data, error, count } = await query
+          if (error) throw error
 
-      return { success: true, data: data || [], total: count || 0 }
+          return { success: true, data: data || [], total: count || 0 }
+        },
+        {
+          tenantId,
+          ttlMs: CATEGORIES_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['categories'],
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       console.error('Error fetching categories:', error)
       return { success: false, error: error.message, data: [], total: 0 }
@@ -33,14 +49,26 @@ class CategoriesService {
 
   async getAllCategories(tenantId) {
     try {
-      const { data, error } = await supabaseService.client
-        .from(this.table)
-        .select('category_id, name, parent_category_id')
-        .eq('tenant_id', tenantId)
-        .order('name')
+      return await queryCache.getOrLoad(
+        'categories:all',
+        async () => {
+          const { data, error } = await supabaseService.client
+            .from(this.table)
+            .select('category_id, name, parent_category_id')
+            .eq('tenant_id', tenantId)
+            .order('name')
 
-      if (error) throw error
-      return { success: true, data: data || [] }
+          if (error) throw error
+          return { success: true, data: data || [] }
+        },
+        {
+          tenantId,
+          ttlMs: CATEGORIES_CACHE_TTL_MS,
+          storage: 'session',
+          tags: ['categories'],
+          shouldCache: (result) => result?.success === true,
+        }
+      )
     } catch (error) {
       return { success: false, data: [], error: error.message }
     }
@@ -80,6 +108,8 @@ class CategoriesService {
       throw insertError
     }
 
+    queryCache.invalidateByTags(['categories'], { tenantId })
+
     return created[0]
   }
 
@@ -91,6 +121,7 @@ class CategoriesService {
         parent_category_id: category.parent_category_id || null
       })
       if (error) throw error
+      queryCache.invalidateByTags(['categories'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -104,6 +135,7 @@ class CategoriesService {
         parent_category_id: updates.parent_category_id || null
       }, { tenant_id: tenantId, category_id: categoryId })
       if (error) throw error
+      queryCache.invalidateByTags(['categories'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
       return { success: false, error: error.message }
@@ -116,6 +148,7 @@ class CategoriesService {
         tenant_id: tenantId, category_id: categoryId
       })
       if (error) throw error
+      queryCache.invalidateByTags(['categories'], { tenantId })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

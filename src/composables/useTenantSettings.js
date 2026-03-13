@@ -3,6 +3,7 @@ import { useTenant } from './useTenant'
 import tenantSettingsService from '@/services/tenantSettings.service'
 
 const settings = ref(null)
+const loadedTenantId = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
@@ -11,20 +12,28 @@ export function useTenantSettings() {
 
   // Cargar configuraciones
   const loadSettings = async (force = false) => {
-    if (settings.value && !force) return settings.value
-
     if (!tenantId.value) {
+      settings.value = null
+      loadedTenantId.value = null
       error.value = 'No hay tenant activo'
       return null
     }
+
+    if (loadedTenantId.value !== tenantId.value) {
+      settings.value = null
+    }
+
+    if (settings.value && loadedTenantId.value === tenantId.value && !force) return settings.value
+
 
     loading.value = true
     error.value = null
 
     try {
-      const result = await tenantSettingsService.getSettings(tenantId.value)
+      const result = await tenantSettingsService.getSettings(tenantId.value, { forceRefresh: force })
       if (result.success) {
         settings.value = result.data || {}
+        loadedTenantId.value = tenantId.value
         return settings.value
       } else {
         error.value = result.error
