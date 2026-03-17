@@ -39,7 +39,11 @@ export function useTheme() {
     const normalized = normalizeTheme(theme) || 'light'
     const effectiveTheme = normalized === 'auto' ? getSystemTheme() : normalized
     isDark.value = effectiveTheme === 'dark'
-    vuetifyTheme.global.name.value = effectiveTheme
+    if (typeof vuetifyTheme.change === 'function') {
+      vuetifyTheme.change(effectiveTheme)
+    } else {
+      vuetifyTheme.global.name.value = effectiveTheme
+    }
     return normalized
   }
 

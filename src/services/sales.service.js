@@ -44,7 +44,7 @@ class SalesService {
           p_third_party: saleData.third_party_id || null
         }
 
-        if (includeSoldAt) {
+        if (includeSoldAt && normalizedSoldAt) {
           payload.p_sold_at = normalizedSoldAt
         }
 
@@ -84,7 +84,7 @@ class SalesService {
         .from(this.table)
         .select(`
           sale_id, sale_number, location_id, customer_id, sold_by, third_party_id,
-          subtotal, discount_total, tax_total, total, status, sold_at, created_at,
+          subtotal, discount_total, tax_total, total, status, sold_at,
           location:location_id(name),
           customer:customer_id(full_name, document),
           sold_by_user:sold_by(full_name),

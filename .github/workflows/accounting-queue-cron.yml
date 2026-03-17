@@ -1,7 +1,5 @@
-name: Accounting Queue Cron
+name: Accounting Queue Manual Trigger
 on:
-  schedule:
-    - cron: "*/1 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -9,10 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger accounting queue worker
+        env:
+          ACCOUNTING_QUEUE_WORKER_URL: ${{ secrets.ACCOUNTING_QUEUE_WORKER_URL }}
+          ACCOUNTING_QUEUE_CRON_KEY: ${{ secrets.ACCOUNTING_QUEUE_CRON_KEY }}
         run: |
-          response="$(curl --fail-with-body -sS -X POST "${{ secrets.ACCOUNTING_QUEUE_WORKER_URL }}" \
+          response="$(curl --fail-with-body -sS -X POST "${ACCOUNTING_QUEUE_WORKER_URL}" \
             -H "Content-Type: application/json" \
-            -H "x-cron-key: ${{ secrets.ACCOUNTING_QUEUE_CRON_KEY }}" \
+            -H "x-cron-key: ${ACCOUNTING_QUEUE_CRON_KEY}" \
             -d '{"limit":100}')"
 
           echo "$response"

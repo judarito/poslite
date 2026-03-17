@@ -463,7 +463,7 @@ class ElectronicInvoicingService {
         document: {
           saleId:        saleId,
           saleNumber:    sale.sale_number,
-          issuedAt:      sale.sold_at,
+          issuedAt:      sale.sold_at || new Date().toISOString(),
           currency:      tenant.currency_code || 'COP',
           subtotal:      sale.subtotal,
           discountTotal: sale.discount_total,

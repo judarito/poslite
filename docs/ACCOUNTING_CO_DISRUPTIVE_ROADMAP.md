@@ -86,7 +86,9 @@ Se agregó worker para procesar eventos `PENDING/FAILED` sin intervención manua
 
 - Edge Function: `supabase/functions/accounting-queue-worker/index.ts`
 - RPC usada: `fn_accounting_process_queue(tenant_id, limit, event_id)`
-- Cron de ejemplo: `.github/workflows/accounting-queue-cron.yml` (cada minuto)
+- Cron principal: `migrations/ADD_SUPABASE_CRON_PIPELINES.sql`
+- Job Supabase: `poslite_process_accounting_queue_every_minute`
+- Workflow GitHub: `.github/workflows/accounting-queue-cron.yml` queda solo como respaldo manual
 
 ### Variables requeridas
 
@@ -95,13 +97,14 @@ En Supabase Edge Function:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ACCOUNTING_QUEUE_CRON_KEY` (recomendado)
 
-En GitHub Secrets:
-- `ACCOUNTING_QUEUE_WORKER_URL` (URL invoke de la función)
-- `ACCOUNTING_QUEUE_CRON_KEY` (mismo valor del secreto en Supabase)
+En Supabase / SQL:
+- `pg_cron` habilitado
+- RPC `fn_accounting_process_queue(...)`
+- Función wrapper `public.fn_accounting_process_queue_all_tenants(...)`
 
 ### Flujo
 
 1. POS/Compras encolan evento.
-2. Worker ejecuta procesamiento por tenant en modo `ASYNC`.
+2. Supabase Cron ejecuta procesamiento por tenant en modo `ASYNC`.
 3. Eventos pasan a `PROCESSED`, `FAILED` o `SKIPPED`.
 4. La pestaña `Cola POS` muestra badge con pendientes para guía visual.

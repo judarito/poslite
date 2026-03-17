@@ -96,3 +96,41 @@ curl -X POST "https://[PROJECT_REF].supabase.co/functions/v1/accounting-queue-wo
 Migración requerida:
 
 - `migrations/ADD_ACCOUNTING_QUEUE_PROCESSOR.sql`
+- `migrations/ADD_SUPABASE_CRON_PIPELINES.sql`
+
+## Supabase Cron Jobs
+
+Jobs creados por SQL:
+
+- `poslite_process_accounting_queue_every_minute`
+- `poslite_push_dispatcher_every_minute`
+
+Comportamiento:
+
+- La cola contable corre en `pg_cron` directamente sobre Postgres.
+- El push dispatcher se dispara con `pg_cron + pg_net`.
+- GitHub Actions queda solo como respaldo manual, no como scheduler principal.
+
+Secrets requeridos en Vault para push dispatcher:
+
+- `PUSH_DISPATCHER_URL`
+- `PUSH_DISPATCHER_SECRET`
+
+Verificación sugerida:
+
+```sql
+select jobid, jobname, schedule, active
+from cron.job
+where jobname in (
+  'poslite_process_accounting_queue_every_minute',
+  'poslite_push_dispatcher_every_minute',
+  'poslite_refresh_all_alerts_hourly'
+);
+```
+
+Prueba manual desde SQL:
+
+```sql
+select public.fn_accounting_process_queue_all_tenants(100);
+select public.fn_push_dispatcher_cron(100);
+```

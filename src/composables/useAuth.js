@@ -14,6 +14,7 @@ const userProfile = ref(null) // Datos del usuario desde la tabla users
 // Obtener datos del usuario desde la tabla users
 async function fetchUserProfile(authUserId) {
   try {
+    const { saveTenant, clearTenant } = useTenant()
     const { data, error } = await supabaseService.select(
       'users',
       `
@@ -76,6 +77,16 @@ async function fetchUserProfile(authUserId) {
       }
 
       userProfile.value = profile
+
+      if (profile.tenants?.tenant_id) {
+        saveTenant({
+          tenant_id: profile.tenants.tenant_id,
+          tenant_name: profile.tenants.name,
+          currency_code: profile.tenants.currency_code
+        })
+      } else {
+        clearTenant()
+      }
       
       return {
         success: true,
@@ -84,6 +95,7 @@ async function fetchUserProfile(authUserId) {
       }
     }
 
+    clearTenant()
     return { success: false, error: 'User profile not found' }
   } catch (error) {
     console.error('Error fetching user profile:', error)
@@ -133,6 +145,10 @@ function handleSessionExpired() {
   const { clearTenant } = useTenant()
   clearTenant()
 
+  import('@/utils/sessionManager')
+    .then(({ stopSessionMonitoring }) => stopSessionMonitoring())
+    .catch(() => {})
+
   // Redirigir al login si no está ya allí
   if (router.currentRoute.value.path !== '/login') {
     router.push('/login')
@@ -150,19 +166,44 @@ export const useAuth = () => {
   // Inicializar sesión
   const initAuth = async () => {
     try {
-      const { data } = await supabase.auth.getSession()
-      session.value = data.session
-      user.value = data.session?.user ?? null
+      const { clearTenant } = useTenant()
+      const validSession = await supabaseService.getValidSession({
+        redirectOnFail: false,
+        minValiditySeconds: 60
+      })
+      session.value = validSession
+      user.value = validSession?.user ?? null
 
       // Si hay usuario, cargar su perfil
       if (user.value) {
         await fetchUserProfile(user.value.id)
+      } else {
+        userProfile.value = null
+        queryCache.clearAll()
+        clearTenant()
       }
 
       // El listener ya está configurado via setupAuthListener(),
       // no duplicar aquí para evitar race conditions
+      return {
+        success: true,
+        session: validSession,
+        isAuthenticated: !!validSession
+      }
     } catch (error) {
       console.error('Error al inicializar autenticación:', error)
+      user.value = null
+      userProfile.value = null
+      session.value = null
+      queryCache.clearAll()
+      const { clearTenant } = useTenant()
+      clearTenant()
+      return {
+        success: false,
+        session: null,
+        isAuthenticated: false,
+        error: error.message
+      }
     }
   }
 
@@ -182,6 +223,9 @@ export const useAuth = () => {
 
       // Obtener perfil del usuario y datos del tenant
       const profileResult = await fetchUserProfile(data.user.id)
+
+      const { startSessionMonitoring } = await import('@/utils/sessionManager')
+      startSessionMonitoring()
 
       return { 
         success: true, 

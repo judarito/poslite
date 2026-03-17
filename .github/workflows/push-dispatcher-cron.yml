@@ -1,7 +1,5 @@
-name: Push Dispatcher Cron
+name: Push Dispatcher Manual Trigger
 on:
-  schedule:
-    - cron: "*/1 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -9,8 +7,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call push dispatcher
+        env:
+          PUSH_DISPATCHER_URL: ${{ secrets.PUSH_DISPATCHER_URL }}
+          PUSH_DISPATCHER_SECRET: ${{ secrets.PUSH_DISPATCHER_SECRET }}
         run: |
-          curl -sS -X POST "${{ secrets.PUSH_DISPATCHER_URL }}" \
-            -H "Authorization: Bearer ${{ secrets.PUSH_DISPATCHER_SECRET }}" \
+          curl -sS -X POST "${PUSH_DISPATCHER_URL}" \
+            -H "Authorization: Bearer ${PUSH_DISPATCHER_SECRET}" \
             -H "Content-Type: application/json" \
             -d '{"limit":100}'

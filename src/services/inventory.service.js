@@ -6,6 +6,85 @@ class InventoryService {
     this.stockTable = 'stock_balances'
   }
 
+  _getComputedAlertLevel(stockRow) {
+    const onHand = Number(stockRow?.on_hand || 0)
+    const reserved = Number(stockRow?.reserved || 0)
+    const minStock = Number(stockRow?.variant?.min_stock || 0)
+    const available = onHand - reserved
+
+    if (onHand <= 0) return 'OUT_OF_STOCK'
+    if (available <= 0) return 'NO_AVAILABLE'
+    if (minStock > 0 && onHand <= minStock) return 'LOW_STOCK'
+    if (minStock > 0 && available <= minStock) return 'LOW_AVAILABLE'
+    return 'OK'
+  }
+
+  _isMissingStockAlertsView(error) {
+    const message = String(error?.message || '').toLowerCase()
+    return (
+      message.includes('vw_stock_alerts') &&
+      (
+        message.includes('schema cache') ||
+        message.includes('could not find the table') ||
+        message.includes('relation') ||
+        message.includes('does not exist')
+      )
+    )
+  }
+
+  async _getStockAlertsFallback(tenantId, filters = {}) {
+    let query = supabaseService.client
+      .from(this.stockTable)
+      .select(`
+        tenant_id,
+        location_id,
+        on_hand,
+        reserved,
+        updated_at,
+        location:location_id(name),
+        variant:variant_id(
+          variant_id,
+          sku,
+          variant_name,
+          cost,
+          price,
+          min_stock,
+          product:product_id(product_id, name)
+        )
+      `)
+      .eq('tenant_id', tenantId)
+      .order('updated_at', { ascending: false })
+
+    if (filters.location_id) query = query.eq('location_id', filters.location_id)
+
+    const { data, error } = await query
+    if (error) throw error
+
+    const rows = (data || [])
+      .map((item) => {
+        const available = Number(item.on_hand || 0) - Number(item.reserved || 0)
+        return {
+          ...item,
+          variant_id: item.variant?.variant_id || null,
+          sku: item.variant?.sku || null,
+          product_id: item.variant?.product?.product_id || null,
+          product_name: item.variant?.product?.name || null,
+          variant_name: item.variant?.variant_name || null,
+          location_name: item.location?.name || null,
+          min_stock: Number(item.variant?.min_stock || 0),
+          available,
+          alert_level: this._getComputedAlertLevel(item)
+        }
+      })
+      .filter((item) => item.alert_level !== 'OK')
+
+    const filtered = filters.alert_level
+      ? rows.filter((item) => item.alert_level === filters.alert_level)
+      : rows
+
+    return { success: true, data: filtered }
+  }
+
   // Obtener stock actual por sede (usa tabla materializada stock_balances)
   async getStockBalances(tenantId, page = 1, pageSize = 20, filters = {}) {
     try {
@@ -334,6 +413,14 @@ class InventoryService {
       if (error) throw error
       return { success: true, data: data || [] }
     } catch (error) {
+      if (this._isMissingStockAlertsView(error)) {
+        console.warn('vw_stock_alerts no existe en Supabase; usando fallback desde stock_balances')
+        try {
+          return await this._getStockAlertsFallback(tenantId, filters)
+        } catch (fallbackError) {
+          return { success: false, error: fallbackError.message, data: [] }
+        }
+      }
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -371,4 +458,3 @@ class InventoryService {
 }
 
 export default new InventoryService()
-

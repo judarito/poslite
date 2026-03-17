@@ -2,6 +2,12 @@ import supabaseService from './supabase.service'
 import queryCache from '@/utils/queryCache'
 
 const DASHBOARD_SUMMARY_TTL_MS = 60 * 1000
+const getDateKey = (value) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().substring(0, 10)
+}
 
 class ReportsService {
   constructor() {
@@ -85,7 +91,8 @@ class ReportsService {
 
       const byDay = {}
       ;(data || []).forEach(s => {
-        const day = s.sold_at.substring(0, 10)
+        const day = getDateKey(s.sold_at)
+        if (!day) return
         if (!byDay[day]) byDay[day] = { date: day, count: 0, gross_total: 0, returns_total: 0, net_total: 0 }
         byDay[day].count++
         const total = parseFloat(s.total) || 0
@@ -1014,7 +1021,8 @@ class ReportsService {
       const byDay = {}
 
       ;(r1.data || []).forEach(s => {
-        const d = s.sold_at.substring(0, 10)
+        const d = getDateKey(s.sold_at)
+        if (!d) return
         if (!byDay[d]) byDay[d] = { date: d, ingresos_ventas: 0, gastos: 0, otros_ingresos: 0, neto: 0 }
         byDay[d].ingresos_ventas += parseFloat(s.total) || 0
       })
@@ -1161,7 +1169,8 @@ class ReportsService {
         dailyMap[key] = 0
       }
       ;(rLast30.data || []).forEach(s => {
-        const key = s.sold_at.substring(0, 10)
+        const key = getDateKey(s.sold_at)
+        if (!key) return
         if (key in dailyMap) dailyMap[key] += parseFloat(s.total) || 0
       })
       const dailySeries = Object.entries(dailyMap).map(([date, total]) => ({ date, total }))

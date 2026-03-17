@@ -16,12 +16,14 @@ app.config.globalProperties.$supabase = supabase
 
 // Inicializar autenticación antes de montar la app
 const { initAuth } = useAuth()
-initAuth().then(() => {
+initAuth().then((result) => {
   app.use(router)
   app.use(vuetify)
   app.use(createI18nPlugin())
   app.mount('#app')
 
   // Iniciar monitoreo de sesión después de montar la app
-  startSessionMonitoring()
+  if (result?.isAuthenticated) {
+    startSessionMonitoring()
+  }
 })
