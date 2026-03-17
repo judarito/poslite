@@ -83,7 +83,7 @@
         app
       >
         <v-list-item
-          :title="userProfile?.full_name || user?.email || t('app.user')"
+          :title="userProfile?.full_name || user?.email || superAdminInfo?.email || t('app.user')"
           :subtitle="(canManageTenants && !userProfile) ? t('app.superAdmin') : (userProfile?.tenants?.name || t('app.noCompany'))"
         >
           <template #prepend>
@@ -206,7 +206,7 @@ const { tenantId, clearTenant } = useTenant()
 const { locale: tenantLocale, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 const { isDark, setTheme, ensureThemeForUser, syncThemeFromTenant } = useTheme()
-const { canManageTenants } = useSuperAdmin()
+const { canManageTenants, superAdminInfo } = useSuperAdmin()
 const { mobile: isMobile } = useDisplay()
 const { t, setLocale, locale } = useI18n()
 
@@ -287,7 +287,7 @@ const superAdminMenuItems = computed(() => [
 // Filtrar menú según permisos del usuario
 const menuSections = computed(() => {
   // Guarda: esperar a que se inicialicen los datos
-  if (!user.value) {
+  if (!user.value && !canManageTenants.value) {
     return []
   }
 
@@ -339,7 +339,7 @@ const handleResize = () => {
 const handleProfileClick = () => {
   try {
     // Guarda: asegurar que hay un usuario autenticado
-    if (!user.value?.id) {
+    if (!user.value?.id && !canManageTenants.value) {
       console.warn('No hay usuario autenticado')
       return
     }

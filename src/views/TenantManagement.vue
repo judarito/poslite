@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- Estado de carga inicial -->
-    <div v-if="!isInitialized" class="text-center pa-4">
+    <div v-if="!isInitialized || isResolving" class="text-center pa-4">
       <v-progress-circular indeterminate color="primary"></v-progress-circular>
       <div class="mt-2">Cargando...</div>
     </div>
@@ -358,7 +358,7 @@ import { useI18n } from '@/i18n'
 const { t } = useI18n()
 
 const { tenantId, currentTenant } = useTenant()
-const { canManageTenants, superAdminInfo } = useSuperAdmin()
+const { canManageTenants, superAdminInfo, isResolving } = useSuperAdmin()
 const { showNotification } = useNotification()
 
 // Agregar estabilidad a los cambios reactivos
