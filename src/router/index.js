@@ -503,6 +503,14 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
+    if (to.path === '/' && isAuthenticated) {
+      const isTenantSuperAdmin = await canManageTenants()
+      if (isTenantSuperAdmin) {
+        next('/tenant-management')
+        return
+      }
+    }
+
     // Validación de Super Admin para gestión de tenants
     if (to.meta.requiresSuperAdmin && isAuthenticated) {
       const isSuperAdmin = await canManageTenants()

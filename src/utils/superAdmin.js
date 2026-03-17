@@ -4,9 +4,14 @@
  */
 import { supabase } from '@/plugins/supabase'
 
+const normalizeEmail = (value) => String(value || '')
+  .trim()
+  .replace(/^['"]|['"]$/g, '')
+  .toLowerCase()
+
 const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || '')
   .split(',')
-  .map(e => e.trim().toLowerCase())
+  .map(normalizeEmail)
   .filter(Boolean)
 
 /**
@@ -26,11 +31,15 @@ export const isSuperAdmin = async () => {
       .from('users')
       .select('user_id')
       .eq('auth_user_id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (profileError) {
+      console.error('Error checking super admin profile:', profileError)
+      return false
+    }
 
     // Si no encuentra perfil = Super Admin
-    // Si profileError.code === 'PGRST116' significa no hay registros
-    if (profileError && profileError.code === 'PGRST116') {
+    if (!profile) {
       return true
     }
 
@@ -63,7 +72,7 @@ export const isSuperAdminByEmail = async () => {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) return false
 
-    return allowed.includes((user.email || '').toLowerCase())
+    return allowed.includes(normalizeEmail(user.email))
   } catch (error) {
     console.error('Error checking super admin email:', error)
     return false

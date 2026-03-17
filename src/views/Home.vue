@@ -1,5 +1,57 @@
 <template>
   <div class="home-root ofir-home" :class="isDark ? 'ofir-home--dark' : 'ofir-home--light'">
+    <template v-if="isSuperAdminDashboard">
+      <v-row class="ofir-home__hero mb-4" align="center">
+        <v-col cols="12" md="8">
+          <div class="ofir-home__eyebrow">OfirOne Super Admin</div>
+          <h1 class="ofir-home__title">Control de tenants</h1>
+          <p class="ofir-home__subtitle">
+            Administra empresas, usuarios administradores y accesos globales del sistema.
+          </p>
+        </v-col>
+        <v-col cols="12" md="4" class="d-flex justify-md-end">
+          <v-btn
+            class="ofir-home__cta"
+            color="primary"
+            prepend-icon="mdi-office-building-cog"
+            size="large"
+            to="/tenant-management"
+          >
+            Ir a tenants
+          </v-btn>
+        </v-col>
+      </v-row>
+
+      <v-row>
+        <v-col cols="12" md="7">
+          <v-card class="ofir-panel">
+            <v-card-title class="text-body-1 font-weight-bold">
+              Acceso especial
+            </v-card-title>
+            <v-card-text class="text-body-2">
+              Este usuario no pertenece a un tenant operativo. Por eso no se cargan widgets de ventas, inventario ni caja en el inicio.
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="5">
+          <v-card class="ofir-panel">
+            <v-card-title class="text-body-1 font-weight-bold">
+              Acciones rápidas
+            </v-card-title>
+            <v-card-text class="d-flex flex-column" style="gap: 12px;">
+              <v-btn color="primary" variant="tonal" to="/tenant-management" prepend-icon="mdi-office-building-plus">
+                Gestionar tenants
+              </v-btn>
+              <v-btn color="secondary" variant="tonal" to="/superadmin/roles-menus" prepend-icon="mdi-shield-crown">
+                Roles y menús
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </template>
+
+    <template v-else>
     <v-row class="ofir-home__hero mb-3" align="center">
       <v-col cols="12" md="8">
         <div class="ofir-home__eyebrow">OfirOne Dashboard</div>
@@ -256,6 +308,7 @@
         </v-card>
       </v-col>
     </v-row>
+    </template>
   </div>
 </template>
 
@@ -269,6 +322,7 @@ import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAppAlerts } from '@/composables/useAppAlerts'
+import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useI18n } from '@/i18n'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
@@ -284,6 +338,8 @@ const { userProfile } = useAuth()
 const { tenantId } = useTenant()
 const { isDark } = useTheme()
 const { cashSessionMaxHours } = useTenantSettings()
+const { canManageTenants } = useSuperAdmin()
+const isSuperAdminDashboard = computed(() => canManageTenants.value && !userProfile.value)
 
 // ─── KPIs & charts ────────────────────────────────────────────────────────
 const kpiLoading     = ref(true)
@@ -400,6 +456,8 @@ async function loadKPIs() {
 }
 
 onMounted(async () => {
+  if (isSuperAdminDashboard.value) return
+
   await loadPOSContext()
   await loadKPIs()
   if (tenantId.value) {

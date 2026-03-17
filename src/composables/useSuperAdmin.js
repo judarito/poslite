@@ -2,13 +2,18 @@
  * Composable para gestión de Super Admin
  * Super Admin = Usuario en auth.users pero NO en tabla users (sin tenant)
  */
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useTenant } from './useTenant'
 
+const normalizeEmail = (value) => String(value || '')
+  .trim()
+  .replace(/^['"]|['"]$/g, '')
+  .toLowerCase()
+
 const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || '')
   .split(',')
-  .map(e => e.trim().toLowerCase())
+  .map(normalizeEmail)
   .filter(Boolean)
 
 export const useSuperAdmin = () => {
@@ -23,12 +28,11 @@ export const useSuperAdmin = () => {
     if (!user.value?.id) {
       return false
     }
-    
+
     return !!(
       user.value && // Autenticado en Auth
       user.value.id && // Tiene ID de auth
-      !userProfile.value && // NO tiene perfil en tabla users
-      !tenantId.value // NO tiene tenant
+      !userProfile.value // NO tiene perfil en tabla users
     )
   })
 
@@ -43,7 +47,7 @@ export const useSuperAdmin = () => {
     const allowed = SUPER_ADMIN_EMAILS.length > 0 ? SUPER_ADMIN_EMAILS : allowedSuperAdminEmails
     if (allowed.length === 0) return false
     if (!user.value?.email) return false // Guarda: si no hay email, no es super admin
-    return allowed.includes(user.value.email.toLowerCase())
+    return allowed.includes(normalizeEmail(user.value.email))
   })
 
   const canManageTenants = computed(() => {

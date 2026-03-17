@@ -234,12 +234,14 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useTenant } from '@/composables/useTenant'
 import { useTheme } from '@/composables/useTheme'
+import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import { useI18n } from '@/i18n'
 
 const router = useRouter()
 const { signIn, resetPassword, updatePassword, loading } = useAuth()
 const { saveTenant } = useTenant()
 const { syncThemeFromTenant, ensureThemeForUser, isDark } = useTheme()
+const { canManageTenants } = useSuperAdmin()
 const { t } = useI18n()
 
 const showPassword = ref(false)
@@ -288,6 +290,13 @@ const handleLogin = async () => {
       })
 
       await syncThemeFromTenant(result.tenant.tenant_id, result.data?.user?.id || null)
+    } else {
+      await ensureThemeForUser({ authUserId: result.data?.user?.id || null })
+    }
+
+    if (canManageTenants.value && !result.profile) {
+      router.push('/tenant-management')
+      return
     }
 
     router.push('/')
