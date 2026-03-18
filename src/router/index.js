@@ -55,9 +55,10 @@ const AccountingTaxCenter = () => import('@/views/AccountingTaxCenter.vue')
 const AccountingReconciliation = () => import('@/views/AccountingReconciliation.vue')
 const AccountingAIControl = () => import('@/views/AccountingAIControl.vue')
 const SetupWizard = () => import('@/components/SetupWizard.vue')
+const HelpCenter = () => import('@/views/HelpCenter.vue')
 
 function isRouteAlwaysAllowed(path) {
-  return path === '/' || path === '/about'
+  return path === '/' || path === '/about' || path === '/setup' || path === '/help'
 }
 function canAccessPathByMenu(path, allowedRoutes) {
   if (!Array.isArray(allowedRoutes) || allowedRoutes.length === 0) return true
@@ -139,6 +140,12 @@ const routes = [
     path: '/about',
     name: 'About',
     component: About,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/help',
+    name: 'HelpCenter',
+    component: HelpCenter,
     meta: { requiresAuth: true }
   },
   {

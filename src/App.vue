@@ -69,6 +69,10 @@
           </v-badge>
         </v-btn>
 
+        <v-btn class="ofir-topbar__icon-btn" icon to="/help">
+          <v-icon>mdi-lifebuoy</v-icon>
+        </v-btn>
+
         <v-btn class="ofir-topbar__icon-btn" icon @click="handleProfileClick">
           <v-icon>mdi-account-circle</v-icon>
         </v-btn>
@@ -359,7 +363,7 @@ const handleProfileClick = () => {
 
 const handleMenuAction = (action) => {
   if (action === 'openManual') {
-    window.open('/MANUAL_USUARIO.html', '_blank')
+    router.push('/help')
   }
 }
 

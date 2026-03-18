@@ -48,6 +48,11 @@
       </v-card-title>
     </v-card>
 
+    <ContextHelpCard
+      class="mb-3"
+      context-key="pos"
+    />
+
     <v-row no-gutters align="start" class="pos-main-row">
       <!-- Panel Izquierdo: Búsqueda de productos -->
       <v-col cols="12" md="7" class="pr-md-2">
@@ -587,6 +592,7 @@ import taxesService from '@/services/taxes.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import creditService from '@/services/credit.service'
 import ListView from '@/components/ListView.vue'
+import ContextHelpCard from '@/components/ContextHelpCard.vue'
 import { calculateDiscount } from '@/utils/discountCalculator'
 import { formatMoney } from '@/utils/formatters'
 import { applyLineTaxes } from '@/utils/taxCalculator'

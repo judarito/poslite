@@ -12,6 +12,29 @@
       </v-tab>
     </v-tabs>
 
+    <v-alert
+      v-if="productsHintConfig"
+      :type="productsHintConfig.type"
+      variant="tonal"
+      class="mb-3"
+    >
+      <div class="text-subtitle-2 font-weight-bold mb-1">{{ productsHintConfig.title }}</div>
+      <div class="text-body-2">{{ productsHintConfig.message }}</div>
+
+      <div class="d-flex flex-wrap ga-2 mt-3">
+        <v-btn
+          v-for="action in productsHintConfig.actions"
+          :key="action.label"
+          size="small"
+          :color="action.color"
+          :variant="action.variant || 'tonal'"
+          @click="action.onClick"
+        >
+          {{ action.label }}
+        </v-btn>
+      </div>
+    </v-alert>
+
     <div class="d-flex justify-end mb-3 products-toolbar">
       <v-btn
         color="success"
@@ -687,6 +710,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import ListView from '@/components/ListView.vue'
@@ -700,10 +724,13 @@ import { utils, writeFileXLSX } from 'xlsx'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const { tenantId } = useTenant()
 const { defaultPageSize, loadSettings } = useTenantSettings()
 const currentTab = ref('products')
+const guidedActionHandled = ref('')
 
 // Estado independiente para productos y componentes
 const products = ref([])
@@ -782,6 +809,117 @@ const productionTypeOptions = [
   { value: 'ON_DEMAND', title: 'Bajo Demanda (On-Demand)' },
   { value: 'TO_STOCK', title: 'Para Stock (To-Stock)' }
 ]
+const allowedTabs = ['products', 'components']
+
+const openBulkImports = () => {
+  router.push({
+    path: '/bulk-imports',
+    query: {
+      type: 'product_variants',
+      onboarding: 'inventory-import'
+    }
+  })
+}
+
+const goToInventoryOperations = () => {
+  router.push({
+    path: '/inventory',
+    query: {
+      tab: 'operations',
+      onboarding: 'inventory-stock'
+    }
+  })
+}
+
+const productsHintConfig = computed(() => {
+  const onboarding = String(route.query.onboarding || '').trim()
+
+  if (onboarding === 'sales-products') {
+    return {
+      type: 'info',
+      title: 'Catalogo listo para vender',
+      message: 'Para vender en POS necesitas productos con al menos una variante activa. Si vienes de Excel, puedes acelerar el arranque con cargue masivo.',
+      actions: [
+        {
+          label: 'Nuevo producto',
+          color: 'primary',
+          variant: 'elevated',
+          onClick: openCreateDialog
+        },
+        {
+          label: 'Cargue masivo',
+          color: 'secondary',
+          onClick: openBulkImports
+        }
+      ]
+    }
+  }
+
+  if (onboarding === 'purchases-products') {
+    return {
+      type: 'info',
+      title: 'Catalogo listo para compras',
+      message: 'Antes de comprar, verifica que el producto y su variante existan. Luego podras ingresar existencias desde Compras o desde Operaciones de inventario.',
+      actions: [
+        {
+          label: 'Nuevo producto',
+          color: 'primary',
+          variant: 'elevated',
+          onClick: openCreateDialog
+        },
+        {
+          label: 'Cargue masivo',
+          color: 'secondary',
+          onClick: openBulkImports
+        }
+      ]
+    }
+  }
+
+  if (onboarding === 'inventory-products') {
+    return {
+      type: 'warning',
+      title: 'Productos con inventario activo',
+      message: 'Crea productos inventariables y activa control de inventario para que luego puedas cargar stock real y verlo en kardex.',
+      actions: [
+        {
+          label: 'Nuevo producto',
+          color: 'primary',
+          variant: 'elevated',
+          onClick: openCreateDialog
+        },
+        {
+          label: 'Cargue masivo',
+          color: 'secondary',
+          onClick: openBulkImports
+        }
+      ]
+    }
+  }
+
+  if (onboarding === 'inventory-variants') {
+    return {
+      type: 'info',
+      title: 'Las variantes son las que operan el stock',
+      message: 'Cada producto debe tener al menos una variante para comprar, mover y vender inventario. Usa el boton de variantes en la lista o carga varias desde Excel.',
+      actions: [
+        {
+          label: 'Cargue masivo',
+          color: 'secondary',
+          variant: 'elevated',
+          onClick: openBulkImports
+        },
+        {
+          label: 'Ir a inventario',
+          color: 'primary',
+          onClick: goToInventoryOperations
+        }
+      ]
+    }
+  }
+
+  return null
+})
 
 // Lógica condicional para habilitar/deshabilitar campos según tipo de inventario
 const canTrackInventory = computed(() => {
@@ -897,7 +1035,27 @@ const loadUnits = async () => {
   }
 }
 
+const applyRouteContext = () => {
+  const requestedTab = String(route.query.tab || '').trim()
+  if (allowedTabs.includes(requestedTab)) {
+    currentTab.value = requestedTab
+  }
+}
+
+const handleGuidedAction = () => {
+  const action = String(route.query.action || '').trim()
+  if (!action || guidedActionHandled.value === action) return
+
+  if (action === 'create-product') {
+    guidedActionHandled.value = action
+    openCreateDialog()
+  }
+}
+
 const openCreateDialog = () => {
+  const onboarding = String(route.query.onboarding || '').trim()
+  const shouldTrackInventoryByDefault = ['sales-products', 'purchases-products', 'inventory-products'].includes(onboarding)
+
   isEditing.value = false
   formData.value = { 
     product_id: null, 
@@ -910,7 +1068,7 @@ const openCreateDialog = () => {
     base_price: 0,
     base_min_stock: 0,
     is_active: true, 
-    track_inventory: false, 
+    track_inventory: shouldTrackInventoryByDefault,
     requires_expiration: false,
     inventory_behavior: 'RESELL',
     production_type: null,
@@ -1269,14 +1427,35 @@ const downloadCatalogExcel = async () => {
 onMounted(async () => {
   await loadSettings()
   await loadUnits()
+  applyRouteContext()
+  handleGuidedAction()
 })
 
 // Recargar productos cuando cambie el tab
 watch(currentTab, () => {
   if (tenantId.value) {
-    loadProducts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+    if (currentTab.value === 'components') {
+      loadComponents({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+    } else {
+      loadProducts({ page: 1, pageSize: defaultPageSize.value, search: '', tenantId: tenantId.value })
+    }
   }
 })
+
+watch(
+  () => route.query.tab,
+  () => {
+    applyRouteContext()
+  }
+)
+
+watch(
+  () => route.query.action,
+  () => {
+    guidedActionHandled.value = ''
+    handleGuidedAction()
+  }
+)
 </script>
 
 <style scoped>

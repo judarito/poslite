@@ -66,6 +66,11 @@
       </v-col>
     </v-row>
 
+    <ContextHelpCard
+      class="mb-4"
+      context-key="purchases"
+    />
+
     <ListView
       title="Compras"
       icon="mdi-cart-plus"
@@ -1507,6 +1512,7 @@ import purchasesService from '@/services/purchases.service'
 import batchesService from '@/services/batches.service'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ListView from '@/components/ListView.vue'
+import ContextHelpCard from '@/components/ContextHelpCard.vue'
 import { formatMoney, formatDateTime as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
 
@@ -2910,7 +2916,6 @@ const showMsg = (msg, color = 'success') => {
   border-color: rgba(var(--v-theme-primary), 0.2) !important;
 }
 </style>
-
 
 
 

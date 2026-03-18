@@ -29,6 +29,46 @@
       </v-card-text>
     </v-card>
 
+    <ContextHelpCard
+      class="mb-4"
+      context-key="accounting"
+    />
+
+    <v-alert
+      v-if="accountingSetupHintVisible"
+      :type="accountingProcess?.state === 'READY_FOR_TEST' ? 'success' : 'info'"
+      variant="tonal"
+      class="mb-4"
+      icon="mdi-rocket-launch-outline"
+    >
+      <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+          <strong>Onboarding contable:</strong>
+          {{ accountingSetupMessage }}
+          <div v-if="accountingProcess?.blockers?.length" class="mt-2 text-body-2">
+            Bloqueantes: {{ accountingProcess.blockers.join(', ') }}
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <v-btn
+            v-if="accountingProcess?.nextStep"
+            color="primary"
+            variant="elevated"
+            :to="accountingProcess.nextStep.route || accountingProcess.route"
+          >
+            {{ accountingProcess.nextStep.actionLabel || 'Continuar onboarding' }}
+          </v-btn>
+          <v-btn
+            color="secondary"
+            variant="tonal"
+            :to="{ path: '/setup', query: { process: 'accounting' } }"
+          >
+            Ver asistente
+          </v-btn>
+        </div>
+      </div>
+    </v-alert>
+
     <v-card class="mb-4">
       <v-card-title class="d-flex align-center justify-space-between flex-wrap gap-2">
         <span class="d-flex align-center gap-2">
@@ -901,14 +941,17 @@ import { utils, writeFileXLSX } from 'xlsx'
 import { useTenant } from '@/composables/useTenant'
 import { useNotification } from '@/composables/useNotification'
 import { useAccountingViewMode } from '@/composables/useAccountingViewMode'
+import { useSetupAssistant } from '@/composables/useSetupAssistant'
 import accountingService from '@/services/accounting.service'
 import ListView from '@/components/ListView.vue'
+import ContextHelpCard from '@/components/ContextHelpCard.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { tenantId } = useTenant()
 const { show } = useNotification()
 const { viewMode, isTableView } = useAccountingViewMode()
+const { processMap, loadSetupReadiness } = useSetupAssistant()
 
 const loading = ref(false)
 const aiLoading = ref(false)
@@ -1037,6 +1080,22 @@ const modeLabel = computed(() => {
   if (mode === 'OFF') return 'OFF'
   if (mode === 'MANUAL') return 'MANUAL'
   return 'ASYNC'
+})
+const accountingProcess = computed(() => processMap.value.accounting || null)
+const accountingSetupHintVisible = computed(() => {
+  if (!accountingProcess.value) return false
+  return accountingProcess.value.state !== 'OPERATIONAL' || String(route.query.onboarding || '').trim().length > 0
+})
+const accountingSetupMessage = computed(() => {
+  if (!accountingProcess.value) {
+    return 'Estamos evaluando el estado contable del tenant.'
+  }
+
+  if (accountingProcess.value.state === 'READY_FOR_TEST') {
+    return 'La configuracion base ya esta lista. Falta validar un evento o asiento real.'
+  }
+
+  return accountingProcess.value.nextStep?.description || accountingProcess.value.onboardingDescription || 'Completa los pasos pendientes para adoptar contabilidad gradualmente.'
 })
 
 const resolveTabFromRoute = () => {
@@ -1271,6 +1330,8 @@ const ensureActiveTabData = async (tab, options = {}) => {
 const loadAll = async () => {
   loading.value = true
   try {
+    await loadSetupReadiness()
+
     if (!tenantId.value) {
       settings.value = createDefaultSettings()
       resetLoadedTabs()
@@ -1294,7 +1355,13 @@ const loadAll = async () => {
 }
 
 const goToCompanyConfig = () => {
-  router.push('/tenant-config')
+  router.push({
+    path: '/tenant-config',
+    query: {
+      tab: 'accounting',
+      onboarding: 'accounting-enable'
+    }
+  })
 }
 
 const goToRoute = (route) => {
@@ -1454,6 +1521,7 @@ const processPendingQueue = async () => {
     }
 
     await Promise.all(refreshTasks)
+    await loadSetupReadiness()
     loadedTabs.value = {
       ...loadedTabs.value,
       dashboard: loadedTabs.value.dashboard,

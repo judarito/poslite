@@ -6,6 +6,19 @@
         Configuración de Empresa
       </v-card-title>
 
+      <v-alert
+        v-if="setupHintVisible"
+        type="info"
+        variant="tonal"
+        class="mx-4 mt-4"
+        icon="mdi-rocket-launch-outline"
+      >
+        <strong>Modo guiado:</strong> estás completando la configuración inicial.
+        <div class="mt-2">
+          {{ setupHintMessage }}
+        </div>
+      </v-alert>
+
       <v-tabs v-model="tab" color="primary" class="px-4">
         <v-tab value="general">General</v-tab>
         <v-tab value="ui">Interfaz</v-tab>
@@ -735,20 +748,24 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAICache } from '@/composables/useAICache'
 import { useTheme } from '@/composables/useTheme'
+import { useSetupAssistant } from '@/composables/useSetupAssistant'
 import tenantSettingsService from '@/services/tenantSettings.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()
 const { syncThemeFromTenant } = useTheme()
+const { processMap, loadSetupReadiness } = useSetupAssistant()
 const { 
   cacheStats, 
   validCacheCount, 
@@ -914,6 +931,20 @@ const accountingModeDescription = computed(() => {
   return 'El POS envía eventos a una cola y contabilidad los procesa sin bloquear operación.'
 })
 
+const allowedTabs = ['general', 'ui', 'ai', 'accounting', 'inventory', 'sales', 'invoicing', 'notifications']
+const setupHintKey = computed(() => String(route.query.onboarding || '').trim())
+const accountingProcess = computed(() => processMap.value.accounting || null)
+const setupHintVisible = computed(() => setupHintKey.value.length > 0)
+const setupHintMessage = computed(() => {
+  if (setupHintKey.value.startsWith('accounting')) {
+    return accountingProcess.value?.nextStep?.description || 'Completa los campos contables esenciales y guarda antes de volver al asistente.'
+  }
+  if (setupHintKey.value === 'sales-company') {
+    return 'Completa datos del negocio, nombre comercial y prefijo para dejar la primera venta lista.'
+  }
+  return 'Completa los campos necesarios y guarda para que el asistente reevalúe el progreso.'
+})
+
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
 
 const loadData = async () => {
@@ -1055,6 +1086,7 @@ const saveAll = async () => {
       
       // Recargar settings del composable
       await loadSettings(true)
+      await loadSetupReadiness()
       
       // Sincronizar tema si cambió
       await syncThemeFromTenant(tenantId.value)
@@ -1083,5 +1115,22 @@ const confirmClearAllCache = () => {
   }
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await loadData()
+  await loadSetupReadiness()
+  const queryTab = String(route.query.tab || '').trim()
+  if (allowedTabs.includes(queryTab)) {
+    tab.value = queryTab
+  }
+})
+
+watch(
+  () => route.query.tab,
+  (nextTab) => {
+    const normalized = String(nextTab || '').trim()
+    if (allowedTabs.includes(normalized)) {
+      tab.value = normalized
+    }
+  }
+)
 </script>

@@ -1,276 +1,282 @@
-# Sistema de Asistente de Configuración Inicial
+# Sistema de Asistente de Configuracion Inicial
 
-## 📋 Descripción
+## Descripcion
 
-Sistema completo para guiar a nuevos tenants en la configuración inicial de su negocio, con creación automática de datos predeterminados (unidades, impuestos, métodos de pago, roles).
+El asistente de configuracion ya no se modela como una lista plana de tareas. Desde 2026-03-18 funciona como un hub de onboarding operativo orientado a procesos criticos del negocio.
 
-## ✨ Características Implementadas
+Objetivo principal:
+- llevar al usuario desde "tenant creado" hasta "primer flujo operativo exitoso"
+- priorizar resultados operativos sobre configuraciones aisladas
+- reducir la friccion para venta, compra, caja, inventario y contabilidad
 
-### 1. **Asistente de Configuración (Setup Wizard)**
+## Arquitectura actual
 
-Componente interactivo que muestra el progreso de configuración y guía al usuario.
+### 1. UI principal
 
-**Ubicación:** `src/components/SetupWizard.vue`
+- Archivo: `src/components/SetupWizard.vue`
+- Ruta: `/setup`
+- Rol funcional:
+  - presentar progreso global
+  - mostrar la ruta recomendada
+  - agrupar el onboarding por procesos
+  - listar bloqueantes, pasos esenciales y pruebas operativas
 
-**Pasos Verificados:**
-- ✅ Configuraciones Generales (moneda, prefijo facturas)
-- ✅ Ubicaciones (mínimo 1 activa)
-- ✅ Cajas Registradoras (mínimo 1 activa)
-- ✅ Categorías de Productos (mínimo 1)
-- ✅ Unidades de Medida (creadas automáticamente)
-- ✅ Impuestos (creados automáticamente)
-- ✅ Métodos de Pago (creados automáticamente)
-- ✅ Productos (mínimo 1)
-- ⭕ Usuarios Adicionales (opcional)
+### 2. Motor de readiness
 
-**Funcionalidades:**
-- Barra de progreso visual (0-100%)
-- Estado de cada paso (completado/pendiente)
-- Indicadores de pasos requeridos vs opcionales
-- Botón de navegación directa a cada módulo
-- Actualización en tiempo real del progreso
-- Botón "Ir al POS" cuando todo está completado
+- Archivo: `src/composables/useSetupAssistant.js`
+- Rol funcional:
+  - centralizar reglas de completitud
+  - consultar el estado real del tenant en Supabase
+  - devolver progreso, estado, bloqueantes y siguiente accion
+  - adjuntar metadata de onboarding por proceso para deep links y guias contextuales
 
-### 2. **Creación de Tenant con Defaults**
+### 3. Entrada rapida desde Home
 
-La función `fn_create_tenant` se actualizó para crear automáticamente todos los datos base necesarios.
+- Archivo: `src/views/Home.vue`
+- Comportamiento actual:
+  - se muestra un CTA compacto `Config inicial` al lado de `Nueva Venta`
+  - incluye badge con cantidad de configuraciones esenciales pendientes
+  - desaparece cuando el tenant ya esta operativo en lo esencial
 
-**Archivo:** `migrations/UPDATE_CREATE_TENANT_DEFAULTS.sql`
+### 4. Guiado contextual entre modulos
 
-**Cambios Principales:**
-- ❌ **Eliminado:** Parámetro `p_copy_from_tenant_id` (ya no copia de otros tenants)
-- ✅ **Agregado:** Creación automática de 12 unidades de medida
-- ✅ **Agregado:** Creación automática de 3 impuestos (IVA 19%, 5%, 0%)
-- ✅ **Agregado:** Creación automática de 5 métodos de pago
-- ✅ **Mejorado:** 4 roles predefinidos con permisos completos
+El asistente ya no solo navega a rutas. Tambien lleva contexto de onboarding:
 
-**Datos Creados Automáticamente:**
+- `TenantConfig` puede abrir tab especifico via `query.tab`
+- `Accounting` puede abrir tab especifico via `query.tab`
+- `Products` puede abrir tab especifico via `query.tab`
+- `Products` puede disparar `query.action=create-product`
+- el wizard puede enfocar un proceso via `query.process`
+- los modulos muestran avisos de `modo guiado` cuando vienen del onboarding
 
-#### Unidades de Medida (12):
-- Unidad, Kilogramo, Gramo, Libra
-- Metro, Centímetro
-- Litro, Mililitro
-- Caja, Paquete, Docena, Par
+### 4. Router
 
-#### Impuestos (3):
-- IVA 19% (por defecto)
-- IVA 5%
-- IVA 0% (Exento)
+- Archivo: `src/router/index.js`
+- Ajuste vigente:
+  - `/setup` se trata como ruta siempre permitida para evitar bloqueo por menu dinamico durante onboarding
 
-#### Métodos de Pago (5):
-- Efectivo
-- Tarjeta Débito
-- Tarjeta Crédito
-- Transferencia Bancaria
-- QR / Nequi / Daviplata
+## Procesos criticos modelados
 
-#### Roles con Permisos (4):
-1. **ADMINISTRATOR:** Acceso completo a todo
-2. **MANAGER:** Gerente (productos, inventario, ventas, compras, reportes)
-3. **CASHIER:** Cajero (solo ventas, clientes, layaway)
-4. **WAREHOUSE:** Bodeguero (inventario, compras, productos)
+El asistente trabaja hoy con 5 procesos:
 
-### 3. **Simplificación de TenantManagement.vue**
+1. `Vender`
+2. `Comprar`
+3. `Operar caja`
+4. `Controlar inventario`
+5. `Activar contabilidad`
 
-**Cambios:**
-- ❌ Eliminado switch "Copiar configuraciones de tenant existente"
-- ❌ Eliminado selector de tenant plantilla
-- ✅ Agregada alerta informativa sobre configuración automática
-- ✅ Mención al Asistente de Configuración post-creación
+Cada proceso expone:
+- `state`
+- `stateLabel`
+- `stateColor`
+- `progressPercentage`
+- `requiredStepsCount`
+- `completedRequired`
+- `missingRequired`
+- `nextStep`
+- `blockers`
 
-### 4. **Actualización del Service**
+## Estados operativos
 
-**Archivo:** `src/services/tenants.service.js`
+Estados soportados por el motor:
 
-**Cambios:**
-- Firma función: `createTenant(tenantData, adminData)` (eliminado 3er parámetro)
-- Llamada RPC actualizada: solo `p_tenant_data` y `p_admin_data`
+- `BLOCKED`
+- `IN_PROGRESS`
+- `READY_FOR_TEST`
+- `OPERATIONAL`
 
-### 5. **Integración en Router y Menú**
+Interpretacion:
 
-**Router:**
-- Nueva ruta: `/setup` → `SetupWizard.vue`
-- Meta: `requiresAuth: true` (no requiere permisos específicos)
+- `BLOCKED`: faltan requisitos esenciales
+- `IN_PROGRESS`: ya puede avanzar, pero no esta listo del todo
+- `READY_FOR_TEST`: ya no hay bloqueantes esenciales; falta validar el flujo
+- `OPERATIONAL`: el proceso ya quedo operativo
 
-**Menú App.vue:**
-- Agregado item "Asistente de Configuración" en sección "Configuración"
-- Icono: `mdi-rocket-launch`
-- Sin restricciones de permisos (visible para todos)
+## Reglas vigentes por proceso
 
-## 🚀 Flujo de Uso
+### Vender
 
-### Super Admin Crea Nuevo Tenant:
+Checks actuales:
+- datos de empresa y prefijo en `tenant_settings`
+- al menos una sede activa
+- al menos una caja activa
+- al menos un medio de pago activo
+- catalogo con productos y variantes listas para vender
+- asignacion de caja a usuario como paso recomendado
+- venta registrada como prueba operativa
 
-1. **Super Admin** accede a `/tenant-management`
-2. Completa formulario con datos del negocio y administrador
-3. Hace clic en "Crear Tenant"
-4. Sistema crea automáticamente:
-   - Tenant con configuraciones base
-   - 1 Ubicación "PRINCIPAL"
-   - 1 Caja "CAJA PRINCIPAL"
-   - 12 Unidades de medida
-   - 3 Impuestos
-   - 5 Métodos de pago
-   - 4 Roles con permisos
-   - 1 Usuario administrador
+### Comprar
 
-### Nuevo Usuario Administrador Inicia Sesión:
+Checks actuales:
+- al menos un proveedor en `third_parties` (`supplier` o `both`)
+- sede disponible para recepcion
+- productos y variantes disponibles para comprar/recibir
+- compra registrada como prueba operativa
 
-1. Hace login con sus credenciales
-2. Es redirigido al **Home** (dashboard)
-3. Ve en el menú "Configuración" → "Asistente de Configuración"
-4. Al acceder, ve checklist con progreso:
-   ```
-   ✅ Unidades de Medida (creadas automáticamente)
-   ✅ Impuestos (creados automáticamente)
-   ✅ Métodos de Pago (creados automáticamente)
-   ⏳ Configuraciones Generales (revisar moneda, prefijos)
-   ⏳ Categorías de Productos (crear al menos 1)
-   ⏳ Productos (crear al menos 1)
-   ```
-5. Hace clic en cada paso pendiente y completa la configuración
-6. Al alcanzar 100%, botón "Ir al Punto de Venta" se habilita
-7. ¡Listo para vender! 🎉
+### Operar caja
 
-## 📊 Verificación del Progreso
+Checks actuales:
+- caja activa
+- asignacion activa en `cash_register_assignments`
+- sesion de caja como prueba operativa
 
-El wizard verifica dinámicamente:
+### Controlar inventario
 
-```javascript
-// Ejemplo: Verificar si hay ubicaciones configuradas
-const { count } = await supabase
-  .from('locations')
-  .select('*', { count: 'exact', head: true })
-  .eq('tenant_id', authStore.currentTenantId)
-  .eq('is_active', true)
+Checks actuales:
+- productos inventariables activos
+- variantes activas para operar stock
+- stock inicial o existencia positiva en `stock_balances`
+- movimiento de inventario como prueba operativa
+- guia contextual para cargar inventario desde:
+  - `Compras`
+  - `Inventario > Operaciones`
+  - `Cargue masivo`
 
-return count > 0 // ✅ Completado si hay al menos 1
-```
+### Activar contabilidad
 
-Cada paso tiene su propia query de verificación independiente.
+Checks actuales:
+- modulo contable habilitado en `tenant_settings`
+- cuentas base en `accounting_accounts`
+- automatizacion ventas/compras como paso recomendado
+- asiento contable como prueba operativa
 
-## 🎨 Interfaz del Wizard
+## Tablas evaluadas por el motor
 
-### Estados Visuales:
+`useSetupAssistant.js` consulta actualmente:
 
-**Completado:**
-- Avatar verde con ✓
-- Fondo verde claro
-- Chip "Completado"
+- `tenant_settings`
+- `locations`
+- `cash_registers`
+- `payment_methods`
+- `products`
+- `product_variants`
+- `cash_register_assignments`
+- `sales`
+- `third_parties`
+- `purchases`
+- `stock_balances`
+- `inventory_moves`
+- `cash_sessions`
+- `accounting_accounts`
+- `accounting_entries`
 
-**Pendiente Requerido:**
-- Avatar naranja con icono
-- Chip rojo "Requerido"
-- Botón "Configurar"
+## Flujo de uso esperado
 
-**Pendiente Opcional:**
-- Avatar gris con icono
-- Chip gris "Opcional"
-- Botón "Ver"
+### Tenant nuevo
 
-### Barra de Progreso:
+1. Super admin crea tenant
+2. Sistema crea defaults base
+3. Admin tenant entra al sistema
+4. Desde `Home` ve el CTA `Config inicial` si faltan pasos esenciales
+5. Entra a `/setup`
+6. Sigue la `Ruta recomendada`
+7. Completa procesos criticos y realiza pruebas operativas
+8. Cuando ya no hay pendientes esenciales, el CTA del Home desaparece
 
-- 0-49%: Naranja (warning)
-- 50-99%: Azul (primary)
-- 100%: Verde (success)
+## UX vigente
 
-## 📝 Notas Técnicas
+### En Home
 
-### Stored Procedure:
+- no se usa card grande del asistente
+- se evita competir visualmente con el dashboard
+- el CTA del asistente:
+  - va junto a `Nueva Venta`
+  - usa badge con pendientes
+  - aparece solo si hace falta
 
-```sql
--- Firma actualizada
-CREATE OR REPLACE FUNCTION fn_create_tenant(
-  p_tenant_data JSONB,
-  p_admin_data JSONB
-)
-RETURNS JSONB
-```
+### En el wizard
 
-### Llamada desde Frontend:
+- hero de onboarding operativo
+- resumen global
+- tarjetas por proceso
+- persistencia de paneles expandidos por tenant
+- checklist expandible por proceso
+- boton a la siguiente mejor accion
+- boton `Ir al Punto de Venta` cuando todo este operativo
+- bloque especifico de adopcion contable gradual
 
-```javascript
-const result = await tenantsService.createTenant(
-  {
-    name: 'Mi Empresa',
-    tax_id: '900123456-7',
-    email: 'contacto@miempresa.com',
-    invoice_prefix: 'FAC'
-  },
-  {
-    full_name: 'Juan Pérez',
-    email: 'admin@miempresa.com',
-    password: 'SecurePassword123'
-  }
-)
-```
+### En Configuracion de Empresa
 
-### Response:
+- si el usuario entra desde onboarding, se muestra alerta de `Modo guiado`
+- el tab correcto se selecciona automaticamente segun el contexto recibido
 
-```json
-{
-  "success": true,
-  "tenant_id": "uuid...",
-  "user_id": "uuid...",
-  "location_id": "uuid...",
-  "register_id": "uuid...",
-  "message": "Tenant creado exitosamente con configuración por defecto completa"
-}
-```
+### En Contabilidad
 
-## 🔧 Instalación
+- si el proceso contable aun no esta operativo, el modulo muestra una banda de onboarding
+- la banda expone:
+  - mensaje del siguiente paso
+  - bloqueantes
+  - CTA al siguiente paso
+  - regreso rapido al asistente
 
-1. **Ejecutar migración SQL:**
-   ```powershell
-   psql -U postgres -d pos_lite -f "migrations/UPDATE_CREATE_TENANT_DEFAULTS.sql"
-   ```
+### En Inventario
 
-2. **Reiniciar servidor dev:**
-   ```powershell
-   npm run dev
-   ```
+- si el usuario entra desde onboarding, el modulo puede abrir el tab correcto via `query.tab`
+- el modulo muestra una alerta contextual para explicar:
+  - como cargar stock inicial
+  - como validarlo en kardex
+  - que existe `Cargue masivo` para productos, variantes y stock inicial
 
-3. **Acceder al wizard:**
-   - Login → Menú → Configuración → Asistente de Configuración
-   - URL directa: `http://localhost:5173/setup`
+### En Cargue masivo
 
-## ✅ Checklist de Testing
+- `BulkImports.vue` reconoce `query.type`
+- puede abrir directo en `product_variants`
+- muestra mensaje contextual cuando se usa como atajo desde onboarding de inventario
 
-- [ ] Ejecutar migración SQL sin errores
-- [ ] Crear nuevo tenant desde TenantManagement
-- [ ] Verificar que se crean 12 unidades automáticamente
-- [ ] Verificar que se crean 3 impuestos automáticamente
-- [ ] Verificar que se crean 5 métodos de pago automáticamente
-- [ ] Verificar que se crean 4 roles automáticamente
-- [ ] Login como nuevo admin del tenant
-- [ ] Acceder a "Asistente de Configuración"
-- [ ] Verificar progreso inicial (~33% por defaults)
-- [ ] Crear 1 categoría → Progreso aumenta
-- [ ] Crear 1 producto → Progreso aumenta
-- [ ] Alcanzar 100% → Botón "Ir al POS" visible
-- [ ] Hacer venta de prueba completa
+### En Productos
 
-## 🎯 Beneficios
+- `Products.vue` reconoce `query.tab`
+- `Products.vue` reconoce `query.action=create-product`
+- muestra una alerta contextual para:
+  - catalogo de ventas
+  - catalogo de compras
+  - productos inventariables
+  - variantes operativas
+- desde onboarding puede abrir directamente el dialogo de creacion de producto
 
-1. **Onboarding más rápido:** Usuario nuevo sabe exactamente qué configurar
-2. **Menos errores:** Datos predeterminados correctos desde el inicio
-3. **UX mejorada:** Guía visual clara con progreso
-4. **Escalable:** Fácil agregar nuevos pasos al wizard
-5. **Mantenible:** Cada paso es independiente y verificable
+## Defaults de tenant que siguen siendo base del onboarding
 
-## 🔮 Mejoras Futuras (Sugerencias)
+La creacion de tenant con defaults sigue siendo parte del flujo y continua soportando:
 
-- [ ] Guardar progreso en `localStorage` o tabla DB
-- [ ] Agregar tooltips explicativos en cada paso
-- [ ] Video tutorial embedded por paso
-- [ ] Wizard multi-paso con navegación siguiente/anterior
-- [ ] Confeti al alcanzar 100% 🎉
-- [ ] Email automático al completar configuración
-- [ ] Dashboard widget con progreso (en Home)
-- [ ] Recordatorio si configuración incompleta después de 7 días
+- ubicacion principal
+- caja principal
+- unidades de medida
+- impuestos base
+- metodos de pago
+- roles por defecto
+- usuario administrador inicial
+
+## Testing recomendado
+
+- [ ] Crear tenant nuevo
+- [ ] Verificar que el CTA `Config inicial` aparezca en `Home`
+- [ ] Entrar a `/setup`
+- [ ] Confirmar que `Vender` inicie bloqueado o en progreso segun defaults
+- [ ] Crear producto y variante, y verificar cambio de estado
+- [ ] Registrar venta de prueba y verificar paso de prueba operativa
+- [ ] Crear proveedor y compra de prueba
+- [ ] Verificar stock inicial por compra, ajuste o cargue masivo
+- [ ] Verificar movimiento reflejado en kardex
+- [ ] Activar contabilidad y validar plan de cuentas / primer asiento
+- [ ] Confirmar que el CTA desaparece cuando ya no hay pendientes esenciales
+
+## Reglas de mantenimiento
+
+- Nuevos requisitos de onboarding deben definirse primero en `src/composables/useSetupAssistant.js`
+- `SetupWizard.vue` solo debe consumir ese estado; no debe volver a duplicar queries de readiness
+- `Home.vue` debe mantener acceso compacto; no volver a introducir un panel grande del asistente
+- Contabilidad debe mantenerse como onboarding gradual y no como precondicion para operar POS
+- Si un paso requiere abrir un tab o subflujo concreto, el enlace debe usar contexto (`query.tab`, `query.onboarding`, `query.process`) en lugar de solo mandar a la ruta base
+
+## Mejoras futuras sugeridas
+
+- persistir estado historico del onboarding en DB
+- guardar fecha de primera venta / compra / apertura de caja / primer asiento
+- onboarding guiado por sector de negocio
+- mensajes contextuales dentro de cada modulo segun `nextStep`
+- alertas de tenants estancados con onboarding incompleto
 
 ---
 
-**Implementado por:** AI Agent  
-**Fecha:** 2026-02-20  
-**Versión:** 1.0
+Fecha de actualizacion: 2026-03-18
+Version del documento: 2.2

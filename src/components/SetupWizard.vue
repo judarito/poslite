@@ -1,322 +1,452 @@
 <template>
-  <v-card class="mx-auto" max-width="900">
-    <v-card-title class="bg-gradient-primary text-white">
-      <v-icon start size="large">mdi-rocket-launch</v-icon>
-      <span class="text-h5">Asistente de Configuración Inicial</span>
-    </v-card-title>
+  <div class="setup-page">
+    <v-card class="setup-hero">
+      <v-card-text class="pa-6 pa-md-8">
+        <div class="d-flex flex-column flex-md-row justify-space-between ga-6">
+          <div class="setup-hero__copy">
+            <div class="setup-hero__eyebrow">Onboarding operativo</div>
+            <h1 class="setup-hero__title">Asistente de Configuracion Inicial</h1>
+            <p class="setup-hero__subtitle">
+              Te guiamos por los procesos criticos para que vender, comprar, operar caja, controlar inventario y activar contabilidad sea claro desde el primer dia.
+            </p>
 
-    <v-card-text class="pa-6">
-      <!-- Progreso General -->
-      <div class="mb-6">
-        <div class="d-flex justify-space-between align-center mb-2">
-          <span class="text-h6">Progreso de Configuración</span>
-          <span class="text-h6 font-weight-bold" :class="progressColor">
-            {{ completedSteps }}/{{ totalSteps }}
-          </span>
+            <div class="d-flex flex-wrap ga-2 mt-4">
+              <v-chip color="primary" variant="flat">
+                {{ overall.progressPercentage }}% listo
+              </v-chip>
+              <v-chip color="success" variant="tonal">
+                {{ overall.operationalProcesses }}/{{ overall.totalProcesses }} procesos operativos
+              </v-chip>
+              <v-chip v-if="overall.nextAction" color="warning" variant="tonal">
+                Siguiente: {{ overall.nextAction.processTitle }}
+              </v-chip>
+            </div>
+          </div>
+
+          <div class="setup-hero__panel">
+            <div class="text-overline mb-2">Progreso esencial</div>
+            <div class="text-h3 font-weight-bold mb-2">{{ overall.completedRequired }}/{{ overall.requiredSteps }}</div>
+            <v-progress-linear
+              :model-value="overall.progressPercentage"
+              :color="overall.isFullyOperational ? 'success' : 'primary'"
+              height="12"
+              rounded
+              class="mb-3"
+            />
+            <div class="text-body-2 text-medium-emphasis">
+              {{ summaryMessage }}
+            </div>
+          </div>
         </div>
-        <v-progress-linear
-          :model-value="progressPercentage"
-          :color="progressColor"
-          height="12"
-          rounded
-        ></v-progress-linear>
-        <div class="text-caption text-center mt-1">
-          {{ progressPercentage }}% completado
-        </div>
-      </div>
+      </v-card-text>
+    </v-card>
 
-      <v-alert
-        v-if="progressPercentage === 100"
-        type="success"
-        variant="tonal"
-        class="mb-4"
-      >
-        <v-icon start>mdi-check-circle</v-icon>
-        <strong>¡Configuración Completa!</strong>
-        <div class="mt-2">
-          Tu negocio está listo para comenzar a operar. Puedes empezar a crear productos y realizar ventas.
-        </div>
-      </v-alert>
+    <v-alert
+      v-if="error"
+      type="error"
+      variant="tonal"
+      class="mt-4"
+    >
+      {{ error }}
+    </v-alert>
 
-      <v-alert
-        v-else
-        type="info"
-        variant="tonal"
-        class="mb-4"
-      >
-        <v-icon start>mdi-information</v-icon>
-        <strong>Configuración Inicial Requerida</strong>
-        <div class="mt-2">
-          Completa los siguientes pasos para poder realizar ventas en tu negocio.
-        </div>
-      </v-alert>
-
-      <!-- Lista de Pasos de Configuración -->
-      <v-list class="bg-transparent">
-        <v-list-item
-          v-for="step in setupSteps"
-          :key="step.id"
-          class="mb-2 rounded-lg"
-          :class="step.isCompleted ? 'bg-success-lighten-5' : 'bg-grey-lighten-4'"
-          @click="navigateToStep(step)"
-        >
-          <template v-slot:prepend>
-            <v-avatar
-              :color="step.isCompleted ? 'success' : step.isRequired ? 'warning' : 'grey'"
-              size="48"
-            >
-              <v-icon
-                :icon="step.isCompleted ? 'mdi-check-circle' : step.icon"
-                color="white"
-                size="28"
-              ></v-icon>
-            </v-avatar>
-          </template>
-
-          <v-list-item-title class="text-h6 mb-1">
-            {{ step.title }}
-            <v-chip
-              v-if="step.isRequired"
-              size="x-small"
-              color="error"
-              class="ml-2"
-            >
-              Requerido
-            </v-chip>
-            <v-chip
-              v-else
-              size="x-small"
-              color="grey"
-              class="ml-2"
-            >
-              Opcional
-            </v-chip>
-          </v-list-item-title>
-
-          <v-list-item-subtitle class="text-wrap">
-            {{ step.description }}
-          </v-list-item-subtitle>
-
-          <template v-slot:append>
+    <v-row class="mt-1">
+      <v-col cols="12" md="8">
+        <v-card class="setup-summary-card h-100">
+          <v-card-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+            <span class="d-flex align-center ga-2">
+              <v-icon color="primary">mdi-compass-outline</v-icon>
+              Ruta recomendada
+            </span>
             <v-btn
-              v-if="!step.isCompleted"
-              :color="step.isRequired ? 'primary' : 'grey'"
+              color="primary"
               variant="tonal"
-              @click.stop="navigateToStep(step)"
+              prepend-icon="mdi-refresh"
+              :loading="loading"
+              @click="refreshProgress"
             >
-              {{ step.route ? 'Configurar' : 'Ver' }}
-              <v-icon end>mdi-chevron-right</v-icon>
+              Actualizar
             </v-btn>
-            <v-chip
-              v-else
-              color="success"
-              variant="flat"
+          </v-card-title>
+          <v-divider />
+          <v-card-text>
+            <v-alert
+              v-if="overall.nextAction"
+              type="info"
+              variant="tonal"
+              class="mb-4"
             >
-              <v-icon start>mdi-check</v-icon>
-              Completado
-            </v-chip>
-          </template>
-        </v-list-item>
-      </v-list>
+              <strong>{{ overall.nextAction.processTitle }}</strong>: {{ overall.nextAction.title }}
+              <div class="mt-2">{{ overall.nextAction.description }}</div>
+            </v-alert>
 
-      <!-- Acciones -->
-      <div class="mt-6 d-flex justify-space-between">
+            <v-alert
+              v-else
+              type="success"
+              variant="tonal"
+              class="mb-4"
+            >
+              Todos los procesos criticos ya pasaron la etapa de arranque.
+            </v-alert>
+
+            <v-row>
+              <v-col
+                v-for="process in processes"
+                :key="process.id"
+                cols="12"
+                sm="6"
+              >
+                <v-sheet class="setup-process-card pa-4" rounded="xl">
+                  <div class="d-flex align-center justify-space-between mb-3">
+                    <div class="d-flex align-center ga-2">
+                      <v-avatar :color="process.stateColor" variant="tonal" size="38">
+                        <v-icon size="20">{{ process.icon }}</v-icon>
+                      </v-avatar>
+                      <div>
+                        <div class="font-weight-bold">{{ process.title }}</div>
+                        <div class="text-caption text-medium-emphasis">
+                          {{ process.completedRequired }}/{{ process.requiredStepsCount }} esenciales
+                        </div>
+                      </div>
+                    </div>
+                    <v-chip :color="process.stateColor" size="small" variant="tonal">
+                      {{ process.stateLabel }}
+                    </v-chip>
+                  </div>
+
+                  <div class="text-body-2 mb-3">{{ process.description }}</div>
+
+                  <v-progress-linear
+                    :model-value="process.progressPercentage"
+                    :color="process.stateColor"
+                    height="8"
+                    rounded
+                    class="mb-3"
+                  />
+
+                  <div class="text-caption mb-3">
+                    {{ process.nextStep ? `Siguiente paso: ${process.nextStep.title}` : 'Proceso completo' }}
+                  </div>
+
+                  <v-btn
+                    block
+                    :color="process.stateColor === 'error' ? 'primary' : process.stateColor"
+                    variant="tonal"
+                    :to="process.nextStep?.route || process.route"
+                  >
+                    {{ process.nextStep?.actionLabel || 'Abrir proceso' }}
+                  </v-btn>
+                </v-sheet>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="4">
+        <v-card class="setup-sidebar-card h-100">
+          <v-card-title class="d-flex align-center ga-2">
+            <v-icon color="secondary">mdi-flag-checkered</v-icon>
+            Objetivos de arranque
+          </v-card-title>
+          <v-divider />
+          <v-list class="bg-transparent">
+            <v-list-item v-for="item in launchGoals" :key="item.title">
+              <template #prepend>
+                <v-avatar :color="item.color" size="32" variant="tonal">
+                  <v-icon size="16">{{ item.icon }}</v-icon>
+                </v-avatar>
+              </template>
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+              <v-list-item-subtitle class="text-wrap">{{ item.description }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-card
+      v-if="accountingProcess && accountingProcess.state !== 'OPERATIONAL'"
+      class="setup-accounting-card"
+    >
+      <v-card-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+        <span class="d-flex align-center ga-2">
+          <v-icon color="secondary">mdi-scale-balance</v-icon>
+          {{ accountingProcess.onboardingTitle }}
+        </span>
+        <v-chip :color="accountingProcess.stateColor" variant="tonal">
+          {{ accountingProcess.stateLabel }}
+        </v-chip>
+      </v-card-title>
+      <v-divider />
+      <v-card-text>
+        <p class="text-body-2 mb-4">{{ accountingProcess.onboardingDescription }}</p>
+        <v-list class="bg-transparent">
+          <v-list-item
+            v-for="item in accountingProcess.onboardingChecklist || []"
+            :key="item"
+          >
+            <template #prepend>
+              <v-icon color="secondary" size="18">mdi-check-circle-outline</v-icon>
+            </template>
+            <v-list-item-title>{{ item }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+
+        <div class="d-flex flex-wrap ga-2 mt-3">
+          <v-btn
+            color="secondary"
+            variant="elevated"
+            :to="accountingProcess.nextStep?.route || accountingProcess.route"
+          >
+            {{ accountingProcess.nextStep?.actionLabel || 'Continuar contabilidad' }}
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :to="{ path: '/accounting', query: { tab: 'dashboard', onboarding: 'accounting-overview' } }"
+          >
+            Abrir modulo contable
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <v-card class="mt-4">
+      <v-card-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+        <span class="d-flex align-center ga-2">
+          <v-icon color="primary">mdi-format-list-checks</v-icon>
+          Checklist por proceso
+        </span>
         <v-btn
-          color="grey"
-          variant="text"
-          @click="closeWizard"
-        >
-          Cerrar
-        </v-btn>
-        <v-btn
-          v-if="progressPercentage === 100"
+          v-if="overall.isFullyOperational"
           color="success"
           variant="elevated"
-          size="large"
+          prepend-icon="mdi-point-of-sale"
           @click="startSelling"
         >
-          <v-icon start>mdi-cash-register</v-icon>
           Ir al Punto de Venta
         </v-btn>
+      </v-card-title>
+      <v-divider />
+
+      <v-card-text>
+        <v-expansion-panels
+          v-model="expandedPanels"
+          multiple
+          variant="accordion"
+        >
+          <v-expansion-panel
+            v-for="process in processes"
+            :key="process.id"
+            :value="process.id"
+          >
+            <v-expansion-panel-title>
+              <div class="setup-panel-title d-flex align-center justify-space-between w-100 ga-3">
+                <div class="d-flex align-center ga-3">
+                  <v-avatar :color="process.stateColor" variant="tonal" size="38">
+                    <v-icon size="20">{{ process.icon }}</v-icon>
+                  </v-avatar>
+                  <div>
+                    <div class="font-weight-bold">{{ process.title }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ process.description }}</div>
+                  </div>
+                </div>
+
+                <div class="d-flex align-center ga-2 flex-wrap justify-end">
+                  <v-chip :color="process.stateColor" size="small" variant="tonal">
+                    {{ process.stateLabel }}
+                  </v-chip>
+                  <v-chip size="small" variant="outlined">
+                    {{ process.progressPercentage }}%
+                  </v-chip>
+                </div>
+              </div>
+            </v-expansion-panel-title>
+
+            <v-expansion-panel-text>
+              <v-alert
+                v-if="process.blockers.length > 0"
+                type="warning"
+                variant="tonal"
+                class="mb-4"
+              >
+                <strong>Bloqueantes actuales:</strong> {{ process.blockers.join(', ') }}
+              </v-alert>
+
+              <v-list class="bg-transparent">
+                <v-list-item
+                  v-for="step in process.steps"
+                  :key="step.id"
+                  class="setup-step"
+                >
+                  <template #prepend>
+                    <v-avatar :color="step.stateColor" size="36" variant="tonal">
+                      <v-icon size="18">{{ step.completed ? 'mdi-check' : (step.required ? 'mdi-alert' : 'mdi-arrow-right') }}</v-icon>
+                    </v-avatar>
+                  </template>
+
+                  <v-list-item-title class="d-flex align-center flex-wrap ga-2">
+                    <span>{{ step.title }}</span>
+                    <v-chip
+                      :color="step.required ? 'error' : 'grey'"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      {{ step.required ? 'Esencial' : 'Recomendado' }}
+                    </v-chip>
+                    <v-chip
+                      v-if="step.kind === 'proof'"
+                      color="info"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      Prueba final
+                    </v-chip>
+                  </v-list-item-title>
+
+                  <v-list-item-subtitle class="text-wrap">
+                    {{ step.description }}
+                  </v-list-item-subtitle>
+
+                  <template #append>
+                    <div class="d-flex align-center ga-2 flex-wrap justify-end">
+                      <v-chip :color="step.stateColor" size="small" variant="tonal">
+                        {{ step.stateLabel }}
+                      </v-chip>
+                      <v-btn
+                        v-if="!step.completed && step.route"
+                        size="small"
+                        color="primary"
+                        variant="text"
+                        :to="step.route"
+                      >
+                        {{ step.actionLabel }}
+                      </v-btn>
+                    </div>
+                  </template>
+                </v-list-item>
+              </v-list>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+      </v-card-text>
+    </v-card>
+
+    <div class="mt-4 d-flex justify-space-between flex-wrap ga-2">
+      <v-btn color="grey" variant="text" @click="closeWizard">
+        Cerrar
+      </v-btn>
+      <div class="d-flex flex-wrap ga-2">
         <v-btn
-          v-else
+          v-if="overall.nextAction"
           color="primary"
           variant="elevated"
-          @click="refreshProgress"
+          :to="overall.nextAction.route"
         >
-          <v-icon start>mdi-refresh</v-icon>
-          Actualizar Progreso
+          {{ overall.nextAction.label }}
+        </v-btn>
+        <v-btn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="mdi-view-dashboard-outline"
+          @click="goToHome"
+        >
+          Ir al dashboard
         </v-btn>
       </div>
-    </v-card-text>
-  </v-card>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
-import { supabase } from '@/plugins/supabase'
+import { useSetupAssistant } from '@/composables/useSetupAssistant'
 
 const router = useRouter()
+const route = useRoute()
 const { tenantId } = useTenant()
+const { loading, error, processes, processMap, overall, loadSetupReadiness } = useSetupAssistant()
+const expandedPanels = ref([])
 
-// Estado
-const setupSteps = ref([
+const getWizardStorageKey = (suffix) => `setup-wizard:${tenantId.value || 'no-tenant'}:${suffix}`
+
+const launchGoals = [
   {
-    id: 'general_settings',
-    title: 'Configuraciones Generales',
-    description: 'Moneda, formato de fecha, prefijo de facturas y otras configuraciones básicas.',
-    icon: 'mdi-cog',
-    route: '/tenant-config',
-    isRequired: true,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) return false
-      const { data } = await supabase
-        .from('tenant_settings')
-        .select('invoice_prefix, business_name')
-        .eq('tenant_id', tenantId.value)
-        .single()
-      return data?.invoice_prefix && data?.business_name
-    }
+    title: 'Primera venta sin friccion',
+    description: 'Caja, medios de pago, producto y datos comerciales listos.',
+    icon: 'mdi-point-of-sale',
+    color: 'primary'
   },
   {
-    id: 'locations',
-    title: 'Ubicaciones',
-    description: 'Configura al menos una ubicación o sede donde operas tu negocio.',
-    icon: 'mdi-map-marker',
-    route: '/locations',
-    isRequired: true,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) return false
-      const { data, error } = await supabase
-        .from('locations')
-        .select('location_id')
-        .eq('tenant_id', tenantId.value)
-        .eq('is_active', true)
-      return !error && data && data.length > 0
-    }
+    title: 'Primera compra registrada',
+    description: 'Proveedor, sede y productos preparados para abastecimiento.',
+    icon: 'mdi-cart-plus',
+    color: 'deep-orange'
   },
   {
-    id: 'registers',
-    title: 'Cajas Registradoras',
-    description: 'Configura al menos una caja para poder realizar ventas.',
+    title: 'Caja operativa',
+    description: 'Asignacion y sesion de prueba para reducir bloqueos del equipo.',
     icon: 'mdi-cash-register',
-    route: '/cash-registers',
-    isRequired: true,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) {
-        console.log('❌ Registers: No tenantId')
-        return false
-      }
-      const { data, error } = await supabase
-        .from('cash_registers')
-        .select('cash_register_id')
-        .eq('tenant_id', tenantId.value)
-        .eq('is_active', true)
-      
-      console.log('🔍 Registers Check:', {
-        tenantId: tenantId.value,
-        data,
-        error,
-        result: !error && data && data.length > 0
-      })
-      
-      return !error && data && data.length > 0
-    }
+    color: 'success'
   },
   {
-    id: 'categories',
-    title: 'Categorías de Productos',
-    description: 'Crea categorías para organizar tus productos (ej: Ropa, Alimentos, etc.).',
-    icon: 'mdi-tag-multiple',
-    route: '/categories',
-    isRequired: true,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) return false
-      const { data, error } = await supabase
-        .from('categories')
-        .select('category_id')
-        .eq('tenant_id', tenantId.value)
-      return !error && data && data.length > 0
-    }
-  },
-  {
-    id: 'products',
-    title: 'Productos',
-    description: 'Crea tus primeros productos para empezar a vender.',
-    icon: 'mdi-package-variant',
-    route: '/products',
-    isRequired: true,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) return false
-      const { data, error } = await supabase
-        .from('products')
-        .select('product_id')
-        .eq('tenant_id', tenantId.value)
-      return !error && data && data.length > 0
-    }
-  },
-  {
-    id: 'users',
-    title: 'Usuarios Adicionales',
-    description: 'Agrega usuarios para cajeros, vendedores o administradores adicionales (Opcional).',
-    icon: 'mdi-account-multiple',
-    route: '/auth',
-    isRequired: false,
-    isCompleted: false,
-    checkQuery: async () => {
-      if (!tenantId.value) return false
-      const { data, error } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq('tenant_id', tenantId.value)
-      return !error && data && data.length > 1 // Más de 1 usuario (el admin ya existe)
-    }
+    title: 'Contabilidad activable',
+    description: 'Modulo listo para adoptarse sin detener POS ni inventario.',
+    icon: 'mdi-scale-balance',
+    color: 'secondary'
   }
-])
+]
 
-// Computed
-const totalSteps = computed(() => setupSteps.value.filter(s => s.isRequired).length)
-const completedSteps = computed(() => setupSteps.value.filter(s => s.isRequired && s.isCompleted).length)
-const progressPercentage = computed(() => Math.round((completedSteps.value / totalSteps.value) * 100))
-const progressColor = computed(() => {
-  if (progressPercentage.value === 100) return 'success'
-  if (progressPercentage.value >= 50) return 'primary'
-  return 'warning'
+const summaryMessage = computed(() => {
+  if (overall.value.isFullyOperational) {
+    return 'Excelente. Tus procesos criticos ya quedaron listos para operar.'
+  }
+
+  if (overall.value.nextAction) {
+    return `Te falta avanzar en ${overall.value.nextAction.processTitle}: ${overall.value.nextAction.title}.`
+  }
+
+  return 'Estamos calculando que falta para dejar la operacion lista.'
 })
 
-// Métodos
-const checkProgress = async () => {
-  for (const step of setupSteps.value) {
-    if (step.checkQuery) {
-      try {
-        step.isCompleted = await step.checkQuery()
-      } catch (error) {
-        console.error(`Error checking step ${step.id}:`, error)
+const accountingProcess = computed(() => processMap.value.accounting || null)
+
+const syncExpandedPanelsFromContext = () => {
+  const nextPanels = new Set(expandedPanels.value || [])
+  const stored = localStorage.getItem(getWizardStorageKey('expanded'))
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) {
+        parsed.forEach((panel) => nextPanels.add(panel))
       }
-    }
+    } catch (_) {}
   }
+
+  const focusProcess = String(route.query.process || '').trim()
+  if (focusProcess && processMap.value[focusProcess]) {
+    nextPanels.add(focusProcess)
+  } else if (!nextPanels.size && overall.value.nextProcess?.id) {
+    nextPanels.add(overall.value.nextProcess.id)
+  }
+
+  expandedPanels.value = [...nextPanels]
 }
 
 const refreshProgress = async () => {
-  await checkProgress()
-}
-
-const navigateToStep = (step) => {
-  if (step.route) {
-    router.push(step.route)
-  }
+  await loadSetupReadiness()
+  syncExpandedPanelsFromContext()
 }
 
 const closeWizard = () => {
-  // Guardar que el usuario cerró el wizard
   localStorage.setItem('setupWizardDismissed', 'true')
+  router.push('/')
+}
+
+const goToHome = () => {
   router.push('/')
 }
 
@@ -324,22 +454,106 @@ const startSelling = () => {
   router.push('/pos')
 }
 
-// Lifecycle
-onMounted(async () => {
-  await checkProgress()
+onMounted(() => {
+  loadSetupReadiness().then(() => {
+    syncExpandedPanelsFromContext()
+  })
 })
+
+watch(expandedPanels, (value) => {
+  localStorage.setItem(getWizardStorageKey('expanded'), JSON.stringify(value || []))
+})
+
+watch(
+  () => [route.query.process, tenantId.value],
+  () => {
+    syncExpandedPanelsFromContext()
+  }
+)
 </script>
 
 <style scoped>
-.bg-gradient-primary {
-  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+.setup-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.bg-success-lighten-5 {
-  background-color: rgba(76, 175, 80, 0.1);
+.setup-hero {
+  border: 1px solid rgba(66, 125, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(120, 214, 75, 0.14), transparent 26%),
+    radial-gradient(circle at left top, rgba(46, 90, 255, 0.16), transparent 28%),
+    linear-gradient(145deg, rgba(11, 21, 46, 0.96), rgba(10, 18, 38, 0.92));
 }
 
-.bg-grey-lighten-4 {
-  background-color: rgba(0, 0, 0, 0.05);
+.setup-hero__copy {
+  flex: 1 1 560px;
+}
+
+.setup-hero__panel {
+  min-width: 260px;
+  max-width: 320px;
+  border-radius: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(123, 154, 255, 0.18);
+}
+
+.setup-hero__eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #9db5f4;
+  margin-bottom: 8px;
+}
+
+.setup-hero__title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+  margin: 0 0 10px;
+  color: #eff5ff;
+}
+
+.setup-hero__subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: #bfd0f7;
+  font-size: 1rem;
+}
+
+.setup-summary-card,
+.setup-sidebar-card {
+  border-radius: 22px;
+}
+
+.setup-accounting-card {
+  border-radius: 22px;
+  border: 1px solid rgba(173, 106, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(201, 123, 255, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(28, 22, 48, 0.92), rgba(17, 16, 34, 0.9));
+}
+
+.setup-process-card {
+  height: 100%;
+  border: 1px solid rgba(72, 116, 214, 0.16);
+  background: linear-gradient(180deg, rgba(23, 34, 64, 0.8), rgba(15, 24, 46, 0.72));
+}
+
+.setup-step {
+  border: 1px solid rgba(109, 133, 192, 0.16);
+  border-radius: 18px;
+  margin-bottom: 10px;
+}
+
+.setup-panel-title {
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .setup-hero__panel {
+    max-width: none;
+  }
 }
 </style>

@@ -1,8 +1,8 @@
 # CONTEXTO_ULTIMO
 
-Fecha de actualizacion: 2026-03-13
+Fecha de actualizacion: 2026-03-18
 Owner: Equipo POSLite
-Ultimo cambio registrado: endurecimiento de rendimiento app/POS/alertas/dashboard, hardening retrocompatible de fecha manual POS mientras se despliega migracion, y reubicacion responsive de acciones `Cobrar`/`Limpiar` al header del POS
+Ultimo cambio registrado: centro de ayuda interactivo con manual de usuario, FAQs y ayuda contextual en modulos criticos
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -28,6 +28,140 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 ```
 
 ## Estado tecnico actual
+
+### Onboarding operativo v2 (implementado 2026-03-18)
+
+- El `Asistente de Configuracion Inicial` dejo de ser un checklist plano y ahora funciona como hub de procesos criticos:
+  - `Vender`
+  - `Comprar`
+  - `Operar caja`
+  - `Controlar inventario`
+  - `Activar contabilidad`
+- Archivos principales:
+  - `src/components/SetupWizard.vue`
+  - `src/composables/useSetupAssistant.js`
+  - `src/views/Home.vue`
+  - `src/router/index.js`
+- La logica de readiness ahora esta centralizada en `useSetupAssistant`, no embebida dentro del componente.
+- Cada proceso expone:
+  - estado (`BLOCKED`, `IN_PROGRESS`, `READY_FOR_TEST`, `OPERATIONAL`)
+  - progreso esencial
+  - bloqueantes
+  - siguiente mejor accion
+  - prueba operativa sugerida
+- El asistente evalua datos reales del tenant usando tablas ya existentes:
+  - `tenant_settings`
+  - `locations`
+  - `cash_registers`
+  - `payment_methods`
+  - `products`
+  - `product_variants`
+  - `cash_register_assignments`
+  - `sales`
+  - `third_parties`
+  - `purchases`
+  - `stock_balances`
+  - `inventory_moves`
+  - `cash_sessions`
+  - `accounting_accounts`
+  - `accounting_entries`
+- `Home.vue` ya no muestra un bloque grande del asistente:
+  - ahora expone un CTA compacto `Config inicial` junto a `Nueva Venta`;
+  - solo aparece si hay configuraciones esenciales pendientes;
+  - muestra badge con cantidad pendiente;
+  - desaparece cuando el tenant queda operativo.
+- La ruta `/setup` se considera ruta siempre permitida en router para evitar bloqueo por menu dinamico durante onboarding.
+
+### Fase siguiente del onboarding (implementado 2026-03-18)
+
+- `useSetupAssistant.js` ahora incluye metadata de onboarding por proceso:
+  - `onboardingTitle`
+  - `onboardingDescription`
+  - `onboardingChecklist` (especialmente en contabilidad)
+- Los pasos del asistente ya pueden redirigir con contexto a tabs y rutas especificas:
+  - `TenantConfig` con `query.tab`
+  - `Accounting` con `query.tab`
+  - `Accounting plan de cuentas` con contexto `from=setup`
+- `SetupWizard.vue` ahora:
+  - persiste paneles expandidos por tenant en `localStorage`
+  - puede enfocar proceso via `query.process`
+  - incluye bloque dedicado para onboarding contable gradual
+- `TenantConfig.vue` ahora:
+  - reconoce `query.tab`
+  - muestra alerta de modo guiado si entra desde el asistente
+  - recarga readiness despues de guardar
+- `Accounting.vue` ahora:
+  - muestra banda de onboarding contable con bloqueantes y CTA
+  - redirige a `TenantConfig` en tab contable cuando aplica
+  - recarga readiness al cargar el modulo y despues de procesar cola
+- `Inventory.vue` ahora:
+  - reconoce `query.tab`
+  - muestra guia contextual cuando entra desde onboarding
+  - explica como cargar stock por compras, operaciones o cargue masivo
+- `Products.vue` ahora:
+  - reconoce `query.tab`
+  - reconoce `query.action=create-product`
+  - muestra guia contextual para catalogo, variantes e inventario
+  - puede abrir el dialogo de nuevo producto desde onboarding
+- `BulkImports.vue` ahora:
+  - reconoce `query.type`
+  - puede abrir directo en `product_variants`
+  - muestra contexto cuando entra desde onboarding de inventario
+
+### Regla UX vigente para onboarding
+
+- El asistente debe sentirse continuo entre modulos:
+  - no solo redirigir, sino llevar al usuario al tab o subflujo correcto
+  - mostrar contexto de "modo guiado" cuando entre desde onboarding
+- La adopcion contable se maneja como flujo gradual y explicado:
+  - activacion
+  - plan de cuentas
+  - automatizacion
+  - validacion del primer evento/asiento
+
+### Implicaciones de producto (vigentes)
+
+- El onboarding ahora esta orientado a “primer resultado operativo”, no solo a “datos maestros creados”.
+- En inventario el readiness debe distinguir:
+  - catalogo base (`products`)
+  - variantes listas para operar (`product_variants`)
+  - stock real cargado (`stock_balances`)
+  - movimiento validado (`inventory_moves`)
+- El `Home` debe mantenerse liviano:
+  - no volver a montar cards grandes del asistente en el dashboard principal;
+  - el acceso recomendado es CTA compacto + redireccion a `/setup`.
+- Si se agregan nuevos requisitos de arranque, deben modelarse primero en `useSetupAssistant.js` y luego reflejarse en la UI del wizard.
+- Contabilidad sigue tratandose como proceso de adopcion gradual:
+  - no debe bloquear POS;
+  - debe mostrar prerequisitos y prueba de validacion, no solo toggles de configuracion.
+
+### Centro de ayuda y manual de usuario (implementado 2026-03-18)
+
+- Se creo un centro de ayuda dentro de la app:
+  - ruta: `/help`
+  - vista: `src/views/HelpCenter.vue`
+- La base de contenido vive en:
+  - `src/content/helpCenter.js`
+  - `src/composables/useHelpCenter.js`
+- La documentacion asociada quedo en:
+  - `docs/MANUAL_USUARIO.md`
+  - `docs/HELP_CENTER_SYSTEM.md`
+- El centro de ayuda cubre 5 frentes de producto:
+  - guia `Primeros pasos`
+  - guias operativas de venta, compra, caja, inventario y contabilidad
+  - FAQs de errores comunes
+  - checklists interactivos con persistencia local
+  - accesos directos a modulos
+- Se agrego ayuda contextual reusable:
+  - componente `src/components/ContextHelpCard.vue`
+  - usado en `PointOfSale.vue`, `Purchases.vue`, `Inventory.vue` y `Accounting.vue`
+- El acceso al centro de ayuda quedo disponible:
+  - desde la barra superior
+  - desde el item `Manual de usuario` del menu especial de superadmin
+- La ruta `/help` se considera ruta siempre permitida para no quedar bloqueada por menus dinamicos.
+- Regla UX vigente:
+  - el `Home` no debe cargar tarjetas adicionales de ayuda para no sobrecargar el dashboard;
+  - el contenido del manual debe concentrarse en `/help`.
 
 ### Base contable implementada
 

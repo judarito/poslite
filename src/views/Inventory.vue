@@ -1,5 +1,33 @@
 <template>
   <div class="fill-width ofir-page inventory-page">
+    <ContextHelpCard
+      class="mb-4"
+      context-key="inventory"
+    />
+
+    <v-alert
+      v-if="inventoryHintConfig"
+      :type="inventoryHintConfig.type"
+      variant="tonal"
+      class="mb-4"
+    >
+      <div class="text-subtitle-2 font-weight-bold mb-1">{{ inventoryHintConfig.title }}</div>
+      <div class="text-body-2">{{ inventoryHintConfig.message }}</div>
+
+      <div class="d-flex flex-wrap ga-2 mt-3">
+        <v-btn
+          v-for="action in inventoryHintConfig.actions"
+          :key="action.label"
+          size="small"
+          :color="action.color"
+          :variant="action.variant || 'tonal'"
+          :to="action.to"
+        >
+          {{ action.label }}
+        </v-btn>
+      </div>
+    </v-alert>
+
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="stock">Stock Actual</v-tab>
       <v-tab value="components">Insumos</v-tab>
@@ -443,16 +471,19 @@
 
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import inventoryService from '@/services/inventory.service'
 import productsService from '@/services/products.service'
+import ContextHelpCard from '@/components/ContextHelpCard.vue'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const { tenantId } = useTenant()
 const { defaultPageSize } = useTenantSettings()
@@ -460,6 +491,7 @@ const { userProfile } = useAuth()
 
 const tab = ref('stock')
 const locations = ref([])
+const allowedTabs = ['stock', 'components', 'kardex', 'operations']
 
 // Stock
 const stockItems = ref([])
@@ -517,6 +549,59 @@ const rules = {
   positive: v => v > 0 || 'Debe ser mayor a 0'
 }
 
+const inventoryHintConfig = computed(() => {
+  const onboarding = String(route.query.onboarding || '').trim()
+
+  if (onboarding === 'inventory-stock') {
+    return {
+      type: 'info',
+      title: 'Como cargar inventario inicial',
+      message: 'Puedes ingresar stock desde una compra, desde Operaciones con Ingreso por Compra o Ajuste de Inventario, o por cargue masivo de productos y variantes con stock inicial.',
+      actions: [
+        {
+          label: 'Operaciones de inventario',
+          color: 'primary',
+          variant: 'elevated',
+          to: { path: '/inventory', query: { tab: 'operations', onboarding: 'inventory-stock' } }
+        },
+        {
+          label: 'Registrar compra',
+          color: 'success',
+          to: '/purchases'
+        },
+        {
+          label: 'Cargue masivo',
+          color: 'secondary',
+          to: { path: '/bulk-imports', query: { type: 'product_variants', onboarding: 'inventory-import' } }
+        }
+      ]
+    }
+  }
+
+  if (onboarding === 'inventory-proof') {
+    return {
+      type: 'success',
+      title: 'Valida el movimiento en kardex',
+      message: 'Despues de una compra, ajuste o traslado, revisa el kardex para confirmar que el movimiento quedo registrado y el stock cambio como esperabas.',
+      actions: [
+        {
+          label: 'Ver kardex',
+          color: 'primary',
+          variant: 'elevated',
+          to: { path: '/inventory', query: { tab: 'kardex', onboarding: 'inventory-proof' } }
+        },
+        {
+          label: 'Abrir operaciones',
+          color: 'secondary',
+          to: { path: '/inventory', query: { tab: 'operations', onboarding: 'inventory-stock' } }
+        }
+      ]
+    }
+  }
+
+  return null
+})
+
 const moveTypes = [
   { label: 'Compra', value: 'PURCHASE_IN' },
   { label: 'Devolucion Proveedor', value: 'PURCHASE_RETURN_OUT' },
@@ -536,6 +621,13 @@ const moveTypeColor = (t) => ({
 const isIncoming = (t) => ['PURCHASE_IN', 'RETURN_IN', 'TRANSFER_IN', 'ADJUSTMENT'].includes(t)
 
 const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+
+const applyRouteContext = () => {
+  const requestedTab = String(route.query.tab || '').trim()
+  if (allowedTabs.includes(requestedTab)) {
+    tab.value = requestedTab
+  }
+}
 
 const loadStockPage = ({ page }) => {
   stockPage.value = page || 1
@@ -795,8 +887,16 @@ watch(tab, (newTab) => {
   }
 })
 
+watch(
+  () => route.query.tab,
+  () => {
+    applyRouteContext()
+  }
+)
+
 onMounted(async () => {
   await loadLocations()
+  applyRouteContext()
   loadStock()
   loadKardex()
   loadPendingTransfers()

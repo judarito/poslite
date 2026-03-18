@@ -1,5 +1,17 @@
 <template>
   <div>
+    <v-alert
+      v-if="bulkImportHintVisible"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+    >
+      <div class="text-subtitle-2 font-weight-bold mb-1">Cargue masivo para catalogo e inventario</div>
+      <div class="text-body-2">
+        Esta opcion te permite crear productos, variantes y stock inicial desde Excel para acelerar el arranque del tenant.
+      </div>
+    </v-alert>
+
     <v-card class="mb-4" elevation="2">
       <v-card-title class="d-flex align-center justify-space-between">
         <div>
@@ -120,7 +132,7 @@
       <v-card>
         <v-card-title>
           Errores de importación
-n          <v-spacer></v-spacer>
+          <v-spacer></v-spacer>
           <v-btn icon variant="text" @click="errorDialog = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
@@ -156,7 +168,8 @@ n          <v-spacer></v-spacer>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useNotification } from '@/composables/useNotification'
@@ -165,9 +178,10 @@ import { processBulkImport } from '@/services/bulkImport.service'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const { tenantId } = useTenant()
-const { user, userProfile } = useAuth()
+const { userProfile } = useAuth()
 const { show: showSnackbar } = useNotification()
 
 const selectedType = ref('product_variants')
@@ -183,6 +197,10 @@ const typeOptions = [
   { label: 'Productos/variantes', value: 'product_variants' },
   { label: 'Terceros (clientes/proveedores)', value: 'third_parties' }
 ]
+const bulkImportHintVisible = computed(() => {
+  const onboarding = String(route.query.onboarding || '').trim()
+  return onboarding === 'inventory-import' || onboarding === 'inventory-stock'
+})
 
 const historyHeaders = [
   { title: 'Archivo', key: 'file_name', value: 'file_name' },
@@ -206,6 +224,13 @@ const templateUrl = computed(() =>
     : '/templates/import-product-variants.xlsx'
 )
 const notesUrl = computed(() => '/templates/import-product-variants-notes.md')
+
+const applyRouteContext = () => {
+  const requestedType = String(route.query.type || '').trim()
+  if (typeOptions.some((option) => option.value === requestedType)) {
+    selectedType.value = requestedType
+  }
+}
 
 const loadHistory = async () => {
   if (!tenantId.value) return
@@ -279,6 +304,19 @@ const statusColor = (status) => {
 }
 
 onMounted(() => {
+  applyRouteContext()
+  loadHistory()
+})
+
+watch(
+  () => route.query.type,
+  () => {
+    applyRouteContext()
+    loadHistory()
+  }
+)
+
+watch(selectedType, () => {
   loadHistory()
 })
 </script>

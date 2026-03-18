@@ -61,15 +61,36 @@
         </p>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-md-end">
-        <v-btn
-          class="ofir-home__cta"
-          color="secondary"
-          prepend-icon="mdi-plus"
-          size="large"
-          to="/pos"
-        >
-          Nueva Venta
-        </v-btn>
+        <div class="ofir-home__actions">
+          <v-btn
+            class="ofir-home__cta"
+            color="secondary"
+            prepend-icon="mdi-plus"
+            size="large"
+            to="/pos"
+          >
+            Nueva Venta
+          </v-btn>
+
+          <v-btn
+            v-if="showSetupButton"
+            class="ofir-home__assistant-btn"
+            :color="setupStatusColor"
+            prepend-icon="mdi-rocket-launch-outline"
+            variant="tonal"
+            size="large"
+            to="/setup"
+          >
+            Config inicial
+            <v-badge
+              inline
+              :content="setupPendingCount"
+              color="error"
+              :model-value="setupPendingCount > 0"
+              class="ml-2"
+            />
+          </v-btn>
+        </div>
       </v-col>
     </v-row>
 
@@ -323,6 +344,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAppAlerts } from '@/composables/useAppAlerts'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
+import { useSetupAssistant } from '@/composables/useSetupAssistant'
 import { useI18n } from '@/i18n'
 import SalesForecastWidget from '@/components/SalesForecastWidget.vue'
 import reportsService from '@/services/reports.service'
@@ -339,7 +361,19 @@ const { tenantId } = useTenant()
 const { isDark } = useTheme()
 const { cashSessionMaxHours } = useTenantSettings()
 const { canManageTenants } = useSuperAdmin()
+const { overall: setupOverall, loadSetupReadiness } = useSetupAssistant()
 const isSuperAdminDashboard = computed(() => canManageTenants.value && !userProfile.value)
+const setupPendingCount = computed(() => Math.max(setupOverall.value.requiredSteps - setupOverall.value.completedRequired, 0))
+const showSetupButton = computed(() => (
+  !!tenantId.value &&
+  !!userProfile.value &&
+  setupOverall.value.requiredSteps > 0 &&
+  !setupOverall.value.isFullyOperational
+))
+const setupStatusColor = computed(() => {
+  if ((setupOverall.value.requiredSteps - setupOverall.value.completedRequired) <= 1) return 'warning'
+  return 'error'
+})
 
 // ─── KPIs & charts ────────────────────────────────────────────────────────
 const kpiLoading     = ref(true)
@@ -458,8 +492,17 @@ async function loadKPIs() {
 onMounted(async () => {
   if (isSuperAdminDashboard.value) return
 
-  await loadPOSContext()
-  await loadKPIs()
+  const tasks = [
+    loadPOSContext(),
+    loadKPIs()
+  ]
+
+  if (tenantId.value && userProfile.value) {
+    tasks.push(loadSetupReadiness())
+  }
+
+  await Promise.all(tasks)
+
   if (tenantId.value) {
     const r = await cashService.getExpiredSessions(tenantId.value, cashSessionMaxHours.value)
     if (r.success) expiredSessions.value = r.data
@@ -609,6 +652,21 @@ const navigateTo = (route) => {
   box-shadow: 0 12px 24px rgba(77, 189, 66, 0.25);
 }
 
+.ofir-home__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.ofir-home__assistant-btn {
+  border-radius: 14px;
+  font-weight: 700;
+}
+
 .ofir-alert {
   border-radius: 14px;
   border: 1px solid transparent;
@@ -706,6 +764,14 @@ const navigateTo = (route) => {
   }
 
   .ofir-home__cta {
+    width: 100%;
+  }
+
+  .ofir-home__actions {
+    max-width: none;
+  }
+
+  .ofir-home__assistant-btn {
     width: 100%;
   }
 }
