@@ -40,130 +40,141 @@
 
           <!-- Filtros -->
           <v-card-text>
-            <v-row dense>
-              <v-col cols="12" sm="4">
-                <v-select
-                  v-model="filterLocation"
-                  :items="locations"
-                  item-title="name"
-                  item-value="location_id"
-                  :label="t('app.branch')"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @update:model-value="loadBatches"
-                ></v-select>
-              </v-col>
-              <v-col cols="12" sm="4">
-                <v-select
-                  v-model="filterAlertLevel"
-                  :items="alertLevels"
-                  label="Estado"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  @update:model-value="loadBatches"
-                ></v-select>
-              </v-col>
-              <v-col cols="12" sm="4">
-                <v-text-field
-                  v-model="searchBatchNumber"
-                  label="Buscar lote"
-                  variant="outlined"
-                  density="compact"
-                  prepend-inner-icon="mdi-magnify"
-                  clearable
-                  @update:model-value="loadBatches"
-                ></v-text-field>
-              </v-col>
-            </v-row>
+            <ListView
+              title="Gestion de Lotes"
+              icon="mdi-barcode"
+              :items="batches"
+              :total-items="totalBatches"
+              :loading="loading"
+              :page-size="pageSize"
+              item-key="batch_id"
+              title-field="productLabel"
+              subtitle-field="batch_number"
+              avatar-icon="mdi-package-variant-closed"
+              avatar-color="info"
+              empty-message="No hay lotes registrados"
+              create-button-text="Nuevo Lote"
+              :editable="false"
+              :deletable="false"
+              :table-columns="batchTableColumns"
+              view-storage-key="batch-management-lots"
+              @create="openCreateDialog"
+              @load-page="loadBatches"
+              @search="loadBatches"
+            >
+              <template #filters>
+                <v-row dense>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="filterLocation"
+                      :items="locations"
+                      item-title="name"
+                      item-value="location_id"
+                      :label="t('app.branch')"
+                      variant="outlined"
+                      density="compact"
+                      clearable
+                      @update:model-value="refreshBatches"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="filterAlertLevel"
+                      :items="alertLevels"
+                      item-title="title"
+                      item-value="value"
+                      label="Estado"
+                      variant="outlined"
+                      density="compact"
+                      clearable
+                      @update:model-value="refreshBatches"
+                    ></v-select>
+                  </v-col>
+                </v-row>
+              </template>
+
+              <template #title="{ item }">
+                {{ item.variant?.product?.name || 'Sin producto' }}
+              </template>
+
+              <template #subtitle="{ item }">
+                {{ [item.variant?.variant_name, item.variant?.sku ? `SKU: ${item.variant.sku}` : null, item.batch_number].filter(Boolean).join(' • ') }}
+              </template>
+
+              <template #content="{ item }">
+                <div class="mt-2 d-flex flex-wrap ga-2">
+                  <v-chip size="small" variant="tonal">{{ item.location?.name || 'Sin sede' }}</v-chip>
+                  <v-chip v-if="item.physical_location" size="small" variant="outlined">
+                    {{ item.physical_location }}
+                  </v-chip>
+                  <v-chip :color="getAlertColor(item)" size="small">
+                    {{ getAlertLabel(item) }}
+                  </v-chip>
+                  <v-chip size="small" variant="tonal">
+                    Stock: {{ item.on_hand }} / Disp.: {{ item.on_hand - item.reserved }}
+                  </v-chip>
+                </div>
+              </template>
+
+              <template #table-cell-batch_number="{ item }">
+                {{ item.batch_number }}
+              </template>
+
+              <template #table-cell-location_name="{ item }">
+                {{ item.location?.name || '—' }}
+              </template>
+
+              <template #table-cell-physical_location="{ item }">
+                <v-chip v-if="item.physical_location" size="small" variant="outlined">
+                  {{ item.physical_location }}
+                </v-chip>
+                <span v-else class="text-medium-emphasis">-</span>
+              </template>
+
+              <template #table-cell-expiration_date="{ item }">
+                <div v-if="item.expiration_date">
+                  {{ formatDate(item.expiration_date) }}
+                  <div class="text-caption" :class="getDaysColor(item)">
+                    {{ formatDaysToExpiry(item) }}
+                  </div>
+                </div>
+                <span v-else class="text-medium-emphasis">Sin vencimiento</span>
+              </template>
+
+              <template #table-cell-stock="{ item }">
+                <div class="text-right">
+                  <strong>{{ item.on_hand }}</strong>
+                  <span v-if="item.reserved > 0" class="text-grey text-caption ml-1">
+                    ({{ item.reserved }} reserv.)
+                  </span>
+                </div>
+                <div class="text-caption text-grey text-right">
+                  {{ item.on_hand - item.reserved }} disponible
+                </div>
+              </template>
+
+              <template #table-cell-alert_level="{ item }">
+                <v-chip :color="getAlertColor(item)" size="small">
+                  {{ getAlertLabel(item) }}
+                </v-chip>
+              </template>
+
+              <template #actions="{ item }">
+                <v-btn
+                  icon="mdi-pencil"
+                  variant="text"
+                  size="small"
+                  @click.stop="openEditDialog(item)"
+                ></v-btn>
+                <v-btn
+                  icon="mdi-eye"
+                  variant="text"
+                  size="small"
+                  @click.stop="viewTraceability(item)"
+                ></v-btn>
+              </template>
+            </ListView>
           </v-card-text>
-
-          <!-- Tabla de lotes -->
-          <v-table density="comfortable">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Lote</th>
-                <th>Sede</th>
-                <th>Ubicación</th>
-                <th>Vencimiento</th>
-                <th class="text-right">Stock</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="batch in batches" :key="batch.batch_id">
-                <td>
-                  <div class="text-body-2">{{ batch.variant?.product?.name }}</div>
-                  <div class="text-caption text-grey">{{ batch.variant?.variant_name }}</div>
-                  <div class="text-caption text-grey">SKU: {{ batch.variant?.sku }}</div>
-                </td>
-                <td>{{ batch.batch_number }}</td>
-                <td>{{ batch.location?.name }}</td>
-                <td>
-                  <v-chip v-if="batch.physical_location" size="small" variant="outlined">
-                    {{ batch.physical_location }}
-                  </v-chip>
-                  <span v-else class="text-grey">-</span>
-                </td>
-                <td>
-                  <div v-if="batch.expiration_date">
-                    {{ formatDate(batch.expiration_date) }}
-                    <div class="text-caption" :class="getDaysColor(batch)">
-                      {{ formatDaysToExpiry(batch) }}
-                    </div>
-                  </div>
-                  <span v-else class="text-grey">Sin vencimiento</span>
-                </td>
-                <td class="text-right">
-                  <div>
-                    <strong>{{ batch.on_hand }}</strong>
-                    <span v-if="batch.reserved > 0" class="text-grey text-caption ml-1">
-                      ({{ batch.reserved }} reserv.)
-                    </span>
-                  </div>
-                  <div class="text-caption text-grey">
-                    {{ (batch.on_hand - batch.reserved) }} disponible
-                  </div>
-                </td>
-                <td>
-                  <v-chip :color="getAlertColor(batch)" size="small">
-                    {{ getAlertLabel(batch) }}
-                  </v-chip>
-                </td>
-                <td>
-                  <v-btn
-                    icon="mdi-pencil"
-                    variant="text"
-                    size="small"
-                    @click="openEditDialog(batch)"
-                  ></v-btn>
-                  <v-btn
-                    icon="mdi-eye"
-                    variant="text"
-                    size="small"
-                    @click="viewTraceability(batch)"
-                  ></v-btn>
-                </td>
-              </tr>
-              <tr v-if="batches.length === 0">
-                <td colspan="8" class="text-center text-grey pa-4">
-                  No hay lotes registrados
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-pagination
-              v-model="currentPage"
-              :length="Math.ceil(totalBatches / pageSize)"
-              @update:model-value="loadBatches"
-            ></v-pagination>
-          </v-card-actions>
         </v-card>
       </v-window-item>
 
@@ -357,6 +368,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import ListView from '@/components/ListView.vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import batchesService from '@/services/batches.service'
@@ -379,7 +391,6 @@ const locations = ref([])
 const variants = ref([])
 const dashboardData = ref([])
 const topAtRisk = ref([])
-const currentPage = ref(1)
 const { defaultPageSize: pageSize } = useTenantSettings()
 const totalBatches = ref(0)
 const criticalAlerts = ref(0)
@@ -387,13 +398,22 @@ const criticalAlerts = ref(0)
 // Filtros
 const filterLocation = ref(null)
 const filterAlertLevel = ref(null)
-const searchBatchNumber = ref('')
+const batchListState = ref({ page: 1, pageSize: pageSize.value || 10, search: '' })
 
 const alertLevels = [
   { title: 'Vencidos', value: 'EXPIRED' },
   { title: 'Críticos', value: 'CRITICAL' },
   { title: 'Advertencia', value: 'WARNING' },
   { title: 'OK', value: 'OK' }
+]
+
+const batchTableColumns = [
+  { title: 'Lote', key: 'batch_number', width: '150px' },
+  { title: 'Sede', key: 'location_name', width: '150px' },
+  { title: 'Ubicacion', key: 'physical_location', width: '140px' },
+  { title: 'Vencimiento', key: 'expiration_date', width: '180px' },
+  { title: 'Stock', key: 'stock', align: 'right', width: '150px' },
+  { title: 'Estado', key: 'alert_level', width: '130px' }
 ]
 
 // Dialog
@@ -413,23 +433,40 @@ const formData = ref({
 const requiresExpiration = ref(false)
 
 // Methods
-async function loadBatches() {
+async function loadBatches(params = {}) {
   if (!tenantId.value) return
+  const nextState = typeof params === 'number'
+    ? { ...batchListState.value, page: params }
+    : { ...batchListState.value, ...params }
+
+  batchListState.value = {
+    page: nextState.page || 1,
+    pageSize: nextState.pageSize || pageSize.value || 10,
+    search: nextState.search || ''
+  }
+
   loading.value = true
   try {
-    const result = await batchesService.getBatches(tenantId.value, currentPage.value, pageSize.value, {
+    const result = await batchesService.getBatches(tenantId.value, batchListState.value.page, batchListState.value.pageSize, {
       location_id: filterLocation.value,
-      batch_number: searchBatchNumber.value,
+      batch_number: batchListState.value.search,
       alert_level: filterAlertLevel.value,
       hasStock: true
     })
     if (result.success) {
-      batches.value = result.data
+      batches.value = result.data.map((batch) => ({
+        ...batch,
+        productLabel: batch.variant?.product?.name || 'Sin producto'
+      }))
       totalBatches.value = result.total
     }
   } finally {
     loading.value = false
   }
+}
+
+function refreshBatches() {
+  loadBatches({ page: 1, search: batchListState.value.search })
 }
 
 async function loadLocations() {

@@ -1,8 +1,8 @@
 # CONTEXTO_ULTIMO
 
-Fecha de actualizacion: 2026-03-18
+Fecha de actualizacion: 2026-03-19
 Owner: Equipo POSLite
-Ultimo cambio registrado: centro de ayuda interactivo con manual de usuario, FAQs y ayuda contextual en modulos criticos
+Ultimo cambio registrado: `ListView` ahora centraliza el cambio `lista/tabla` con persistencia local y se migraron modulos pendientes (`BulkImports`, `TenantManagement`, `SuperAdminRolesMenus`, `Cartera`, `CashRegisterAssignments`, `BatchManagement`) al patron comun
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -152,6 +152,11 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
   - FAQs de errores comunes
   - checklists interactivos con persistencia local
   - accesos directos a modulos
+- UX vigente del centro de ayuda:
+  - los procesos ahora usan CTA `Abrir guia`
+  - al abrir una guia, el panel de contenido hace scroll automatico
+  - la guia activa se marca visualmente como `Guia abierta`
+  - se agregaron `FAQs rapidas` y bloque `Siguientes pasos` dentro de la vista
 - Se agrego ayuda contextual reusable:
   - componente `src/components/ContextHelpCard.vue`
   - usado en `PointOfSale.vue`, `Purchases.vue`, `Inventory.vue` y `Accounting.vue`
@@ -162,6 +167,15 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 - Regla UX vigente:
   - el `Home` no debe cargar tarjetas adicionales de ayuda para no sobrecargar el dashboard;
   - el contenido del manual debe concentrarse en `/help`.
+- La documentacion de caja quedo reforzada:
+  - la operacion de caja se documenta por `sesiones`, no solo por cajas creadas
+  - cada sesion debe abrirse y cerrarse
+  - existe el parametro tenant `cash_session_max_hours`
+  - ese parametro define cuantas horas maximo puede estar abierta una sesion antes de marcarse como vencida
+- El manual HTML legacy quedo actualizado y sincronizado:
+  - fuente editable: `docs/MANUAL_USUARIO.html`
+  - version publica: `public/MANUAL_USUARIO.html`
+  - ahora referencia el centro de ayuda interno `/help`, el CTA `Config inicial`, el flujo de inventario por compras/movimientos/cargue masivo y la operacion de caja basada en sesiones
 
 ### Base contable implementada
 
@@ -191,6 +205,12 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
   - Toda lista nueva o modificada en la app debe usar el componente generico `src/components/ListView.vue`.
   - En contabilidad, el modo `LIST` debe renderizarse con `<ListView>`; `TABLE` se mantiene para grillas densas.
   - No se permiten implementaciones nuevas de listas manuales con `v-list`/`v-expansion-panels`/`v-timeline` si el caso aplica a listado.
+- `src/components/ListView.vue` fue ampliado para uso transversal:
+  - soporta cambio entre vista `list` y `table`
+  - guarda la preferencia por vista en `localStorage`
+  - permite listas `server-side` y `client-side`
+  - soporta columnas configurables por vista mediante `tableColumns`
+  - soporta slots `table-cell-*` para personalizar celdas sin reimplementar tablas manuales
 - Vistas ajustadas para doble modo:
   - `src/views/Accounting.vue`
   - `src/views/AccountingAutomation.vue`
@@ -210,6 +230,13 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
   - Separadores visuales entre items (`v-divider`).
   - `density="compact"` para reducir altura de filas.
   - Paginacion cliente con `v-pagination` + leyenda "Mostrando X - Y de N registros".
+- Modulos no contables migrados al patron comun:
+  - `src/views/BulkImports.vue` (historial de importaciones)
+  - `src/views/TenantManagement.vue` (lista de tenants)
+  - `src/views/SuperAdminRolesMenus.vue` (roles estandar y catalogo global de menus)
+  - `src/views/Cartera.vue` (cuentas de credito)
+  - `src/views/CashRegisterAssignments.vue` (asignaciones caja-cajero)
+  - `src/views/BatchManagement.vue` (lotes con paginacion server-side)
 
 ### Regla de producto obligatoria (listas)
 

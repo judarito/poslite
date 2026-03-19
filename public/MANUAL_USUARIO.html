@@ -402,7 +402,7 @@
         <main class="main-content">
             <div class="header">
                 <h1>Manual de Usuario - Sistema OfirOne</h1>
-                <p>Guía completa para el uso del sistema de punto de venta con gestión de inventario, manufactura, multi-tenant y Facturación Electrónica DIAN</p>
+                <p>Guía operativa para usar OfirOne en sus procesos críticos: ventas, compras, caja, inventario, manufactura, multi-tenant y Facturación Electrónica DIAN.</p>
             </div>
 
             <!-- INTRODUCCIÓN -->
@@ -410,7 +410,7 @@
                 <h2>📖 Introducción</h2>
                 
                 <h3>¿Qué es OfirOne?</h3>
-                <p>OfirOne es un sistema integral de punto de venta diseñado para pequeñas y medianas empresas que necesitan gestionar ventas, inventario, manufactura y múltiples puntos de venta desde una única plataforma.</p>
+                <p>OfirOne es un sistema integral para operar ventas, compras, caja, inventario y otros procesos de negocio desde una sola plataforma.</p>
 
                 <div class="feature-grid">
                     <div class="feature-card">
@@ -461,7 +461,10 @@
                 </ul>
 
                 <div class="alert alert-info">
-                    <strong>💡 Sugerencia:</strong> Este manual está organizado por módulos. Recomendamos comenzar con la Configuración Inicial si es la primera vez que usa el sistema.
+                    <strong>💡 Sugerencia:</strong> Este manual está organizado por módulos. Si es la primera vez que usa el sistema, comience con la Configuración Inicial o con el asistente <strong>Config inicial</strong> disponible en el Home cuando aún faltan pasos esenciales.
+                </div>
+                <div class="alert alert-info">
+                    <strong>🆘 Centro de ayuda dentro de la app:</strong> OfirOne cuenta con un centro de ayuda en la ruta <strong>/help</strong>, con guías por proceso, FAQs rápidas y accesos directos a ventas, compras, caja, inventario y contabilidad.
                 </div>
             </section>
 
@@ -502,7 +505,11 @@
                     <li><strong>Catálogos:</strong> Datos maestros (productos, clientes, etc.)</li>
                     <li><strong>Operaciones:</strong> Transacciones diarias (ventas, compras)</li>
                     <li><strong>Reportes:</strong> Análisis y consultas</li>
+                    <li><strong>Ayuda:</strong> Acceso al centro de ayuda integrado para consultar artículos, FAQs y guías de proceso</li>
                 </ul>
+                <div class="alert alert-info">
+                    <strong>✅ Recomendado para nuevos usuarios:</strong> si ve el botón <strong>Config inicial</strong> en el Home, úselo para completar la preparación mínima antes de vender o registrar movimientos.
+                </div>
             </section>
 
             <!-- CONFIGURACIÓN INICIAL -->
@@ -1225,6 +1232,10 @@
             <section id="inventario" class="section">
                 <h2>📊 Control de Inventario</h2>
 
+                <div class="alert alert-info">
+                    <strong>📦 Antes de cargar stock:</strong> asegúrese de tener <strong>productos y variantes</strong> creados, y que el producto tenga habilitado el comportamiento de inventario cuando corresponda.
+                </div>
+
                 <h3>Vista de Inventario</h3>
                 <p>Consulte el stock disponible de todos sus productos por ubicación.</p>
 
@@ -1269,6 +1280,17 @@
                         <li>Motivo/Razón</li>
                         <li>Lote (si aplica)</li>
                     </ul>
+                </div>
+
+                <h3>¿Cómo agregar inventario?</h3>
+                <p>En OfirOne el stock puede ingresar por diferentes caminos según el proceso operativo:</p>
+                <ul>
+                    <li><strong>Compras:</strong> la forma recomendada cuando está registrando mercancía recibida desde un proveedor.</li>
+                    <li><strong>Inventario → Movimientos / Operaciones:</strong> útil para stock inicial, ajustes o regularizaciones.</li>
+                    <li><strong>Cargue Masivo:</strong> ideal para montar catálogo y existencias iniciales en procesos de puesta en marcha.</li>
+                </ul>
+                <div class="alert alert-warning">
+                    <strong>⚠️ Importante:</strong> crear el producto no agrega stock por sí solo. Debe registrar una compra, un movimiento de inventario o un cargue masivo para que la existencia aparezca en inventario.
                 </div>
 
                 <h3>Alertas de Stock Mínimo</h3>
@@ -1905,6 +1927,9 @@
 
                 <h3>Iniciar Sesión de Caja</h3>
                 <p>Antes de realizar ventas, debe abrir una sesión de caja:</p>
+                <div class="alert alert-warning">
+                    <strong>⚠️ Importante:</strong> las cajas operan por <strong>sesiones</strong>. Una caja creada pero sin sesión abierta no puede usarse para vender.
+                </div>
 
                 <div class="step">
                     <span class="step-number">1</span>
@@ -1921,6 +1946,9 @@
                 <div class="step">
                     <span class="step-number">4</span>
                     Haga clic en "Abrir Sesión"
+                </div>
+                <div class="alert alert-info">
+                    <strong>⏱️ Control por tenant:</strong> la empresa puede definir cuántas horas como máximo puede permanecer abierta una sesión usando el parámetro <strong>cash_session_max_hours</strong> en Configuración de Empresa.
                 </div>
 
                 <h3>Realizar una Venta</h3>
@@ -2344,6 +2372,10 @@
             <section id="sesiones-caja" class="section">
                 <h2>💼 Sesiones de Caja</h2>
 
+                <div class="alert alert-info">
+                    <strong>🔐 Regla operativa:</strong> cada turno debe abrir su sesión al comenzar y cerrarla al finalizar. Si una sesión supera el tiempo máximo definido en <strong>cash_session_max_hours</strong>, se considera vencida y debe cerrarse para abrir una nueva.
+                </div>
+
                 <h3>Consultar Sesiones</h3>
                 <div class="step">
                     <span class="step-number">1</span>
@@ -2356,7 +2388,7 @@
                         <li>Fecha</li>
                         <li>Caja</li>
                         <li>Usuario</li>
-                        <li>Estado (Abierta/Cerrada)</li>
+                        <li>Estado (Abierta/Cerrada/Vencida, según configuración)</li>
                     </ul>
                 </div>
 
@@ -2411,6 +2443,9 @@
 
                 <div class="alert alert-info">
                     <strong>💡 Consejo:</strong> Realice retiros periódicos para no acumular mucho efectivo en la caja (seguridad).
+                </div>
+                <div class="alert alert-warning">
+                    <strong>⚙️ Parámetro relacionado:</strong> revise con su administrador el valor de <strong>cash_session_max_hours</strong> en Configuración de Empresa. Ese parámetro define el máximo de horas que una sesión puede permanecer abierta antes de marcarse como vencida.
                 </div>
             </section>
 
@@ -2706,16 +2741,16 @@
                 <ul>
                     <li>📧 Email de soporte: soporte@poslite.com</li>
                     <li>📱 WhatsApp: +57 300 123 4567</li>
-                    <li>🌐 Centro de ayuda: https://ayuda.poslite.com</li>
-                    <li>💬 Chat en vivo: Disponible en el sistema (esquina inferior derecha)</li>
+                    <li>🌐 Centro de ayuda dentro de la app: abra la ruta <strong>/help</strong> o use el acceso de ayuda en la barra superior</li>
+                    <li>💬 Guías rápidas: consulte artículos por proceso, FAQs y siguientes pasos desde el centro de ayuda</li>
                 </ul>
 
                 <h3>Recursos Adicionales</h3>
                 <ul>
-                    <li>🎥 <a href="#">Videos tutoriales</a></li>
-                    <li>📚 <a href="#">Base de conocimientos</a></li>
-                    <li>❓ <a href="#">Preguntas frecuentes (FAQ)</a></li>
-                    <li>🔄 <a href="#">Notas de versión</a></li>
+                    <li>🎥 Tutoriales por proceso dentro del centro de ayuda</li>
+                    <li>📚 Guías operativas para ventas, compras, caja, inventario y contabilidad</li>
+                    <li>❓ FAQs rápidas por módulo</li>
+                    <li>🔄 Artículos con siguientes pasos para completar cada flujo</li>
                 </ul>
 
                 <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #ddd; text-align: center; color: #757575;">
@@ -2772,7 +2807,6 @@
     </script>
 </body>
 </html>
-
 
 
 

@@ -6,21 +6,26 @@ Este directorio contiene la documentación del sistema OfirOne.
 
 El manual de usuario completo está disponible en dos ubicaciones:
 
-1. **Versión Web (Accesible desde la app):**
+1. **Versión Web Estática:**
    - Ubicación: `/public/MANUAL_USUARIO.html`
-   - Acceso: Desde el menú lateral de la aplicación → "Manual de Usuario"
+   - Uso: referencia estática y exportación a PDF
    - Se abre en una nueva pestaña del navegador
 
 2. **Versión de Desarrollo:**
    - Ubicación: `/docs/MANUAL_USUARIO.html`
    - Para desarrollo y edición
 
+3. **Centro de ayuda integrado (principal para usuarios):**
+   - Ruta dentro de la app: `/help`
+   - Acceso: desde la barra superior de la aplicación
+   - Incluye guías por proceso, FAQs y ayuda contextual
+
 ## 🎯 Uso
 
 ### Para Usuarios
 - Iniciar sesión en la aplicación
-- Hacer clic en "Manual de Usuario" en el menú lateral
-- El manual se abrirá en una nueva pestaña
+- Abrir el centro de ayuda desde la barra superior o navegar a `/help`
+- Usar el manual HTML solo cuando necesite una versión extensa o exportable
 
 ### Para Desarrolladores
 Si necesitas editar el manual:

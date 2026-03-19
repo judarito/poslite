@@ -1,162 +1,124 @@
 <template>
   <div>
     <v-card>
-      <v-card-title class="d-flex align-center flex-wrap ga-2">
-        <div class="d-flex align-center">
-          <v-icon start color="primary">mdi-cash-register</v-icon>
-          Asignación de Cajas a Cajeros
-        </div>
-        <v-spacer></v-spacer>
-        <v-btn 
-          color="primary" 
-          prepend-icon="mdi-plus" 
-          @click="openAssignDialog"
-          class="text-none"
-        >
-          <span class="d-none d-sm-inline">Asignar Caja</span>
-          <span class="d-sm-none">Asignar</span>
-        </v-btn>
-      </v-card-title>
-
       <v-card-text>
-        <v-row class="mb-3">
-          <v-col cols="12" sm="4">
-            <v-select
-              v-model="filters.userId"
-              :items="users"
-              item-title="full_name"
-              item-value="user_id"
-              label="Filtrar por Cajero"
-              variant="outlined"
-              density="compact"
-              clearable
-              @update:model-value="loadAssignments"
-            ></v-select>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-select
-              v-model="filters.locationId"
-              :items="locations"
-              item-title="name"
-              item-value="location_id"
-              label="Filtrar por Sede"
-              variant="outlined"
-              density="compact"
-              clearable
-              @update:model-value="loadAssignments"
-            ></v-select>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-select
-              v-model="filters.isActive"
-              :items="[{text:'Todas',value:null},{text:'Activas',value:true},{text:'Inactivas',value:false}]"
-              item-title="text"
-              item-value="value"
-              label="Estado"
-              variant="outlined"
-              density="compact"
-              @update:model-value="loadAssignments"
-            ></v-select>
-          </v-col>
-        </v-row>
+        <ListView
+          title="Asignación de Cajas a Cajeros"
+          icon="mdi-cash-register"
+          :items="assignments"
+          :total-items="assignments.length"
+          :loading="false"
+          :page-size="defaultPageSize"
+          item-key="assignment_id"
+          title-field="user_name"
+          subtitle-field="cash_register_name"
+          avatar-icon="mdi-account-cash"
+          avatar-color="primary"
+          empty-message="Sin asignaciones"
+          create-button-text="Asignar Caja"
+          :editable="false"
+          :deletable="false"
+          :client-side="true"
+          :table-columns="assignmentTableColumns"
+          :search-fields="['user_name', 'cash_register_name', 'location_name']"
+          view-storage-key="cash-register-assignments"
+          @create="openAssignDialog"
+        >
+          <template #filters>
+            <v-row>
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model="filters.userId"
+                  :items="users"
+                  item-title="full_name"
+                  item-value="user_id"
+                  label="Filtrar por Cajero"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  @update:model-value="loadAssignments"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model="filters.locationId"
+                  :items="locations"
+                  item-title="name"
+                  item-value="location_id"
+                  label="Filtrar por Sede"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  @update:model-value="loadAssignments"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model="filters.isActive"
+                  :items="[{text:'Todas',value:null},{text:'Activas',value:true},{text:'Inactivas',value:false}]"
+                  item-title="text"
+                  item-value="value"
+                  label="Estado"
+                  variant="outlined"
+                  density="compact"
+                  @update:model-value="loadAssignments"
+                ></v-select>
+              </v-col>
+            </v-row>
+          </template>
 
-        <!-- Desktop: Table -->
-        <v-table density="comfortable" class="d-none d-sm-table w-100">
-          <thead>
-            <tr>
-              <th>Cajero</th>
-              <th>Caja</th>
-              <th>Sede</th>
-              <th>Estado</th>
-              <th>Asignado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in assignments" :key="item.assignment_id">
-              <td>{{ item.user_name }}</td>
-              <td>{{ item.cash_register_name }}</td>
-              <td>{{ item.location_name }}</td>
-              <td>
-                <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="flat">
-                  {{ item.is_active ? 'Activa' : 'Inactiva' }}
-                </v-chip>
-              </td>
-              <td>{{ formatDate(item.assigned_at) }}</td>
-              <td>
-                <v-btn
-                  v-if="item.is_active"
-                  icon="mdi-close"
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="deactivateAssignment(item)"
-                ></v-btn>
-                <v-btn
-                  v-else
-                  icon="mdi-check"
-                  size="small"
-                  variant="text"
-                  color="success"
-                  @click="activateAssignment(item)"
-                ></v-btn>
-              </td>
-            </tr>
-            <tr v-if="assignments.length === 0">
-              <td colspan="6" class="text-center text-grey pa-4">Sin asignaciones</td>
-            </tr>
-          </tbody>
-        </v-table>
+          <template #subtitle="{ item }">
+            {{ [item.cash_register_name, item.location_name].filter(Boolean).join(' • ') }}
+          </template>
 
-        <!-- Mobile: Cards -->
-        <div class="d-sm-none pa-2">
-          <v-card v-for="item in assignments" :key="item.assignment_id" variant="outlined" class="mb-2">
-            <v-card-text>
-              <div class="d-flex align-center justify-space-between mb-2">
-                <div class="text-body-2 font-weight-bold">{{ item.user_name }}</div>
-                <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="flat">
-                  {{ item.is_active ? 'Activa' : 'Inactiva' }}
-                </v-chip>
-              </div>
-              <v-divider class="my-2"></v-divider>
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span class="text-grey">Caja:</span>
-                <span>{{ item.cash_register_name }}</span>
-              </div>
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span class="text-grey">Sede:</span>
-                <span>{{ item.location_name }}</span>
-              </div>
-              <div class="d-flex justify-space-between text-caption mb-2">
-                <span class="text-grey">Asignado:</span>
-                <span>{{ formatDate(item.assigned_at) }}</span>
-              </div>
-              <v-btn
-                v-if="item.is_active"
-                prepend-icon="mdi-close"
-                size="small"
-                variant="outlined"
-                color="error"
-                block
-                @click="deactivateAssignment(item)"
-              >
-                Desactivar
-              </v-btn>
-              <v-btn
-                v-else
-                prepend-icon="mdi-check"
-                size="small"
-                variant="outlined"
-                color="success"
-                block
-                @click="activateAssignment(item)"
-              >
-                Activar
-              </v-btn>
-            </v-card-text>
-          </v-card>
-          <div v-if="assignments.length === 0" class="text-center text-grey pa-4">Sin asignaciones</div>
-        </div>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="flat">
+                {{ item.is_active ? 'Activa' : 'Inactiva' }}
+              </v-chip>
+              <v-chip size="small" variant="tonal">
+                Asignado: {{ formatDate(item.assigned_at) }}
+              </v-chip>
+            </div>
+          </template>
+
+          <template #table-cell-cash_register_name="{ item }">
+            {{ item.cash_register_name }}
+          </template>
+
+          <template #table-cell-location_name="{ item }">
+            {{ item.location_name }}
+          </template>
+
+          <template #table-cell-is_active="{ item }">
+            <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="flat">
+              {{ item.is_active ? 'Activa' : 'Inactiva' }}
+            </v-chip>
+          </template>
+
+          <template #table-cell-assigned_at="{ item }">
+            {{ formatDate(item.assigned_at) }}
+          </template>
+
+          <template #actions="{ item }">
+            <v-btn
+              v-if="item.is_active"
+              icon="mdi-close"
+              size="small"
+              variant="text"
+              color="error"
+              @click.stop="deactivateAssignment(item)"
+            ></v-btn>
+            <v-btn
+              v-else
+              icon="mdi-check"
+              size="small"
+              variant="text"
+              color="success"
+              @click.stop="activateAssignment(item)"
+            ></v-btn>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
 
@@ -207,6 +169,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import ListView from '@/components/ListView.vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTenantSettings } from '@/composables/useTenantSettings'
@@ -230,6 +193,12 @@ const users = ref([])
 const cashRegisters = ref([])
 const locations = ref([])
 const filters = ref({ userId: null, locationId: null, isActive: true })
+const assignmentTableColumns = [
+  { title: 'Caja', key: 'cash_register_name', width: '180px' },
+  { title: 'Sede', key: 'location_name', width: '160px' },
+  { title: 'Estado', key: 'is_active', width: '120px' },
+  { title: 'Asignado', key: 'assigned_at', width: '180px' }
+]
 
 const assignDialog = ref(false)
 const saving = ref(false)

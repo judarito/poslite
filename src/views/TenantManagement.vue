@@ -236,66 +236,88 @@
         <!-- TAB: LISTA DE TENANTS -->
         <v-window-item value="list">
           <v-card-text>
-            <v-row>
-              <v-col cols="12">
+            <ListView
+              title="Lista de Tenants"
+              icon="mdi-office-building-multiple"
+              :items="tenants"
+              :total-items="tenants.length"
+              :loading="loadingTenants"
+              :page-size="12"
+              item-key="tenant_id"
+              title-field="name"
+              subtitle-field="email"
+              avatar-icon="mdi-domain"
+              avatar-color="primary"
+              empty-message="No hay tenants registrados"
+              :editable="false"
+              :deletable="false"
+              :show-create-button="false"
+              :client-side="true"
+              :table-columns="tenantTableColumns"
+              :search-fields="['name', 'tax_id', 'email', 'legal_name']"
+              view-storage-key="superadmin-tenants"
+            >
+              <template #filters>
+                <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+                  <div class="text-caption text-medium-emphasis">
+                    Gestiona tenants activos e inactivos desde una sola vista.
+                  </div>
+                  <v-btn
+                    color="primary"
+                    variant="tonal"
+                    prepend-icon="mdi-refresh"
+                    @click="loadTenants"
+                    :loading="loadingTenants"
+                  >
+                    Actualizar
+                  </v-btn>
+                </div>
+              </template>
+
+              <template #subtitle="{ item }">
+                {{ [item.tax_id ? `NIT: ${item.tax_id}` : null, item.email].filter(Boolean).join(' • ') }}
+              </template>
+
+              <template #content="{ item }">
+                <div class="mt-2 d-flex flex-wrap ga-2">
+                  <v-chip
+                    :color="item.is_active ? 'success' : 'error'"
+                    size="small"
+                    variant="flat"
+                  >
+                    {{ item.is_active ? 'Activo' : 'Inactivo' }}
+                  </v-chip>
+                  <v-chip size="small" variant="tonal">
+                    Creado: {{ formatDate(item.created_at) }}
+                  </v-chip>
+                </div>
+              </template>
+
+              <template #table-cell-is_active="{ item }">
+                <v-chip
+                  :color="item.is_active ? 'success' : 'error'"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ item.is_active ? 'Activo' : 'Inactivo' }}
+                </v-chip>
+              </template>
+
+              <template #table-cell-created_at="{ item }">
+                {{ formatDate(item.created_at) }}
+              </template>
+
+              <template #actions="{ item }">
                 <v-btn
+                  size="small"
+                  variant="text"
                   color="primary"
-                  variant="tonal"
-                  prepend-icon="mdi-refresh"
-                  @click="loadTenants"
-                  :loading="loadingTenants"
-                  class="mb-4"
+                  @click.stop="viewTenantTemplate(item.tenant_id)"
                 >
-                  Actualizar
+                  Ver Config
                 </v-btn>
-              </v-col>
-
-              <v-col cols="12">
-                <v-card
-                  v-for="tenant in tenants"
-                  :key="tenant.tenant_id"
-                  variant="outlined"
-                  class="mb-3"
-                >
-                  <v-card-text>
-                    <v-row align="center">
-                      <v-col cols="12" sm="8">
-                        <div class="text-h6">{{ tenant.name }}</div>
-                        <div class="text-caption text-grey">
-                          NIT: {{ tenant.tax_id }} • {{ tenant.email }}
-                        </div>
-                        <div class="text-caption text-grey">
-                          Creado: {{ formatDate(tenant.created_at) }}
-                        </div>
-                      </v-col>
-                      <v-col cols="12" sm="4" class="text-right">
-                        <v-chip
-                          :color="tenant.is_active ? 'success' : 'error'"
-                          size="small"
-                          variant="flat"
-                          class="mb-2"
-                        >
-                          {{ tenant.is_active ? 'Activo' : 'Inactivo' }}
-                        </v-chip>
-                        <br>
-                        <v-btn
-                          size="small"
-                          variant="text"
-                          color="primary"
-                          @click="viewTenantTemplate(tenant.tenant_id)"
-                        >
-                          Ver Config
-                        </v-btn>
-                      </v-col>
-                    </v-row>
-                  </v-card-text>
-                </v-card>
-
-                <v-alert v-if="tenants.length === 0 && !loadingTenants" type="info">
-                  No hay tenants registrados
-                </v-alert>
-              </v-col>
-            </v-row>
+              </template>
+            </ListView>
           </v-card-text>
         </v-window-item>
       </v-window>
@@ -348,18 +370,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useTenant } from '@/composables/useTenant'
+import { ref, onMounted } from 'vue'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
-import { useNotification } from '@/composables/useNotification'
+import ListView from '@/components/ListView.vue'
 import tenantsService from '@/services/tenants.service'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
 
-const { tenantId, currentTenant } = useTenant()
 const { canManageTenants, superAdminInfo, isResolving } = useSuperAdmin()
-const { showNotification } = useNotification()
 
 // Agregar estabilidad a los cambios reactivos
 const isInitialized = ref(false)
@@ -404,6 +423,13 @@ const confirmPassword = ref('')
 const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
+
+const tenantTableColumns = [
+  { title: 'NIT', key: 'tax_id', width: '150px' },
+  { title: 'Email', key: 'email', width: '220px' },
+  { title: 'Estado', key: 'is_active', width: '140px' },
+  { title: 'Creado', key: 'created_at', width: '180px' }
+]
 
 const rules = {
   required: v => !!v || 'Campo requerido',

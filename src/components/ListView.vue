@@ -1,6 +1,5 @@
 <template>
   <div class="list-view ofir-list-view">
-    <!-- Toolbar con acciones -->
     <v-card flat class="ofir-list-view__card">
       <v-card-title class="ofir-list-view__title d-flex flex-column flex-sm-row align-start align-sm-center pa-2 pa-sm-4">
         <div class="d-flex align-center mb-2 mb-sm-0">
@@ -24,6 +23,18 @@
           :style="{ 'max-width': $vuetify.display.smAndUp ? '300px' : '100%' }"
           @update:model-value="debouncedSearch"
         ></v-text-field>
+
+        <v-btn-toggle
+          v-if="showViewToggle"
+          v-model="viewMode"
+          mandatory
+          density="comfortable"
+          color="primary"
+          class="ofir-list-view__mode-toggle mb-2 mb-sm-0 mr-sm-2"
+        >
+          <v-btn value="list" icon="mdi-format-list-bulleted" size="small" :title="'Vista lista'"></v-btn>
+          <v-btn value="table" icon="mdi-table" size="small" :title="'Vista tabla'"></v-btn>
+        </v-btn-toggle>
 
         <!-- Botón crear -->
         <v-btn
@@ -54,9 +65,12 @@
         class="ofir-list-view__loading"
       ></v-progress-linear>
 
-      <!-- Lista -->
-      <v-list v-if="!loading && items.length > 0" lines="two" class="ofir-list-view__list">
-        <template v-for="(item, index) in items" :key="item[itemKey]">
+      <v-list
+        v-if="!loading && displayItems.length > 0 && viewMode === 'list'"
+        lines="two"
+        class="ofir-list-view__list"
+      >
+        <template v-for="(item, index) in displayItems" :key="item[itemKey]">
           <v-list-item
             @click="$emit('item-click', item)"
             class="ofir-list-view__item"
@@ -113,12 +127,102 @@
             </template>
           </v-list-item>
 
-          <v-divider v-if="index < items.length - 1" class="ofir-list-view__item-divider"></v-divider>
+          <v-divider v-if="index < displayItems.length - 1" class="ofir-list-view__item-divider"></v-divider>
         </template>
       </v-list>
 
+      <div
+        v-else-if="!loading && displayItems.length > 0 && viewMode === 'table'"
+        class="ofir-list-view__table-container"
+      >
+        <v-table
+          class="ofir-list-view__table"
+          :class="{ 'ofir-list-view__table--explicit': hasExplicitTableColumns }"
+          density="comfortable"
+        >
+          <thead>
+            <tr>
+              <th class="text-left">{{ tableMainTitle }}</th>
+              <th
+                v-for="column in normalizedTableColumns"
+                :key="column.key"
+                :class="column.align ? `text-${column.align}` : 'text-left'"
+                :style="column.width ? { width: column.width } : undefined"
+              >
+                {{ column.title }}
+              </th>
+              <th v-if="showRowActions" class="text-right" style="width: 1%;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in displayItems"
+              :key="item[itemKey]"
+              class="ofir-list-view__table-row"
+              :class="{ 'cursor-pointer': clickable }"
+              @click="handleRowClick(item)"
+            >
+              <td class="ofir-list-view__table-main">
+                <slot name="table-main" :item="item">
+                  <div class="ofir-list-view__table-main-title">
+                    <slot name="title" :item="item">
+                      {{ item[titleField] }}
+                    </slot>
+                  </div>
+                  <div
+                    v-if="showTableSubtitleInline && (subtitleField || $slots.subtitle)"
+                    class="ofir-list-view__table-main-subtitle text-medium-emphasis"
+                  >
+                    <slot name="subtitle" :item="item">
+                      {{ item[subtitleField] }}
+                    </slot>
+                  </div>
+                  <div v-if="showTableContentInline && $slots.content" class="ofir-list-view__table-main-content mt-2">
+                    <slot name="content" :item="item"></slot>
+                  </div>
+                </slot>
+              </td>
+              <td
+                v-for="column in normalizedTableColumns"
+                :key="column.key"
+                :class="column.align ? `text-${column.align}` : 'text-left'"
+              >
+                <slot
+                  :name="`table-cell-${column.key}`"
+                  :item="item"
+                  :value="getColumnValue(item, column)"
+                >
+                  {{ getColumnValue(item, column) }}
+                </slot>
+              </td>
+              <td v-if="showRowActions" class="text-right" @click.stop>
+                <slot name="actions" :item="item">
+                  <div class="d-flex justify-end flex-wrap ga-1">
+                    <v-btn
+                      v-if="editable"
+                      icon="mdi-pencil"
+                      variant="text"
+                      size="small"
+                      @click.stop="$emit('edit', item)"
+                    ></v-btn>
+                    <v-btn
+                      v-if="deletable"
+                      icon="mdi-delete"
+                      variant="text"
+                      size="small"
+                      color="error"
+                      @click.stop="$emit('delete', item)"
+                    ></v-btn>
+                  </div>
+                </slot>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </div>
+
       <!-- Sin datos -->
-      <v-card-text v-if="!loading && items.length === 0">
+      <v-card-text v-if="!loading && displayItems.length === 0">
         <v-alert type="info" variant="tonal" class="text-center ofir-list-view__empty-alert">
           <v-icon size="48" class="mb-2">{{ emptyIcon }}</v-icon>
           <div>{{ emptyMessage }}</div>
@@ -137,15 +241,16 @@
       </v-card-actions>
 
       <!-- Info de paginación -->
-      <v-card-text v-if="items.length > 0" class="text-center text-caption pa-2 ofir-list-view__meta">
-        Mostrando {{ startIndex + 1 }} - {{ endIndex }} de {{ totalItems }} registros
+      <v-card-text v-if="displayItems.length > 0" class="text-center text-caption pa-2 ofir-list-view__meta">
+        Mostrando {{ startIndex + 1 }} - {{ endIndex }} de {{ totalItemsForView }} registros
       </v-card-text>
     </v-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, useSlots } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 
 const props = defineProps({
@@ -168,7 +273,16 @@ const props = defineProps({
   avatarIcon: { type: String, default: '' },
   avatarColor: { type: String, default: 'primary' },
   emptyMessage: { type: String, default: 'No hay registros para mostrar' },
-  emptyIcon: { type: String, default: 'mdi-inbox' }
+  emptyIcon: { type: String, default: 'mdi-inbox' },
+  showViewToggle: { type: Boolean, default: true },
+  defaultViewMode: { type: String, default: 'list' },
+  viewStorageKey: { type: String, default: '' },
+  clientSide: { type: Boolean, default: false },
+  tableMainTitle: { type: String, default: 'Registro' },
+  tableColumns: { type: Array, default: () => [] },
+  searchFields: { type: Array, default: () => [] },
+  tableInlineSubtitle: { type: Boolean, default: false },
+  tableInlineContent: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -180,17 +294,107 @@ const emit = defineEmits([
   'search'
 ])
 
+const slots = useSlots()
+const route = useRoute()
 const { tenantId } = useTenant()
 const currentPage = ref(1)
 const searchQuery = ref('')
+const viewMode = ref('list')
 let searchTimeout = null
+const storageKey = computed(() => {
+  const routeKey = route.name || route.path || 'global'
+  const listKey = props.viewStorageKey || props.title
+  const baseKey = `${routeKey}:${listKey}`
+  return `ofir:list-view-mode:${String(baseKey)}`
+})
 
-const totalPages = computed(() => Math.ceil(props.totalItems / props.pageSize))
+const normalizedTableColumns = computed(() => {
+  return props.tableColumns.map((column) => ({
+    align: 'left',
+    ...column
+  }))
+})
+
+const hasExplicitTableColumns = computed(() => normalizedTableColumns.value.length > 0)
+const showTableSubtitleInline = computed(() => !hasExplicitTableColumns.value || props.tableInlineSubtitle)
+const showTableContentInline = computed(() => !hasExplicitTableColumns.value || props.tableInlineContent)
+
+const filteredClientItems = computed(() => {
+  if (!props.clientSide) return props.items
+
+  const term = normalizeSearch(searchQuery.value)
+  if (!term) return props.items
+
+  return props.items.filter((item) => matchSearch(item, term))
+})
+
+const totalItemsForView = computed(() => {
+  return props.clientSide ? filteredClientItems.value.length : props.totalItems
+})
+
+const totalPages = computed(() => Math.ceil(totalItemsForView.value / props.pageSize) || 1)
 const startIndex = computed(() => (currentPage.value - 1) * props.pageSize)
-const endIndex = computed(() => Math.min(startIndex.value + props.pageSize, props.totalItems))
+const endIndex = computed(() => Math.min(startIndex.value + displayItems.value.length, totalItemsForView.value))
 const showActions = computed(() => props.editable || props.deletable)
+const showRowActions = computed(() => showActions.value || Boolean(slots.actions))
+
+const displayItems = computed(() => {
+  if (!props.clientSide) return props.items
+  return filteredClientItems.value.slice(startIndex.value, startIndex.value + props.pageSize)
+})
+
+const normalizeSearch = (value) => String(value || '').trim().toLowerCase()
+
+const getSearchableValues = (item) => {
+  if (!item) return []
+  if (props.searchFields.length > 0) {
+    return props.searchFields.map((field) => {
+      if (typeof field === 'function') return field(item)
+      return item?.[field]
+    })
+  }
+
+  return Object.values(item).flatMap((value) => {
+    if (Array.isArray(value)) {
+      return value.map((entry) => JSON.stringify(entry))
+    }
+    if (value && typeof value === 'object') {
+      return JSON.stringify(value)
+    }
+    return value
+  })
+}
+
+const matchSearch = (item, term) => {
+  return getSearchableValues(item).some((value) => normalizeSearch(value).includes(term))
+}
+
+const persistViewMode = (mode) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(storageKey.value, mode)
+}
+
+const restoreViewMode = () => {
+  if (typeof window === 'undefined') return
+  const stored = window.localStorage.getItem(storageKey.value)
+  const nextMode = stored === 'table' || stored === 'list' ? stored : props.defaultViewMode
+  viewMode.value = nextMode === 'table' ? 'table' : 'list'
+}
+
+const getColumnValue = (item, column) => {
+  if (typeof column.value === 'function') return column.value(item)
+  if (column.field) return item?.[column.field]
+  return item?.[column.key]
+}
+
+const handleRowClick = (item) => {
+  if (!props.clickable) return
+  emit('item-click', item)
+}
 
 const loadPage = (page) => {
+  currentPage.value = page
+  if (props.clientSide) return
   emit('load-page', {
     page,
     pageSize: props.pageSize,
@@ -205,6 +409,7 @@ const debouncedSearch = () => {
   }
   searchTimeout = setTimeout(() => {
     currentPage.value = 1
+    if (props.clientSide) return
     emit('search', {
       search: searchQuery.value,
       page: 1,
@@ -216,14 +421,30 @@ const debouncedSearch = () => {
 
 // Recargar cuando cambia el tenant
 watch(() => tenantId.value, () => {
-  if (props.autoLoad && tenantId.value) {
+  if (props.autoLoad && tenantId.value && !props.clientSide) {
     currentPage.value = 1
     loadPage(1)
   }
 })
 
+watch(viewMode, (mode) => {
+  persistViewMode(mode)
+})
+
+watch(
+  () => filteredClientItems.value.length,
+  (length) => {
+    if (!props.clientSide) return
+    const maxPage = Math.max(1, Math.ceil(length / props.pageSize) || 1)
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+    }
+  }
+)
+
 onMounted(() => {
-  if (props.autoLoad && tenantId.value) {
+  restoreViewMode()
+  if (props.autoLoad && tenantId.value && !props.clientSide) {
     loadPage(1)
   }
 })
@@ -272,6 +493,11 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.ofir-list-view__mode-toggle {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 .ofir-list-view__divider {
   opacity: 0.55;
 }
@@ -299,6 +525,52 @@ onMounted(() => {
 
 .ofir-list-view__item-divider {
   margin: 0 12px;
+}
+
+.ofir-list-view__table-container {
+  overflow-x: auto;
+}
+
+.ofir-list-view__table {
+  background: transparent !important;
+}
+
+.ofir-list-view__table :deep(table) {
+  min-width: 760px;
+}
+
+.ofir-list-view__table :deep(th) {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ofir-list-view__table :deep(td) {
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.ofir-list-view__table-row {
+  transition: background-color 0.2s ease;
+}
+
+.ofir-list-view__table-row:hover {
+  background-color: rgba(var(--v-theme-primary), 0.05);
+}
+
+.ofir-list-view__table-main {
+  min-width: 260px;
+}
+
+.ofir-list-view__table-main-title {
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.ofir-list-view__table-main-subtitle {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  margin-top: 2px;
 }
 
 .ofir-list-view__empty-alert {

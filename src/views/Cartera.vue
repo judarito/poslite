@@ -50,143 +50,129 @@
     <!-- Filtro + Tabla -->
     <v-card>
       <v-card-text>
-        <v-row align="center" class="mb-3">
-          <v-col cols="12" sm="5">
-            <v-text-field
-              v-model="search"
-              prepend-inner-icon="mdi-magnify"
-              label="Buscar cliente..."
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-select
-              v-model="filterStatus"
-              :items="statusOptions"
-              label="Estado"
-              variant="outlined"
-              density="compact"
-              hide-details
-            ></v-select>
-          </v-col>
-          <v-col cols="12" sm="3" class="text-right">
-            <v-btn color="primary" prepend-icon="mdi-account-plus" variant="outlined" @click="openNewAccountDialog">
-              Nuevo cupo
-            </v-btn>
-          </v-col>
-        </v-row>
+        <ListView
+          title="Cuentas de credito"
+          icon="mdi-account-credit-card-outline"
+          :items="filteredAccounts"
+          :total-items="filteredAccounts.length"
+          :loading="loading"
+          :page-size="12"
+          item-key="credit_account_id"
+          title-field="customerName"
+          subtitle-field="customerDocument"
+          avatar-icon="mdi-account-cash"
+          avatar-color="warning"
+          empty-message="No hay cuentas de credito registradas"
+          :show-create-button="false"
+          :editable="false"
+          :deletable="false"
+          :clickable="true"
+          :client-side="true"
+          :table-columns="creditTableColumns"
+          :search-fields="['customerName', 'customerDocument', 'customerPhone']"
+          view-storage-key="credit-portfolio-accounts"
+          @item-click="openHistory"
+        >
+          <template #filters>
+            <div class="d-flex flex-wrap align-center justify-space-between ga-3">
+              <v-select
+                v-model="filterStatus"
+                :items="statusOptions"
+                label="Estado"
+                variant="outlined"
+                density="compact"
+                hide-details
+                style="max-width: 240px;"
+              ></v-select>
 
-        <!-- Desktop -->
-        <v-table density="comfortable" class="d-none d-sm-table w-100">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th>Documento</th>
-              <th class="text-right">Cupo</th>
-              <th class="text-right">Saldo Deuda</th>
-              <th class="text-right">Disponible</th>
-              <th class="text-right">Uso %</th>
-              <th class="text-center">Estado</th>
-              <th class="text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="acc in filteredAccounts" :key="acc.credit_account_id" class="hoverable-row" @click="openHistory(acc)">
-              <td>
-                <div class="text-body-2 font-weight-medium">{{ acc.customer?.full_name }}</div>
-                <div class="text-caption text-medium-emphasis">{{ acc.customer?.phone }}</div>
-              </td>
-              <td class="text-caption">{{ acc.customer?.document || '—' }}</td>
-              <td class="text-right">{{ formatMoney(acc.credit_limit) }}</td>
-              <td class="text-right font-weight-bold" :class="acc.current_balance > 0 ? 'text-red' : 'text-success'">
-                {{ formatMoney(acc.current_balance) }}
-              </td>
-              <td class="text-right">
-                <span :class="availableCredit(acc) <= 0 ? 'text-error' : 'text-success'">
-                  {{ formatMoney(availableCredit(acc)) }}
-                </span>
-              </td>
-              <td class="text-right" style="min-width:120px">
-                <v-progress-linear
-                  :model-value="usagePercent(acc)"
-                  :color="usagePercent(acc) >= 100 ? 'error' : usagePercent(acc) >= 80 ? 'warning' : 'success'"
-                  height="14"
-                  rounded
-                >
-                  <template #default="{ value }">
-                    <span class="text-caption font-weight-bold" style="font-size:10px">{{ Math.round(value) }}%</span>
-                  </template>
-                </v-progress-linear>
-              </td>
-              <td class="text-center">
-                <v-chip :color="acc.is_active ? 'success' : 'grey'" size="small" variant="tonal">
-                  {{ acc.is_active ? 'Activo' : 'Inactivo' }}
+              <div class="d-flex flex-wrap ga-2">
+                <v-btn color="primary" prepend-icon="mdi-account-plus" variant="outlined" @click="openNewAccountDialog">
+                  Nuevo cupo
+                </v-btn>
+                <v-btn color="primary" prepend-icon="mdi-refresh" variant="tonal" :loading="loading" @click="load">
+                  Actualizar
+                </v-btn>
+              </div>
+            </div>
+          </template>
+
+          <template #subtitle="{ item }">
+            {{ [item.customerDocument, item.customerPhone].filter(Boolean).join(' • ') || 'Sin contacto' }}
+          </template>
+
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-column ga-2">
+              <div class="d-flex flex-wrap ga-2">
+                <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="tonal">
+                  {{ item.is_active ? 'Activo' : 'Inactivo' }}
                 </v-chip>
-              </td>
-              <td class="text-center">
-                <div class="d-flex justify-center gap-1" @click.stop>
-                  <v-btn
-                    size="x-small" color="green" variant="tonal"
-                    prepend-icon="mdi-cash-plus"
-                    @click.stop="openPaymentDialog(acc)"
-                  >Abonar</v-btn>
-                  <v-btn size="x-small" variant="text" icon="mdi-history" @click.stop="openHistory(acc)"></v-btn>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!filteredAccounts.length">
-              <td colspan="8" class="text-center text-medium-emphasis pa-6">
-                <v-icon size="40" class="mb-2">mdi-account-credit-card-outline</v-icon>
-                <div>No hay cuentas de crédito{{ search ? ' con ese filtro' : '' }}</div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-
-        <!-- Mobile -->
-        <div class="d-sm-none">
-          <v-card
-            v-for="acc in filteredAccounts"
-            :key="acc.credit_account_id"
-            variant="outlined"
-            class="mb-3"
-            @click="openHistory(acc)"
-          >
-            <v-card-text class="pa-3">
-              <div class="d-flex justify-space-between align-start mb-2">
-                <div>
-                  <div class="text-body-2 font-weight-bold">{{ acc.customer?.full_name }}</div>
-                  <div class="text-caption text-medium-emphasis">{{ acc.customer?.document }}</div>
-                </div>
-                <v-chip :color="acc.is_active ? 'success' : 'grey'" size="x-small" variant="tonal">
-                  {{ acc.is_active ? 'Activo' : 'Inactivo' }}
+                <v-chip size="small" variant="tonal">Cupo: {{ formatMoney(item.credit_limit) }}</v-chip>
+                <v-chip size="small" variant="tonal" color="error">Deuda: {{ formatMoney(item.current_balance) }}</v-chip>
+                <v-chip size="small" variant="tonal" :color="availableCredit(item) <= 0 ? 'error' : 'success'">
+                  Disponible: {{ formatMoney(availableCredit(item)) }}
                 </v-chip>
               </div>
               <v-progress-linear
-                :model-value="usagePercent(acc)"
-                :color="usagePercent(acc) >= 100 ? 'error' : usagePercent(acc) >= 80 ? 'warning' : 'success'"
-                height="10" rounded class="mb-2"
+                :model-value="usagePercent(item)"
+                :color="usagePercent(item) >= 100 ? 'error' : usagePercent(item) >= 80 ? 'warning' : 'success'"
+                height="10"
+                rounded
               ></v-progress-linear>
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span class="text-medium-emphasis">Deuda:</span>
-                <span class="font-weight-bold text-red">{{ formatMoney(acc.current_balance) }}</span>
-              </div>
-              <div class="d-flex justify-space-between text-caption mb-2">
-                <span class="text-medium-emphasis">Disponible:</span>
-                <span :class="availableCredit(acc) <= 0 ? 'text-error' : 'text-success'">{{ formatMoney(availableCredit(acc)) }}</span>
-              </div>
-              <v-btn size="small" color="green" variant="tonal" block prepend-icon="mdi-cash-plus" @click.stop="openPaymentDialog(acc)">
-                Registrar abono
+            </div>
+          </template>
+
+          <template #table-cell-credit_limit="{ item }">
+            <div class="text-right">{{ formatMoney(item.credit_limit) }}</div>
+          </template>
+
+          <template #table-cell-current_balance="{ item }">
+            <div class="text-right font-weight-bold" :class="item.current_balance > 0 ? 'text-red' : 'text-success'">
+              {{ formatMoney(item.current_balance) }}
+            </div>
+          </template>
+
+          <template #table-cell-available_credit="{ item }">
+            <div class="text-right" :class="availableCredit(item) <= 0 ? 'text-error' : 'text-success'">
+              {{ formatMoney(availableCredit(item)) }}
+            </div>
+          </template>
+
+          <template #table-cell-usage="{ item }">
+            <div style="min-width: 120px;">
+              <v-progress-linear
+                :model-value="usagePercent(item)"
+                :color="usagePercent(item) >= 100 ? 'error' : usagePercent(item) >= 80 ? 'warning' : 'success'"
+                height="14"
+                rounded
+              >
+                <template #default="{ value }">
+                  <span class="text-caption font-weight-bold" style="font-size: 10px;">{{ Math.round(value) }}%</span>
+                </template>
+              </v-progress-linear>
+            </div>
+          </template>
+
+          <template #table-cell-is_active="{ item }">
+            <v-chip :color="item.is_active ? 'success' : 'grey'" size="small" variant="tonal">
+              {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            </v-chip>
+          </template>
+
+          <template #actions="{ item }">
+            <div class="d-flex justify-end flex-wrap ga-1">
+              <v-btn
+                size="x-small"
+                color="green"
+                variant="tonal"
+                prepend-icon="mdi-cash-plus"
+                @click.stop="openPaymentDialog(item)"
+              >
+                Abonar
               </v-btn>
-            </v-card-text>
-          </v-card>
-          <div v-if="!filteredAccounts.length" class="text-center text-medium-emphasis pa-6">
-            No hay cuentas de crédito
-          </div>
-        </div>
+              <v-btn size="x-small" variant="text" icon="mdi-history" @click.stop="openHistory(item)"></v-btn>
+            </div>
+          </template>
+        </ListView>
       </v-card-text>
     </v-card>
 
@@ -353,6 +339,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import ListView from '@/components/ListView.vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import creditService from '@/services/credit.service'
@@ -368,13 +355,21 @@ const { userProfile } = useAuth()
 const loading     = ref(false)
 const accounts    = ref([])
 const summary     = ref(null)
-const search      = ref('')
 const filterStatus = ref('ALL')
 
 const statusOptions = [
   { title: 'Todos', value: 'ALL' },
   { title: 'Con deuda', value: 'WITH_DEBT' },
   { title: 'Sin deuda', value: 'NO_DEBT' },
+]
+
+const creditTableColumns = [
+  { title: 'Documento', key: 'customerDocument', width: '150px' },
+  { title: 'Cupo', key: 'credit_limit', align: 'right', width: '140px' },
+  { title: 'Saldo deuda', key: 'current_balance', align: 'right', width: '150px' },
+  { title: 'Disponible', key: 'available_credit', align: 'right', width: '150px' },
+  { title: 'Uso %', key: 'usage', width: '150px' },
+  { title: 'Estado', key: 'is_active', width: '110px' }
 ]
 
 // ─── Payment dialog ───────────────────────────────────────────────────────
@@ -413,17 +408,14 @@ const showMsg = (msg, color = 'success') => { snackbarMsg.value = msg; snackbarC
 
 // ─── Computed ─────────────────────────────────────────────────────────────
 const filteredAccounts = computed(() => {
-  let list = accounts.value
+  let list = accounts.value.map((account) => ({
+    ...account,
+    customerName: account.customer?.full_name || 'Sin cliente',
+    customerDocument: account.customer?.document || '—',
+    customerPhone: account.customer?.phone || ''
+  }))
   if (filterStatus.value === 'WITH_DEBT') list = list.filter(a => a.current_balance > 0)
   if (filterStatus.value === 'NO_DEBT')   list = list.filter(a => a.current_balance <= 0)
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    list = list.filter(a =>
-      a.customer?.full_name?.toLowerCase().includes(q) ||
-      a.customer?.document?.toLowerCase().includes(q) ||
-      a.customer?.phone?.toLowerCase().includes(q)
-    )
-  }
   return list
 })
 
@@ -538,12 +530,5 @@ async function createNewAccount() {
 </script>
 
 <style scoped>
-.hoverable-row {
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.hoverable-row:hover {
-  background: rgba(var(--v-theme-on-surface), 0.04);
-}
 .gap-1 { gap: 4px; }
 </style>

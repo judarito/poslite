@@ -36,39 +36,64 @@
         <v-row>
           <!-- Panel izquierdo: lista de roles estándar -->
           <v-col cols="12" md="4">
-            <v-card>
-              <v-card-title class="d-flex align-center justify-space-between">
-                <span>Roles Estándar</span>
-                <v-btn size="small" color="deep-purple" variant="tonal" prepend-icon="mdi-plus"
-                  @click="openRoleDialog()">Nuevo</v-btn>
-              </v-card-title>
-              <v-divider />
+            <ListView
+              title="Roles Estándar"
+              icon="mdi-account-key"
+              :items="roleItems"
+              :total-items="roleItems.length"
+              :loading="false"
+              :page-size="10"
+              item-key="name"
+              title-field="name"
+              subtitle-field="subtitle"
+              avatar-icon="mdi-shield-account"
+              avatar-color="deep-purple"
+              empty-message="No hay roles definidos"
+              create-button-text="Nuevo"
+              :editable="false"
+              :deletable="false"
+              :clickable="true"
+              :client-side="true"
+              :table-columns="roleTableColumns"
+              :search-fields="['name']"
+              view-storage-key="superadmin-standard-roles"
+              @create="openRoleDialog()"
+              @item-click="item => selectRole(item.name)"
+            >
+              <template #content="{ item }">
+                <div class="mt-2 d-flex flex-wrap ga-2">
+                  <v-chip size="small" variant="tonal" color="deep-purple">
+                    {{ item.menuCount }} menus asignados
+                  </v-chip>
+                  <v-chip
+                    v-if="selectedRoleName === item.name"
+                    size="small"
+                    color="success"
+                    variant="flat"
+                  >
+                    Rol seleccionado
+                  </v-chip>
+                </div>
+              </template>
 
-              <v-list v-if="standardRoles.length > 0" nav>
-                <v-list-item
-                  v-for="role in standardRoles"
-                  :key="role"
-                  :value="role"
-                  :active="selectedRoleName === role"
-                  active-color="deep-purple"
-                  rounded="lg"
-                  @click="selectRole(role)"
+              <template #table-cell-menuCount="{ item }">
+                <v-chip size="small" variant="tonal" color="deep-purple">
+                  {{ item.menuCount }}
+                </v-chip>
+              </template>
+
+              <template #table-cell-selected="{ item }">
+                <v-chip
+                  v-if="selectedRoleName === item.name"
+                  size="small"
+                  color="success"
+                  variant="flat"
                 >
-                  <template #prepend>
-                    <v-icon color="deep-purple">mdi-account-key</v-icon>
-                  </template>
-                  <v-list-item-title>{{ role }}</v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{ (roleMenuCodes[role] || []).length }} menús asignados
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </v-list>
-
-              <v-card-text v-else class="text-center text-grey py-6">
-                <v-icon size="40" class="mb-2">mdi-account-off</v-icon>
-                <div>No hay roles definidos</div>
-              </v-card-text>
-            </v-card>
+                  Activo
+                </v-chip>
+                <span v-else class="text-medium-emphasis">-</span>
+              </template>
+            </ListView>
           </v-col>
 
           <!-- Panel derecho: menús del rol seleccionado -->
@@ -159,68 +184,87 @@
       <!-- TAB 2: CATÁLOGO DE MENÚS                                     -->
       <!-- ============================================================ -->
       <v-window-item value="menus">
-        <v-card>
-          <v-card-title class="d-flex align-center justify-space-between">
-            <span>Catálogo Global de Menús</span>
-            <v-btn color="deep-purple" variant="tonal" prepend-icon="mdi-plus"
-              @click="openMenuDialog()">Nuevo Ítem</v-btn>
-          </v-card-title>
-          <v-divider />
+        <ListView
+          title="Catálogo Global de Menús"
+          icon="mdi-menu"
+          :items="flatMenuItems"
+          :total-items="flatMenuItems.length"
+          :loading="loadingMenus"
+          :page-size="12"
+          item-key="menu_item_id"
+          title-field="label"
+          subtitle-field="route"
+          avatar-icon="mdi-menu"
+          avatar-color="deep-purple"
+          empty-message="No hay items de menú registrados"
+          create-button-text="Nuevo Ítem"
+          :client-side="true"
+          :table-columns="menuTableColumns"
+          :search-fields="['code', 'label', 'route', 'action', 'parent_code']"
+          view-storage-key="superadmin-menu-catalog"
+          @create="openMenuDialog()"
+          @edit="openMenuDialog"
+        >
+          <template #subtitle="{ item }">
+            {{ item.route || item.action || 'Sin ruta o accion' }}
+          </template>
 
-          <v-card-text v-if="loadingMenus" class="text-center py-8">
-            <v-progress-circular indeterminate color="deep-purple" />
-          </v-card-text>
+          <template #content="{ item }">
+            <div class="mt-2 d-flex flex-wrap ga-2">
+              <v-chip size="small" variant="tonal">
+                {{ item.code }}
+              </v-chip>
+              <v-chip v-if="item.parent_code" size="small" variant="tonal">
+                Padre: {{ item.parent_code }}
+              </v-chip>
+              <v-chip v-if="item.is_superadmin_only" color="orange" size="small" variant="flat">
+                Solo SA
+              </v-chip>
+              <v-chip :color="item.is_active ? 'success' : 'error'" size="small" variant="flat">
+                {{ item.is_active ? 'Activo' : 'Inactivo' }}
+              </v-chip>
+            </div>
+          </template>
 
-          <v-table v-else density="compact">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Label</th>
-                <th>Ícono</th>
-                <th>Ruta / Acción</th>
-                <th>Padre</th>
-                <th>Orden</th>
-                <th>Solo SA</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in flatMenuItems" :key="item.menu_item_id">
-                <td><code class="text-caption">{{ item.code }}</code></td>
-                <td>
-                  <div class="d-flex align-center gap-1">
-                    <v-icon v-if="item.icon" :icon="item.icon" size="16" />
-                    {{ item.label }}
-                  </div>
-                </td>
-                <td><code class="text-caption">{{ item.icon }}</code></td>
-                <td class="text-caption text-grey">{{ item.route || item.action || '—' }}</td>
-                <td><code v-if="item.parent_code" class="text-caption">{{ item.parent_code }}</code><span v-else class="text-grey">—</span></td>
-                <td>{{ item.sort_order }}</td>
-                <td>
-                  <v-chip v-if="item.is_superadmin_only" color="orange" size="x-small">SA</v-chip>
-                  <span v-else class="text-grey text-caption">No</span>
-                </td>
-                <td>
-                  <v-chip :color="item.is_active ? 'success' : 'error'" size="x-small">
-                    {{ item.is_active ? 'Activo' : 'Inactivo' }}
-                  </v-chip>
-                </td>
-                <td>
-                  <v-btn icon="mdi-pencil" size="x-small" variant="text" @click="openMenuDialog(item)" />
-                  <v-btn
-                    :icon="item.is_active ? 'mdi-eye-off' : 'mdi-eye'"
-                    size="x-small"
-                    variant="text"
-                    :color="item.is_active ? 'error' : 'success'"
-                    @click="toggleMenu(item)"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-        </v-card>
+          <template #table-cell-code="{ item }">
+            <code class="text-caption">{{ item.code }}</code>
+          </template>
+
+          <template #table-cell-route_info="{ item }">
+            <span class="text-caption text-medium-emphasis">{{ item.route || item.action || '—' }}</span>
+          </template>
+
+          <template #table-cell-parent_code="{ item }">
+            <code v-if="item.parent_code" class="text-caption">{{ item.parent_code }}</code>
+            <span v-else class="text-medium-emphasis">—</span>
+          </template>
+
+          <template #table-cell-sort_order="{ item }">
+            {{ item.sort_order }}
+          </template>
+
+          <template #table-cell-is_superadmin_only="{ item }">
+            <v-chip v-if="item.is_superadmin_only" color="orange" size="x-small">SA</v-chip>
+            <span v-else class="text-medium-emphasis">No</span>
+          </template>
+
+          <template #table-cell-is_active="{ item }">
+            <v-chip :color="item.is_active ? 'success' : 'error'" size="x-small">
+              {{ item.is_active ? 'Activo' : 'Inactivo' }}
+            </v-chip>
+          </template>
+
+          <template #actions="{ item }">
+            <v-btn icon="mdi-pencil" size="x-small" variant="text" @click.stop="openMenuDialog(item)" />
+            <v-btn
+              :icon="item.is_active ? 'mdi-eye-off' : 'mdi-eye'"
+              size="x-small"
+              variant="text"
+              :color="item.is_active ? 'error' : 'success'"
+              @click.stop="toggleMenu(item)"
+            />
+          </template>
+        </ListView>
       </v-window-item>
 
       <!-- ============================================================ -->
@@ -378,6 +422,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import ListView from '@/components/ListView.vue'
 import superAdminRolesService from '@/services/superAdminRoles.service'
 import { useI18n } from '@/i18n'
 
@@ -414,6 +459,20 @@ const snackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarColor = ref('success')
 
+const roleTableColumns = [
+  { title: 'Menus', key: 'menuCount', align: 'right', width: '110px' },
+  { title: 'Seleccion', key: 'selected', width: '120px' }
+]
+
+const menuTableColumns = [
+  { title: 'Codigo', key: 'code', width: '190px' },
+  { title: 'Ruta / Accion', key: 'route_info', width: '220px' },
+  { title: 'Padre', key: 'parent_code', width: '160px' },
+  { title: 'Orden', key: 'sort_order', align: 'right', width: '90px' },
+  { title: 'Solo SA', key: 'is_superadmin_only', width: '90px' },
+  { title: 'Estado', key: 'is_active', width: '110px' }
+]
+
 // ============================================================
 // COMPUTED
 // ============================================================
@@ -428,6 +487,14 @@ const parentMenuOptions = computed(() => {
   return flatMenuItems.value.filter(m => !m.parent_code).map(m => ({
     code: m.code,
     label: `${m.icon ? '[' + m.icon + '] ' : ''}${m.label}`
+  }))
+})
+
+const roleItems = computed(() => {
+  return standardRoles.value.map((name) => ({
+    name,
+    subtitle: `${(roleMenuCodes.value[name] || []).length} menus asignados`,
+    menuCount: (roleMenuCodes.value[name] || []).length
   }))
 })
 

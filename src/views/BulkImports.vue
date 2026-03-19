@@ -85,47 +85,83 @@
     </v-card>
 
     <v-card elevation="2">
-      <v-card-title class="d-flex align-center justify-space-between">
-        <div>
-          <div class="text-h6">Historial de importaciones</div>
-          <div class="text-caption text-grey">Últimos {{ history.length }} archivos subidos</div>
-        </div>
-        <v-btn
-          variant="text"
-          icon
-          @click="loadHistory"
-          :loading="loadingHistory"
-        >
-          <v-icon>mdi-refresh</v-icon>
-        </v-btn>
-      </v-card-title>
-      <v-data-table
+      <ListView
+        title="Historial de importaciones"
+        icon="mdi-history"
         :items="history"
-        :headers="historyHeaders"
+        :total-items="history.length"
         :loading="loadingHistory"
-        hide-default-footer
-        density="compact"
-        class="text-body-2"
+        :page-size="10"
+        item-key="import_id"
+        title-field="file_name"
+        subtitle-field="import_type"
+        avatar-icon="mdi-file-excel-box"
+        avatar-color="success"
+        empty-message="Aun no hay importaciones registradas."
+        :editable="false"
+        :deletable="false"
+        :show-create-button="false"
+        :client-side="true"
+        :table-columns="historyTableColumns"
+        :search-fields="['file_name', 'import_type', 'status']"
+        view-storage-key="bulk-imports-history"
       >
-        <template #item.status="{ item }">
+        <template #filters>
+          <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+            <div class="text-caption text-medium-emphasis">
+              Ultimos {{ history.length }} archivos subidos para el tipo seleccionado.
+            </div>
+            <v-btn
+              variant="tonal"
+              color="primary"
+              prepend-icon="mdi-refresh"
+              :loading="loadingHistory"
+              @click="loadHistory"
+            >
+              Actualizar
+            </v-btn>
+          </div>
+        </template>
+
+        <template #content="{ item }">
+          <div class="mt-2 d-flex flex-wrap ga-2">
+            <v-chip :color="statusColor(item.status)" :variant="item.status === 'failed' ? 'tonal' : 'outlined'" size="small">
+              {{ item.status }}
+            </v-chip>
+            <v-chip size="small" variant="tonal">Procesados: {{ item.processed_count || 0 }}</v-chip>
+            <v-chip size="small" variant="tonal" :color="item.error_count > 0 ? 'error' : 'success'">
+              Errores: {{ item.error_count || 0 }}
+            </v-chip>
+          </div>
+        </template>
+
+        <template #table-cell-status="{ item }">
           <v-chip :color="statusColor(item.status)" :variant="item.status === 'failed' ? 'tonal' : 'outlined'" size="small">
             {{ item.status }}
           </v-chip>
         </template>
-        <template #item.error_count="{ item }">
+
+        <template #table-cell-error_count="{ item }">
           <span :class="item.error_count > 0 ? 'text-error font-weight-bold' : ''">
             {{ item.error_count }}
           </span>
         </template>
-        <template #item.created_at="{ item }">
+
+        <template #table-cell-created_at="{ item }">
           {{ formatDate(item.created_at) }}
         </template>
-        <template #item.actions="{ item }">
-          <v-btn icon dense @click="loadErrors(item.import_id)">
+
+        <template #actions="{ item }">
+          <v-btn
+            icon
+            variant="text"
+            density="comfortable"
+            @click.stop="loadErrors(item.import_id)"
+          >
             <v-icon>mdi-alert-circle-outline</v-icon>
           </v-btn>
         </template>
-      </v-data-table>
+      </ListView>
     </v-card>
 
     <v-dialog v-model="errorDialog" max-width="700">
@@ -173,6 +209,7 @@ import { useRoute } from 'vue-router'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useNotification } from '@/composables/useNotification'
+import ListView from '@/components/ListView.vue'
 import { uploadBulkImport, listBulkImports, getBulkImportErrors } from '@/services/bulkImportClient.service'
 import { processBulkImport } from '@/services/bulkImport.service'
 import { useI18n } from '@/i18n'
@@ -202,14 +239,11 @@ const bulkImportHintVisible = computed(() => {
   return onboarding === 'inventory-import' || onboarding === 'inventory-stock'
 })
 
-const historyHeaders = [
-  { title: 'Archivo', key: 'file_name', value: 'file_name' },
-  { title: 'Tipo', key: 'import_type', value: 'import_type' },
-  { title: 'Estado', key: 'status', value: 'status' },
-  { title: 'Procesados', key: 'processed_count', value: 'processed_count' },
-  { title: 'Errores', key: 'error_count', value: 'error_count' },
-  { title: 'Creado', key: 'created_at', value: 'created_at' },
-  { title: 'Acciones', key: 'actions', value: 'actions' }
+const historyTableColumns = [
+  { title: 'Estado', key: 'status', width: '150px' },
+  { title: 'Procesados', key: 'processed_count', align: 'right', width: '120px' },
+  { title: 'Errores', key: 'error_count', align: 'right', width: '120px' },
+  { title: 'Creado', key: 'created_at', width: '180px' }
 ]
 
 const errorHeaders = [

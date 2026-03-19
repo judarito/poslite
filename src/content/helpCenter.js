@@ -201,44 +201,52 @@ export const helpArticles = [
     slug: 'caja-operacion',
     process: 'cash',
     title: 'Como abrir, operar y cerrar caja',
-    summary: 'Checklist operativo para evitar bloqueos de caja y dejar trazabilidad de sesiones.',
+    summary: 'Checklist operativo para evitar bloqueos de caja y dejar trazabilidad de sesiones. Las cajas operan mediante sesiones que deben abrirse y cerrarse.',
     audience: 'Cajero, administrador y gerente',
     estimatedMinutes: 7,
     prerequisites: [
       'Caja registrada.',
       'Usuario asignado a caja.',
-      'Monto base o politica operativa definida.'
+      'Monto base o politica operativa definida.',
+      'Tener claro el parametro `cash_session_max_hours`, que define cuantas horas maximo puede durar abierta una sesion antes de marcarse como vencida.'
     ],
     steps: [
       {
         id: 'open-session',
         title: 'Abre una sesion',
-        description: 'Ingresa el monto inicial y confirma que la caja quede abierta.',
+        description: 'Ingresa el monto inicial y confirma que la caja quede abierta. Sin una sesion abierta, la caja no puede operar ventas.',
         route: '/cash-sessions'
       },
       {
         id: 'operate-pos',
         title: 'Opera normalmente desde POS',
-        description: 'Mientras la sesion este activa, las ventas se amarran a la caja actual.',
+        description: 'Mientras la sesion este activa, las ventas se amarran a la caja actual. Si supera el limite de horas configurado, la sesion se marca como vencida.',
         route: '/pos'
       },
       {
         id: 'review-movements',
         title: 'Revisa arqueos y movimientos',
-        description: 'Antes de cerrar, verifica efectivo, medios de pago y diferencias.',
+        description: 'Antes de cerrar, verifica efectivo, medios de pago y diferencias para detectar inconsistencias antes del cierre.',
         route: '/cash-sessions'
       },
       {
         id: 'close-session',
         title: 'Cierra caja al final del turno',
-        description: 'El cierre ayuda a evitar sesiones abiertas por demasiado tiempo y deja control del turno.',
+        description: 'El cierre ayuda a evitar sesiones abiertas por demasiado tiempo, respeta el limite configurado en tenant settings y deja control del turno.',
         route: '/cash-sessions'
+      },
+      {
+        id: 'session-hours-setting',
+        title: 'Revisa el maximo de horas por sesion',
+        description: 'En Configuracion de Empresa existe el parametro `cash_session_max_hours`, que define cuantas horas puede permanecer abierta una sesion antes de considerarse vencida.',
+        route: { path: '/tenant-config', query: { tab: 'general' } }
       }
     ],
     nextSteps: [
       'Haz una venta de prueba para validar la caja actual.',
       'Controla sesiones abiertas desde el dashboard para evitar turnos mal cerrados.',
-      'Asegura que el equipo entienda cuando cerrar y reabrir una sesion.'
+      'Asegura que el equipo entienda cuando cerrar y reabrir una sesion.',
+      'Define con administracion cuantas horas maximo debe durar una sesion de caja para este tenant.'
     ],
     expectedResult: 'La caja queda abierta solo el tiempo necesario, con trazabilidad de aperturas, ventas y cierres.',
     commonErrors: [
@@ -248,10 +256,14 @@ export const helpArticles = [
       },
       {
         title: 'La sesion aparece expirada',
-        answer: 'La empresa tiene un limite de horas para sesiones. Cierra la actual y abre una nueva.'
+        answer: 'La empresa tiene un limite de horas para sesiones controlado por el parametro `cash_session_max_hours` en Configuracion de Empresa. Cierra la sesion actual y abre una nueva.'
+      },
+      {
+        title: 'La caja estuvo abierta mas horas de las permitidas',
+        answer: 'Revisa el parametro `cash_session_max_hours` a nivel tenant. Si el limite es correcto, el equipo debe cerrar la sesion al terminar el turno y abrir una nueva cuando corresponda.'
       }
     ],
-    faqIds: ['faq-no-cash-session', 'faq-session-expired'],
+    faqIds: ['faq-no-cash-session', 'faq-session-expired', 'faq-cash-session-hours'],
     related: ['ventas-operacion', 'primeros-pasos']
   },
   {
@@ -423,7 +435,13 @@ export const helpFaqs = [
     id: 'faq-session-expired',
     process: 'cash',
     question: 'La sesion de caja aparece expirada.',
-    answer: 'La empresa define un maximo de horas por sesion. Cierra la sesion actual y abre una nueva para seguir operando.'
+    answer: 'La empresa define un maximo de horas por sesion mediante `cash_session_max_hours` en Configuracion de Empresa. Si una sesion supera ese tiempo, se marca como vencida y debe cerrarse para abrir una nueva.'
+  },
+  {
+    id: 'faq-cash-session-hours',
+    process: 'cash',
+    question: 'Donde se define cuantas horas puede durar abierta una sesion de caja.',
+    answer: 'Ese limite se configura a nivel de tenant en Configuracion de Empresa, con el parametro `cash_session_max_hours`. Si el valor es 24, cualquier sesion que supere 24 horas se considera vencida.'
   },
   {
     id: 'faq-accounting-hidden',

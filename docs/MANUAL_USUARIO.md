@@ -72,6 +72,14 @@ Incluye:
 - operacion diaria
 - arqueo
 - cierre
+- control de sesiones vencidas
+- parametro de horas maximas por sesion
+
+Importante:
+
+- las cajas no operan solo por existir; operan a traves de sesiones
+- cada sesion de caja debe abrirse al iniciar el turno y cerrarse al finalizarlo
+- en Configuracion de Empresa existe un parametro del tenant que define cuantas horas maximo puede estar abierta una sesion de caja antes de marcarse como vencida
 
 ### 5. Inventario
 
