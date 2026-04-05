@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-04-05
 Owner: Equipo POSLite
-Ultimo cambio registrado: se incorporo la primera implementacion web de billing multi-tenant con UI superadmin, resumen por tenant y enforcement comercial en router, POS, `App.vue`, `TenantConfig` y `About`
+Ultimo cambio registrado: se consolidaron fixes operativos/UX sobre logout, POS, superadmin, billing y modales teletransportados por Vuetify; ademas se agrego migracion pendiente para corregir RLS de `sale_counters`
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -28,6 +28,88 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 ```
 
 ## Estado tecnico actual
+
+### Ajustes recientes de operacion y UX (actualizado 2026-04-05)
+
+- Logout corregido:
+  - archivos: `src/composables/useAuth.js`, `src/services/supabase.service.js`, `src/App.vue`
+  - causa detectada: el router podia seguir viendo sesion valida por cache de `supabase.service` aun despues de cerrar sesion
+  - fix aplicado:
+    - invalidacion explicita de cache de sesion en `signOut`
+    - invalidacion tambien cuando Supabase emite `SIGNED_OUT`
+    - navegacion a login con `router.replace('/login')`
+
+- POS / descuentos reforzados:
+  - archivos: `src/views/PointOfSale.vue`, `src/services/sales.service.js`
+  - regla vigente:
+    - el descuento de linea no puede superar el valor del producto
+    - el descuento global no puede superar el valor neto de la factura
+  - comportamiento implementado:
+    - normalizacion inmediata de descuentos invalidos en UI
+    - tope visual en inputs de descuento
+    - validacion previa antes de cobrar
+    - validacion de respaldo tambien en `sales.service.js`
+
+- Ayuda contextual compacta:
+  - archivo: `src/components/ContextHelpCard.vue`
+  - el bloque inline invasivo fue reemplazado por un disparador compacto `Ayuda`
+  - al abrir, muestra un modal/dialog responsive con guia destacada, pasos, FAQ y acceso al centro de ayuda
+  - ajuste importante posterior:
+    - los estilos del modal no deben depender de `.ofir-shell--dark/.light`
+    - se movio el theming a clases explicitas por componente porque Vuetify teletransporta los `v-dialog` fuera del arbol del layout
+
+- Modales y tema visual:
+  - archivos:
+    - `src/components/AppAlertsDialog.vue`
+    - `src/views/CashSessions.vue`
+    - `src/components/ContextHelpCard.vue`
+  - estado vigente:
+    - se agrego boton `X` visible al modal de cierre de caja
+    - se corrigio la estrategia de theming para modales teletransportados
+    - los modales ahora aplican clases explicitas por tema (`--dark` / `--light`) dentro del propio `v-card`
+  - objetivo:
+    - evitar que alertas, cierre de caja y ayuda hereden mal fondos/contraste cuando el overlay se renderiza fuera de `App.vue`
+
+- Superadmin:
+  - `src/views/SuperAdminRolesMenus.vue`
+    - el panel de roles ya no debe cortar controles en cabeceras estrechas
+    - se desactivo el toggle de vista especificamente en ese modulo y se dio mas ancho al panel izquierdo
+  - `src/components/ListView.vue`
+    - el header ahora puede envolver controles sin romper layout
+  - `src/services/tenants.service.js`
+    - la lista de tenants prioriza RPC `fn_superadmin_list_tenants()`
+  - nueva migracion:
+    - `migrations/ADD_SUPERADMIN_TENANTS_LIST_RPC.sql`
+    - expone listado de tenants via `SECURITY DEFINER` para evitar vacios por RLS
+
+- Billing multi-tenant:
+  - sigue vigente la implementacion web agregada el mismo dia
+  - se confirmo que las migraciones principales existen y son re-ejecutables de forma segura en terminos de objetos (`if not exists`, `create or replace`, `on conflict`)
+  - orden de ejecucion recomendado en DB nueva:
+    - `migrations/ADD_TENANT_BILLING_MONETIZATION.sql`
+    - `migrations/ADD_FREEMIUM_6M_TENANT_SUBSCRIPTIONS.sql`
+    - `migrations/ADD_TENANT_BILLING_SUPERADMIN_WORKFLOWS.sql`
+  - observacion de ambiente:
+    - si ya existe la base proveniente del repo mobile, normalmente basta con la migracion de workflows web/superadmin
+
+- RLS en consecutivos de venta:
+  - error detectado al guardar venta:
+    - `new row violates row-level security policy for table "sale_counters"`
+  - causa:
+    - `sp_create_sale()` usa `fn_next_sale_number()`
+    - esa funcion escribe en `sale_counters`
+    - en algunos ambientes `sale_counters` queda protegido por RLS y rompe la venta
+  - fix preparado:
+    - nueva migracion `migrations/FIX_SALE_COUNTERS_RLS.sql`
+    - redefine `fn_next_sale_number(uuid, uuid)` como `SECURITY DEFINER`
+    - valida que la sede pertenezca al tenant antes de incrementar consecutivo
+  - estado:
+    - este fix requiere ejecucion manual en Supabase para quedar operativo en el ambiente afectado
+
+- Estado de build local:
+  - durante esta sesion no fue posible correr `npm run build`
+  - motivo: en el entorno de trabajo no hay `node` disponible
+  - por tanto, la verificacion ha sido por inspeccion de codigo y consistencia funcional, no por compilacion local
 
 ### Billing multi-tenant web (implementado 2026-04-05)
 

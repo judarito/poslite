@@ -1,7 +1,7 @@
 <template>
   <div class="pos-container ofir-page ofir-pos">
     <!-- Barra Superior POS -->
-    <v-card flat class="mb-2 pos-header-card">
+    <v-card ref="headerCard" flat class="mb-2 pos-header-card">
       <v-card-title class="d-flex flex-column flex-sm-row align-start align-sm-center pa-2">
         <div class="d-flex align-center mb-2 mb-sm-0">
           <v-icon class="mr-2">mdi-point-of-sale</v-icon>
@@ -535,6 +535,43 @@
       </v-col>
     </v-row>
 
+    <transition name="pos-floating-actions">
+      <div
+        v-if="showFloatingHeaderActions"
+        class="pos-floating-actions"
+      >
+        <v-btn
+          class="pos-floating-actions__charge"
+          color="primary"
+          prepend-icon="mdi-check-circle"
+          :loading="processing"
+          :disabled="cart.length === 0 || remaining > 0 || sessionExpired"
+          @click="processSale"
+        >
+          Cobrar {{ formatMoney(totals.total) }}
+        </v-btn>
+        <v-btn
+          class="pos-floating-actions__clear"
+          variant="tonal"
+          color="error"
+          prepend-icon="mdi-trash-can"
+          :disabled="cart.length === 0"
+          @click="clearSale"
+        >
+          Limpiar
+        </v-btn>
+        <v-chip
+          v-if="currentSession"
+          class="pos-floating-actions__status"
+          :color="sessionExpired ? 'error' : 'success'"
+          size="small"
+          :prepend-icon="sessionExpired ? 'mdi-clock-alert' : 'mdi-cash-register'"
+        >
+          {{ currentSession.cash_register?.name || 'Caja' }}
+        </v-chip>
+      </div>
+    </transition>
+
     <!-- Dialog Descuento Global -->
     <v-dialog v-model="showGlobalDiscountDialog" max-width="400">
       <v-card>
@@ -676,8 +713,10 @@ const globalDiscountValue = ref(0)
 
 let searchTimeout = null
 const searchInput = ref(null)
+const headerCard = ref(null)
 const selectedVariant = ref(null)
 const searchingProduct = ref(false)
+const showFloatingHeaderActions = ref(false)
 
 // Descuentos en POS: permitidos para administrador y gerente.
 const canManageDiscounts = computed(() => {
@@ -896,6 +935,18 @@ const holdSalesStorageKey = computed(() => {
   if (!tenantId.value || !userProfile.value?.user_id) return null
   return `${POS_HOLD_SALES_STORAGE_PREFIX}:${tenantId.value}:${userProfile.value.user_id}`
 })
+
+const updateFloatingHeaderActions = () => {
+  if (typeof window === 'undefined') return
+  const headerElement = headerCard.value?.$el || headerCard.value
+  if (!headerElement) {
+    showFloatingHeaderActions.value = false
+    return
+  }
+
+  const rect = headerElement.getBoundingClientRect()
+  showFloatingHeaderActions.value = rect.bottom < 16
+}
 
 const totals = computed(() => {
   let subtotal = 0, discountLine = 0, discountGlobal = 0, tax = 0, total = 0
@@ -1461,6 +1512,39 @@ const getHeldSaleItemsCount = (held) => {
   return (held?.cart || []).reduce((sum, line) => sum + (Number(line?.quantity) || 0), 0)
 }
 
+const buildVariantLabel = (line) => {
+  if (!line) return null
+  const productName = String(line.productName || '').trim()
+  const variantName = String(line.variantName || '').trim()
+  const sku = String(line.sku || '').trim()
+
+  const name = [productName, variantName].filter(Boolean).join(' — ')
+  if (name && sku) return `${name} (${sku})`
+  if (name) return name
+  if (sku) return sku
+  return null
+}
+
+const humanizeSaleError = (message) => {
+  const fallbackMessage = String(message || 'Error al procesar venta')
+  const uuidRegex = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi
+  const variantLabels = new Map(
+    cart.value
+      .filter((line) => line?.variant_id)
+      .map((line) => [String(line.variant_id).toLowerCase(), buildVariantLabel(line)])
+  )
+
+  let normalizedMessage = fallbackMessage.replace(uuidRegex, (match) => {
+    return variantLabels.get(String(match).toLowerCase()) || match
+  })
+
+  normalizedMessage = normalizedMessage
+    .replace(/variante\s+/gi, 'producto ')
+    .replace(/variant\s+/gi, 'producto ')
+
+  return normalizedMessage
+}
+
 const saveSaleOnHold = () => {
   if (cart.value.length === 0) return
 
@@ -1640,7 +1724,7 @@ const processSale = async () => {
       // ─────────────────────────────────────────────────────────────
       clearSale()
     } else {
-      showMsg(r.error || 'Error al procesar venta', 'error')
+      showMsg(humanizeSaleError(r.error), 'error')
     }
   } catch (error) {
     showMsg('Error al procesar venta', 'error')
@@ -1709,10 +1793,15 @@ onMounted(async () => {
 
   // Atajos de teclado
   window.addEventListener('keydown', handleKeyboardShortcuts)
+  window.addEventListener('scroll', updateFloatingHeaderActions, { passive: true })
+  window.addEventListener('resize', updateFloatingHeaderActions, { passive: true })
+  nextTick(() => updateFloatingHeaderActions())
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyboardShortcuts)
+  window.removeEventListener('scroll', updateFloatingHeaderActions)
+  window.removeEventListener('resize', updateFloatingHeaderActions)
 })
 
 // Atajos de teclado
@@ -1778,8 +1867,13 @@ const handleKeyboardShortcuts = (e) => {
 }
 
 .pos-header-card {
+  position: sticky;
+  top: calc(var(--v-layout-top, 64px) + 8px);
+  z-index: 90;
   border: 1px solid rgba(94, 132, 244, 0.26);
   background: linear-gradient(115deg, rgba(12, 20, 41, 0.92), rgba(11, 18, 35, 0.86)) !important;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 28px rgba(6, 12, 26, 0.22);
 }
 
 .pos-panel {
@@ -1821,6 +1915,7 @@ const handleKeyboardShortcuts = (e) => {
 :global(.ofir-shell--light) .pos-header-card {
   border-color: rgba(46, 92, 205, 0.2);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(242, 248, 255, 0.96)) !important;
+  box-shadow: 0 12px 24px rgba(38, 76, 154, 0.12);
 }
 
 :global(.ofir-shell--light) .pos-panel {
@@ -1921,6 +2016,42 @@ const handleKeyboardShortcuts = (e) => {
   max-width: 170px;
 }
 
+.pos-floating-actions {
+  position: fixed;
+  top: auto;
+  bottom: calc(var(--v-layout-bottom, 0px) + 16px);
+  right: 20px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(96, 134, 255, 0.22);
+  background: linear-gradient(145deg, rgba(9, 17, 33, 0.96), rgba(7, 14, 27, 0.94));
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 36px rgba(2, 7, 20, 0.34);
+}
+
+.pos-floating-actions__charge {
+  min-width: 180px;
+}
+
+.pos-floating-actions__status {
+  flex-shrink: 0;
+}
+
+.pos-floating-actions-enter-active,
+.pos-floating-actions-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.pos-floating-actions-enter-from,
+.pos-floating-actions-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 /* Total sticky en desktop */
 @media (min-width: 960px) {
   .totals-sticky {
@@ -1940,9 +2071,36 @@ const handleKeyboardShortcuts = (e) => {
   :global(.ofir-shell--light) .totals-sticky {
     background: rgba(var(--v-theme-surface), 0.94);
   }
+
+  :global(.ofir-shell--light) .pos-floating-actions {
+    border-color: rgba(46, 92, 205, 0.18);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 247, 255, 0.95));
+    box-shadow: 0 16px 30px rgba(35, 73, 146, 0.16);
+  }
 }
 
 @media (max-width: 600px) {
+  .pos-floating-actions {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .pos-floating-actions__charge,
+  .pos-floating-actions__clear {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .pos-floating-actions__status {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
   .held-sale-card :deep(.v-btn) {
     flex: 1;
   }
@@ -1966,6 +2124,19 @@ const handleKeyboardShortcuts = (e) => {
 }
 
 @media (max-width: 959px) {
+  .pos-floating-actions {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    justify-content: space-between;
+  }
+
+  .pos-floating-actions__charge,
+  .pos-floating-actions__clear {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .pos-cart-line-grid,
   .pos-cart-line-grid--admin {
     grid-template-columns: repeat(2, minmax(0, 1fr));
