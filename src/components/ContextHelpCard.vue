@@ -25,9 +25,10 @@
       :max-width="isMobile ? undefined : 920"
       :fullscreen="isMobile"
       scrollable
+      class="help-context-dialog"
     >
-      <v-card class="help-context-card" :color="context.color" variant="tonal">
-        <v-card-title class="d-flex align-center justify-space-between ga-3 flex-wrap">
+      <v-card :class="['help-context-card', isDark ? 'help-context-card--dark' : 'help-context-card--light']">
+        <v-card-title class="help-context-card__header d-flex align-center justify-space-between ga-3 flex-wrap">
           <div class="d-flex align-center ga-3">
             <v-avatar :color="context.color" variant="flat" size="38">
               <v-icon size="20">{{ context.icon }}</v-icon>
@@ -47,7 +48,7 @@
             >
               {{ articleProgress.completed }}/{{ articleProgress.total }} pasos
             </v-chip>
-            <v-btn icon="mdi-close" variant="text" @click="dialog = false" />
+            <v-btn icon="mdi-close" variant="text" class="help-context-card__close" @click="dialog = false" />
           </div>
         </v-card-title>
 
@@ -68,7 +69,7 @@
               </v-chip>
             </div>
 
-            <v-card variant="flat" color="surface" class="help-context-card__article">
+            <v-card variant="flat" class="help-context-card__article">
               <v-card-text>
                 <div class="text-overline mb-1">Guía destacada</div>
                 <div class="text-h6 mb-2">{{ featuredArticle.title }}</div>
@@ -126,6 +127,7 @@
 import { computed, ref } from 'vue'
 import { useHelpCenter } from '@/composables/useHelpCenter'
 import { useDisplay } from 'vuetify'
+import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps({
   contextKey: {
@@ -136,6 +138,7 @@ const props = defineProps({
 
 const dialog = ref(false)
 const { mobile: isMobile } = useDisplay()
+const { isDark } = useTheme()
 const { getArticle, getFaq, getHelpContext, getArticleProgress, markArticleViewed } = useHelpCenter()
 
 const context = computed(() => getHelpContext(props.contextKey))
@@ -172,6 +175,22 @@ function openHelp() {
 .help-context-card {
   border-radius: 18px;
   border: 1px solid rgba(var(--v-theme-primary), 0.16);
+  background: linear-gradient(145deg, rgba(253, 255, 255, 0.98), rgba(242, 248, 255, 0.96)) !important;
+  box-shadow: 0 22px 40px rgba(16, 28, 49, 0.24);
+}
+
+.help-context-dialog :deep(.v-overlay__content) {
+  width: min(920px, calc(100vw - 24px));
+}
+
+.help-context-card__header {
+  border-bottom: 1px solid rgba(var(--v-theme-primary), 0.14);
+  background: linear-gradient(120deg, rgba(54, 176, 111, 0.12), rgba(37, 99, 235, 0.08));
+}
+
+.help-context-card__close {
+  border-radius: 12px;
+  background: rgba(19, 31, 54, 0.06);
 }
 
 .help-context-card__copy {
@@ -184,11 +203,41 @@ function openHelp() {
 
 .help-context-card__article {
   border-radius: 16px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.12);
+  background: rgba(255, 255, 255, 0.94) !important;
 }
 
 .help-context-card__step {
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(var(--v-theme-surface-variant), 0.35);
+  background: rgba(23, 33, 54, 0.06);
+}
+
+.help-context-card--dark {
+  border-color: rgba(92, 133, 255, 0.22);
+  background: linear-gradient(145deg, rgba(9, 17, 33, 0.985), rgba(6, 13, 26, 0.975)) !important;
+  box-shadow: 0 26px 46px rgba(2, 7, 20, 0.48);
+}
+
+.help-context-card--dark .help-context-card__header {
+  border-bottom-color: rgba(92, 133, 255, 0.18);
+  background: linear-gradient(120deg, rgba(28, 122, 75, 0.24), rgba(25, 76, 167, 0.18));
+}
+
+.help-context-card--dark .help-context-card__close {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.help-context-card--dark .help-context-card__article {
+  border-color: rgba(92, 133, 255, 0.18);
+  background: rgba(18, 28, 48, 0.94) !important;
+}
+
+.help-context-card--dark .help-context-card__step {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.help-context-card--light .help-context-card__header {
+  color: #18304f;
 }
 </style>

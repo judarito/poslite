@@ -82,8 +82,21 @@
 
     <!-- Dialog Cerrar Caja -->
     <v-dialog v-model="closeDialog" max-width="700" scrollable class="cash-close-dialog">
-      <v-card class="cash-close-modal">
-        <v-card-title class="cash-close-modal__header"><v-icon start color="error">mdi-lock</v-icon>Cerrar Sesión de Caja</v-card-title>
+      <v-card :class="['cash-close-modal', isDark ? 'cash-close-modal--dark' : 'cash-close-modal--light']">
+        <v-card-title class="cash-close-modal__header">
+          <div class="d-flex align-center ga-2">
+            <v-icon color="error">mdi-lock</v-icon>
+            <span>Cerrar Sesión de Caja</span>
+          </div>
+          <v-spacer></v-spacer>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            class="cash-close-modal__close"
+            @click="closeDialog = false"
+          />
+        </v-card-title>
         <v-card-text v-if="closeSummary" class="cash-close-modal__body">
           <!-- Información de la sesión -->
           <v-alert type="info" variant="tonal" class="mb-3 cash-close-modal__session-info">
@@ -325,6 +338,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAuth } from '@/composables/useAuth'
+import { useTheme } from '@/composables/useTheme'
 import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
@@ -336,6 +350,7 @@ const { t } = useI18n()
 const { tenantId } = useTenant()
 const { defaultPageSize, cashSessionMaxHours, loadSettings } = useTenantSettings()
 const { userProfile } = useAuth()
+const { isDark } = useTheme()
 
 // Sesiones
 const sessions = ref([])
@@ -616,10 +631,18 @@ onMounted(async () => {
 
 .cash-close-modal__header {
   min-height: 60px;
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid rgba(var(--v-theme-primary), 0.22);
   background: linear-gradient(120deg, rgba(236, 86, 74, 0.93), rgba(196, 54, 42, 0.9));
   color: #fff5f4;
   letter-spacing: 0.2px;
+}
+
+.cash-close-modal__close {
+  border-radius: 12px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .cash-close-modal__body {
@@ -699,17 +722,45 @@ onMounted(async () => {
   letter-spacing: 0.25px;
 }
 
-:global(.ofir-shell--light) .cash-close-modal {
+.cash-close-modal--light {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 255, 0.96)) !important;
   border-color: rgba(39, 92, 219, 0.16);
   box-shadow: 0 18px 30px rgba(22, 42, 85, 0.16);
 }
 
-:global(.ofir-shell--light) .cash-close-section {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(246, 251, 255, 0.88));
+.cash-close-modal--light .cash-close-section {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(241, 247, 255, 0.95));
+  color: #172033;
+  border-color: rgba(var(--cash-section-accent), 0.2) !important;
 }
 
-:global(.ofir-shell--light) .cash-close-expected-row {
+.cash-close-modal--light .cash-close-section__title {
+  color: #162238;
+  border-bottom-color: rgba(var(--cash-section-accent), 0.18);
+  background: linear-gradient(120deg, rgba(var(--cash-section-accent), 0.16), rgba(255, 255, 255, 0.82));
+}
+
+.cash-close-modal--light .cash-close-table :deep(td) {
+  color: #1f2a3d;
+  border-bottom-color: rgba(23, 33, 54, 0.08) !important;
+}
+
+.cash-close-modal--light .cash-close-modal__session-info {
+  background: linear-gradient(145deg, rgba(233, 244, 255, 0.98), rgba(245, 250, 255, 0.96)) !important;
+  color: #143153;
+  border-color: rgba(58, 127, 255, 0.2);
+}
+
+.cash-close-modal--light .cash-close-input :deep(.v-field),
+.cash-close-modal--light .cash-close-difference {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.cash-close-modal--light .cash-close-modal__close {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.cash-close-modal--light .cash-close-expected-row {
   background: linear-gradient(100deg, rgba(236, 246, 255, 0.92), rgba(224, 240, 255, 0.9));
 }
 

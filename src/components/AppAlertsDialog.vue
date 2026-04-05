@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="dialogModel" max-width="1000" scrollable class="alerts-dialog">
-    <v-card class="alerts-modal">
+    <v-card :class="['alerts-modal', isDark ? 'alerts-modal--dark' : 'alerts-modal--light']">
       <v-card-title class="d-flex align-center pa-4 alerts-modal__header">
         <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
         {{ t('app.alerts') }}
@@ -799,6 +799,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { useAppAlerts } from '@/composables/useAppAlerts'
+import { useTheme } from '@/composables/useTheme'
 import { useI18n } from '@/i18n'
 import { formatMoney, formatDate } from '@/utils/formatters'
 
@@ -812,6 +813,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const router = useRouter()
 const { mobile: isMobile } = useDisplay()
+const { isDark } = useTheme()
 const { t } = useI18n()
 const alertsTab = ref('stock')
 const ALERTS_PAGE_SIZE = 20
@@ -1031,6 +1033,62 @@ onMounted(() => {
   border-radius: 14px;
   border: 1px dashed rgba(var(--v-theme-primary), 0.3);
   background: rgba(245, 250, 255, 0.9);
+}
+
+.alerts-modal--dark {
+  border-color: rgba(96, 134, 255, 0.22);
+  background: linear-gradient(145deg, rgba(10, 18, 35, 0.985), rgba(7, 14, 28, 0.97)) !important;
+  box-shadow: 0 22px 40px rgba(2, 7, 20, 0.42);
+}
+
+.alerts-modal--dark .alerts-modal__close {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.alerts-modal--dark .alerts-modal__tabs {
+  border-bottom-color: rgba(96, 134, 255, 0.18);
+  background: linear-gradient(180deg, rgba(16, 26, 48, 0.98), rgba(11, 19, 36, 0.96));
+}
+
+.alerts-modal--dark .alerts-modal__tabs :deep(.v-tab) {
+  color: rgba(230, 239, 255, 0.88);
+}
+
+.alerts-modal--dark .alerts-modal__tabs :deep(.v-tab--selected) {
+  background: linear-gradient(90deg, rgba(54, 116, 255, 0.22), rgba(71, 190, 113, 0.2));
+  color: #f5f8ff;
+}
+
+.alerts-modal--dark .alerts-modal__filters {
+  background: rgba(9, 16, 31, 0.78);
+}
+
+.alerts-modal--dark .alerts-modal__filters :deep(.v-field),
+.alerts-modal--dark .alerts-mobile-item {
+  background: rgba(14, 23, 44, 0.72) !important;
+}
+
+.alerts-modal--dark .alerts-table :deep(thead th) {
+  background: rgba(11, 19, 36, 0.96);
+  color: rgba(232, 239, 252, 0.9);
+}
+
+.alerts-modal--dark .alerts-table :deep(tbody tr:hover) {
+  background: rgba(50, 98, 210, 0.16);
+}
+
+.alerts-modal--dark .alerts-empty-state {
+  border-color: rgba(96, 134, 255, 0.26);
+  background: linear-gradient(145deg, rgba(16, 26, 48, 0.96), rgba(10, 18, 35, 0.92));
+  color: rgba(226, 236, 252, 0.82);
+}
+
+.alerts-modal--light .alerts-modal__filters {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.alerts-modal--light .alerts-empty-state {
+  color: rgba(65, 77, 97, 0.82);
 }
 
 .alerts-modal__actions {
