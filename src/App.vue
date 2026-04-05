@@ -159,6 +159,30 @@
 
       <v-main class="ofir-main">
         <v-container fluid class="pa-4 ofir-main__container">
+          <v-alert
+            v-if="showBillingBanner"
+            :type="billingBannerType"
+            variant="tonal"
+            class="mb-4"
+            icon="mdi-credit-card-alert-outline"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap ga-3">
+              <div>
+                <strong>Estado comercial:</strong> {{ billingBannerMessage }}
+                <div class="text-body-2 mt-1">
+                  Plan {{ billingSummary?.plan_name || billingSummary?.plan_code || 'sin nombre' }} ·
+                  Estado {{ billingSummary?.status_label || 'Sin estado' }}
+                </div>
+              </div>
+              <v-btn
+                color="primary"
+                variant="tonal"
+                :to="{ path: '/tenant-config', query: { tab: 'billing' } }"
+              >
+                Ver suscripción
+              </v-btn>
+            </div>
+          </v-alert>
           <router-view></router-view>
         </v-container>
       </v-main>
@@ -196,6 +220,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useNotification } from '@/composables/useNotification'
 import { useTheme } from '@/composables/useTheme'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
+import { useTenantBilling } from '@/composables/useTenantBilling'
 import { useDisplay } from 'vuetify'
 import rolesService from '@/services/roles.service'
 import { useAppAlerts } from '@/composables/useAppAlerts'
@@ -211,6 +236,7 @@ const { locale: tenantLocale, loadSettings } = useTenantSettings()
 const { snackbar, snackbarMessage, snackbarColor } = useNotification()
 const { isDark, setTheme, ensureThemeForUser, syncThemeFromTenant } = useTheme()
 const { canManageTenants, superAdminInfo } = useSuperAdmin()
+const { billingSummary, billingBannerMessage } = useTenantBilling()
 const { mobile: isMobile } = useDisplay()
 const { t, setLocale, locale } = useI18n()
 
@@ -261,6 +287,23 @@ async function loadDynamicMenus(authUserId) {
 
 const alertsDialog = ref(false)
 
+const billingBannerType = computed(() => {
+  const status = billingSummary.value?.status
+  if (status === 'past_due' || status === 'suspended') return 'error'
+  if (status === 'grace_period') return 'warning'
+  return 'info'
+})
+
+const showBillingBanner = computed(() => {
+  return Boolean(
+    !isAuthRoute.value &&
+    tenantId.value &&
+    userProfile.value &&
+    billingSummary.value &&
+    billingBannerMessage.value
+  )
+})
+
 // Composable: alertas del sistema + ubicaciones
 const {
   allAlerts,
@@ -281,6 +324,7 @@ const superAdminMenuItems = computed(() => [
     permissions: [],
     children: [
       { title: t('app.tenantManagement'), icon: 'mdi-office-building-plus', route: '/tenant-management', permissions: ['SUPER_ADMIN_ONLY'] },
+      { title: t('app.tenantBilling'), icon: 'mdi-credit-card-cog', route: '/superadmin/billing', permissions: ['SUPER_ADMIN_ONLY'] },
       { title: t('app.rolesPermissionsMenus'), icon: 'mdi-shield-crown', route: '/superadmin/roles-menus', permissions: ['SUPER_ADMIN_ONLY'] },
     ]
   },
@@ -371,7 +415,7 @@ const handleLogout = async () => {
   const result = await signOut()
   if (result.success) {
     clearTenant()
-    router.push('/login')
+    await router.replace('/login')
   }
 }
 

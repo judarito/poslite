@@ -80,6 +80,7 @@ export default {
     about: 'Acerca de',
     systemManagement: 'Gestión del sistema',
     tenantManagement: 'Gestión de tenants',
+    tenantBilling: 'Billing y monetización',
     rolesPermissionsMenus: 'Roles, permisos y menús'
   },
   settings: {

@@ -140,6 +140,7 @@ function handleSessionExpired() {
   user.value = null
   userProfile.value = null
   session.value = null
+  supabaseService.invalidateSessionCache()
   queryCache.clearAll()
   
   const { clearTenant } = useTenant()
@@ -275,6 +276,7 @@ export const useAuth = () => {
       session.value = null
       user.value = null
       userProfile.value = null
+      supabaseService.invalidateSessionCache()
       queryCache.clearAll()
 
       const { clearTenant } = useTenant()

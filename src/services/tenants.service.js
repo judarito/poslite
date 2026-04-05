@@ -135,13 +135,27 @@ const tenantsService = {
   async getAllTenants() {
     try {
       const { data, error } = await supabaseService.client
+        .rpc('fn_superadmin_list_tenants')
+
+      if (!error) {
+        return { success: true, data: data || [] }
+      }
+
+      const functionMissing =
+        error?.code === 'PGRST202' ||
+        error?.message?.includes('fn_superadmin_list_tenants') ||
+        error?.message?.includes('Could not find the function')
+
+      if (!functionMissing) throw error
+
+      const { data: fallbackData, error: fallbackError } = await supabaseService.client
         .from('tenants')
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (fallbackError) throw fallbackError
 
-      return { success: true, data }
+      return { success: true, data: fallbackData || [] }
     } catch (error) {
       console.error('Error obteniendo tenants:', error)
       return { success: false, error: error.message }

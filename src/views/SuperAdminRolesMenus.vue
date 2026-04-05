@@ -35,7 +35,7 @@
       <v-window-item value="roles">
         <v-row>
           <!-- Panel izquierdo: lista de roles estándar -->
-          <v-col cols="12" md="4">
+          <v-col cols="12" lg="5" xl="4">
             <ListView
               title="Roles Estándar"
               icon="mdi-account-key"
@@ -54,6 +54,8 @@
               :deletable="false"
               :clickable="true"
               :client-side="true"
+              :show-view-toggle="false"
+              default-view-mode="list"
               :table-columns="roleTableColumns"
               :search-fields="['name']"
               view-storage-key="superadmin-standard-roles"
@@ -97,7 +99,7 @@
           </v-col>
 
           <!-- Panel derecho: menús del rol seleccionado -->
-          <v-col cols="12" md="8">
+          <v-col cols="12" lg="7" xl="8">
             <v-card v-if="selectedRoleName">
               <v-card-title class="d-flex align-center justify-space-between flex-wrap gap-2">
                 <span>

@@ -19,8 +19,34 @@
         </div>
       </v-alert>
 
+      <v-alert
+        v-if="billingSummary && billingBannerMessage"
+        :type="billingAlertType"
+        variant="tonal"
+        class="mx-4 mt-4"
+        icon="mdi-credit-card-alert-outline"
+      >
+        <strong>Estado comercial:</strong> {{ billingBannerMessage }}
+        <div class="mt-2 text-body-2">
+          Plan {{ billingSummary.plan_name || billingSummary.plan_code || 'sin nombre' }} ·
+          Estado {{ billingStatusLabel }} ·
+          {{ billingDaysHint }}
+        </div>
+      </v-alert>
+
+      <v-alert
+        v-if="billingSaveBlocked"
+        type="warning"
+        variant="tonal"
+        class="mx-4 mt-4"
+        icon="mdi-lock-outline"
+      >
+        La suscripción actual permite consulta del estado comercial, pero bloquea cambios administrativos en esta pantalla.
+      </v-alert>
+
       <v-tabs v-model="tab" color="primary" class="px-4">
         <v-tab value="general">General</v-tab>
+        <v-tab value="billing">Suscripción</v-tab>
         <v-tab value="ui">Interfaz</v-tab>
         <v-tab value="ai">Inteligencia IA</v-tab>
         <v-tab value="accounting">Contabilidad</v-tab>
@@ -76,6 +102,111 @@
                 <div class="text-caption mb-1">Vista previa del logo:</div>
                 <v-img :src="settings.logo_url" max-height="100" max-width="200" contain class="border rounded"></v-img>
               </div>
+            </v-window-item>
+
+            <!-- BILLING -->
+            <v-window-item value="billing">
+              <div class="text-h6 mb-4">Suscripción y monetización</div>
+
+              <v-alert
+                v-if="!billingSummary && !billingLoading"
+                type="info"
+                variant="tonal"
+                class="mb-4"
+              >
+                No hay una suscripción comercial registrada para este tenant todavía.
+              </v-alert>
+
+              <v-skeleton-loader
+                v-else-if="billingLoading"
+                type="article, article"
+              />
+
+              <template v-else-if="billingSummary">
+                <v-row>
+                  <v-col cols="12" md="4">
+                    <v-card variant="tonal" :color="billingStatusColor">
+                      <v-card-text>
+                        <div class="text-overline">Plan actual</div>
+                        <div class="text-h5">{{ billingSummary.plan_name || billingSummary.plan_code || 'Sin nombre' }}</div>
+                        <div class="text-body-2 mt-2">{{ billingStatusLabel }}</div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+
+                  <v-col cols="12" md="4">
+                    <v-card variant="tonal" color="primary">
+                      <v-card-text>
+                        <div class="text-overline">{{ billingExpiryLabel }}</div>
+                        <div class="text-h5">{{ billingExpiryDate }}</div>
+                        <div class="text-body-2 mt-2">{{ billingDaysHint }}</div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+
+                  <v-col cols="12" md="4">
+                    <v-card variant="tonal" :color="billingSummary.can_operate_sales ? 'success' : 'error'">
+                      <v-card-text>
+                        <div class="text-overline">Operación permitida</div>
+                        <div class="text-body-1 mt-2">Ventas: {{ billingSummary.can_operate_sales ? 'Sí' : 'No' }}</div>
+                        <div class="text-body-1">Administración: {{ billingSummary.can_operate_admin ? 'Sí' : 'No' }}</div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+
+                <v-alert
+                  v-if="billingSummary.banner_message"
+                  type="info"
+                  variant="tonal"
+                  class="mt-4"
+                >
+                  {{ billingSummary.banner_message }}
+                </v-alert>
+
+                <v-row class="mt-2">
+                  <v-col cols="12" md="6">
+                    <v-card variant="outlined">
+                      <v-card-title class="text-subtitle-1">Features activas</v-card-title>
+                      <v-divider />
+                      <v-card-text>
+                        <div v-if="billingFeatures.length" class="d-flex flex-wrap ga-2">
+                          <v-chip
+                            v-for="feature in billingFeatures"
+                            :key="feature.code"
+                            :color="feature.enabled ? 'success' : 'grey'"
+                            size="small"
+                            variant="tonal"
+                          >
+                            {{ feature.code }}: {{ feature.enabled ? 'On' : 'Off' }}
+                          </v-chip>
+                        </div>
+                        <div v-else class="text-body-2 text-medium-emphasis">
+                          No hay feature flags configuradas.
+                        </div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-card variant="outlined">
+                      <v-card-title class="text-subtitle-1">Límites del plan</v-card-title>
+                      <v-divider />
+                      <v-card-text>
+                        <v-list density="compact" v-if="billingLimits.length">
+                          <v-list-item v-for="limit in billingLimits" :key="limit.code">
+                            <v-list-item-title>{{ limit.code }}</v-list-item-title>
+                            <v-list-item-subtitle>{{ limit.value }} {{ limit.unit }}</v-list-item-subtitle>
+                          </v-list-item>
+                        </v-list>
+                        <div v-else class="text-body-2 text-medium-emphasis">
+                          No hay límites configurados.
+                        </div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </template>
             </v-window-item>
 
             <!-- INTERFAZ -->
@@ -736,7 +867,15 @@
 
           <v-divider class="my-4"></v-divider>
 
-          <v-btn type="submit" color="primary" block size="large" :loading="saving" prepend-icon="mdi-content-save">
+          <v-btn
+            type="submit"
+            color="primary"
+            block
+            size="large"
+            :loading="saving"
+            :disabled="billingSaveBlocked"
+            prepend-icon="mdi-content-save"
+          >
             Guardar Configuración
           </v-btn>
         </v-form>
@@ -755,6 +894,7 @@ import { useTenantSettings } from '@/composables/useTenantSettings'
 import { useAICache } from '@/composables/useAICache'
 import { useTheme } from '@/composables/useTheme'
 import { useSetupAssistant } from '@/composables/useSetupAssistant'
+import { useTenantBilling } from '@/composables/useTenantBilling'
 import tenantSettingsService from '@/services/tenantSettings.service'
 import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import { useI18n } from '@/i18n'
@@ -766,6 +906,14 @@ const { tenantId } = useTenant()
 const { loadSettings } = useTenantSettings()
 const { syncThemeFromTenant } = useTheme()
 const { processMap, loadSetupReadiness } = useSetupAssistant()
+const {
+  billingSummary,
+  billingLoading,
+  billingBannerMessage,
+  billingStatusLabel,
+  canOperateAdmin,
+  loadBillingSummary,
+} = useTenantBilling()
 const { 
   cacheStats, 
   validCacheCount, 
@@ -931,10 +1079,65 @@ const accountingModeDescription = computed(() => {
   return 'El POS envía eventos a una cola y contabilidad los procesa sin bloquear operación.'
 })
 
-const allowedTabs = ['general', 'ui', 'ai', 'accounting', 'inventory', 'sales', 'invoicing', 'notifications']
+const allowedTabs = ['general', 'billing', 'ui', 'ai', 'accounting', 'inventory', 'sales', 'invoicing', 'notifications']
 const setupHintKey = computed(() => String(route.query.onboarding || '').trim())
 const accountingProcess = computed(() => processMap.value.accounting || null)
 const setupHintVisible = computed(() => setupHintKey.value.length > 0)
+const billingSaveBlocked = computed(() => billingSummary.value && canOperateAdmin.value === false)
+const billingStatusColor = computed(() => {
+  const status = billingSummary.value?.status
+  if (status === 'active') return 'success'
+  if (status === 'trialing') return 'info'
+  if (status === 'past_due') return 'error'
+  if (status === 'grace_period') return 'warning'
+  if (status === 'suspended') return 'error'
+  return 'primary'
+})
+const billingAlertType = computed(() => {
+  const status = billingSummary.value?.status
+  if (status === 'past_due' || status === 'suspended') return 'error'
+  if (status === 'grace_period') return 'warning'
+  return 'info'
+})
+const billingExpiryLabel = computed(() => {
+  if (!billingSummary.value) return 'Vigencia'
+  if (billingSummary.value.status === 'trialing') return 'Fin del trial'
+  if (billingSummary.value.status === 'grace_period') return 'Fin de gracia'
+  return 'Vigencia'
+})
+const billingExpiryDate = computed(() => {
+  const value = billingSummary.value?.expiration_date
+  if (!value) return 'Sin fecha'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Fecha inválida'
+  return date.toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+})
+const billingDaysHint = computed(() => {
+  const days = billingSummary.value?.days_to_expiry
+  if (!Number.isFinite(days)) return 'Sin cálculo de vigencia'
+  if (days < 0) return `Venció hace ${Math.abs(days)} día(s)`
+  if (days === 0) return 'Vence hoy'
+  if (days === 1) return 'Vence mañana'
+  return `Faltan ${days} día(s)`
+})
+const billingFeatures = computed(() => {
+  return Object.entries(billingSummary.value?.feature_flags || {})
+    .map(([code, enabled]) => ({ code, enabled: enabled === true }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+})
+const billingLimits = computed(() => {
+  return Object.entries(billingSummary.value?.plan_limits || {})
+    .map(([code, detail]) => ({
+      code,
+      value: detail?.value ?? '—',
+      unit: detail?.unit ?? '',
+    }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+})
 const setupHintMessage = computed(() => {
   if (setupHintKey.value.startsWith('accounting')) {
     return accountingProcess.value?.nextStep?.description || 'Completa los campos contables esenciales y guarda antes de volver al asistente.'
@@ -1054,6 +1257,11 @@ const loadData = async () => {
 }
 
 const saveAll = async () => {
+  if (billingSaveBlocked.value) {
+    showMsg('La suscripción actual no permite cambios administrativos en este tenant', 'warning')
+    return
+  }
+
   const { valid } = await configForm.value.validate()
   if (!valid) return
 
@@ -1117,6 +1325,7 @@ const confirmClearAllCache = () => {
 
 onMounted(async () => {
   await loadData()
+  await loadBillingSummary()
   await loadSetupReadiness()
   const queryTab = String(route.query.tab || '').trim()
   if (allowedTabs.includes(queryTab)) {

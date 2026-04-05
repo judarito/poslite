@@ -62,6 +62,18 @@
                     <v-list-item-title class="font-weight-bold">Tema</v-list-item-title>
                     <v-list-item-subtitle>{{ tenantInfo.theme }}</v-list-item-subtitle>
                   </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title class="font-weight-bold">Plan</v-list-item-title>
+                    <v-list-item-subtitle>{{ billingInfo.plan }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title class="font-weight-bold">Estado comercial</v-list-item-title>
+                    <v-list-item-subtitle>{{ billingInfo.status }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title class="font-weight-bold">Vigencia</v-list-item-title>
+                    <v-list-item-subtitle>{{ billingInfo.expiration }}</v-list-item-subtitle>
+                  </v-list-item>
                 </v-list>
               </v-card-text>
             </v-card>
@@ -191,6 +203,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useTenant } from '@/composables/useTenant'
 import { useAuth } from '@/composables/useAuth'
 import { useTheme } from '@/composables/useTheme'
+import { useTenantBilling } from '@/composables/useTenantBilling'
 import supabaseService from '@/services/supabase.service'
 import { useI18n } from '@/i18n'
 
@@ -199,6 +212,7 @@ const { t } = useI18n()
 const { tenantId, currentTenant } = useTenant()
 const { userProfile } = useAuth()
 const { currentTheme } = useTheme()
+const { billingSummary } = useTenantBilling()
 
 const systemInfo = ref({
   version: '1.0.0',
@@ -223,6 +237,19 @@ const tenantInfo = computed(() => {
       role: 'Error', 
       theme: 'Claro'
     }
+  }
+})
+
+const billingInfo = computed(() => {
+  const expirationDate = billingSummary.value?.expiration_date
+  const parsedDate = expirationDate ? new Date(expirationDate) : null
+
+  return {
+    plan: billingSummary.value?.plan_name || billingSummary.value?.plan_code || 'Sin suscripción',
+    status: billingSummary.value?.status_label || 'Sin estado',
+    expiration: parsedDate && !Number.isNaN(parsedDate.getTime())
+      ? parsedDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'Sin fecha registrada'
   }
 })
 

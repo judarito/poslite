@@ -3,6 +3,7 @@ import { supabase } from '@/plugins/supabase'
 import { canManageTenants } from '@/utils/superAdmin'
 import rolesService from '@/services/roles.service'
 import supabaseService from '@/services/supabase.service'
+import tenantBillingService, { getBillingRouteAccess } from '@/services/tenantBilling.service'
 
 const Login = () => import('@/views/Login.vue')
 const Home = () => import('@/views/Home.vue')
@@ -56,6 +57,7 @@ const AccountingReconciliation = () => import('@/views/AccountingReconciliation.
 const AccountingAIControl = () => import('@/views/AccountingAIControl.vue')
 const SetupWizard = () => import('@/components/SetupWizard.vue')
 const HelpCenter = () => import('@/views/HelpCenter.vue')
+const SuperAdminBilling = () => import('@/views/SuperAdminBilling.vue')
 
 function isRouteAlwaysAllowed(path) {
   return path === '/' || path === '/about' || path === '/setup' || path === '/help'
@@ -120,6 +122,23 @@ async function canAccessTenantConfig() {
   } catch (error) {
     console.error('Error checking tenant-config access:', error)
     return false
+  }
+}
+
+async function getCurrentUserTenantId(authUserId) {
+  if (!authUserId) return null
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle()
+
+    if (error) return null
+    return data?.tenant_id || null
+  } catch (_error) {
+    return null
   }
 }
 
@@ -243,6 +262,12 @@ const routes = [
     name: 'Roles',
     component: Roles,
     meta: { requiresAuth: true } // Read-only para tenant admins; edición solo en /superadmin/roles-menus
+  },
+  {
+    path: '/superadmin/billing',
+    name: 'SuperAdminBilling',
+    component: SuperAdminBilling,
+    meta: { requiresAuth: true, requiresSuperAdmin: true }
   },
   {
     path: '/superadmin/roles-menus',
@@ -536,6 +561,35 @@ router.beforeEach(async (to, from, next) => {
         return
       }
     }
+
+    if (
+      to.meta.requiresAuth &&
+      !to.meta.requiresSuperAdmin &&
+      isAuthenticated &&
+      session?.user?.id
+    ) {
+      const isSuperAdmin = await canManageTenants()
+      if (!isSuperAdmin) {
+        const tenantId = await getCurrentUserTenantId(session.user.id)
+        if (tenantId) {
+          const billingResult = await tenantBillingService.getTenantBillingSummary(tenantId)
+          if (billingResult.success && billingResult.data) {
+            const access = getBillingRouteAccess(billingResult.data, to.path)
+            if (!access.allowed) {
+              console.warn(`Acceso denegado por billing (${access.restriction}): ${to.path}`)
+              next({
+                path: '/about',
+                query: {
+                  billing_blocked: access.restriction,
+                },
+              })
+              return
+            }
+          }
+        }
+      }
+    }
+
     // Guard adicional: bloquear acceso directo por URL si la ruta no existe en el menu permitido del usuario.
     // Excluye rutas con validacion dedicada (superadmin/tenant-config).
     if (

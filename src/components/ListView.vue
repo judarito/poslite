@@ -481,6 +481,12 @@ onMounted(() => {
 .ofir-list-view__title {
   border-bottom: 1px solid rgba(var(--v-theme-primary), 0.16);
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ofir-list-view__search {
+  flex: 1 1 240px;
+  min-width: 180px;
 }
 
 .ofir-list-view__search :deep(.v-field),
@@ -491,11 +497,13 @@ onMounted(() => {
 .ofir-list-view__create-btn {
   border-radius: 12px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .ofir-list-view__mode-toggle {
   border-radius: 12px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .ofir-list-view__divider {

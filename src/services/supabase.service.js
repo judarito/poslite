@@ -126,7 +126,11 @@ class SupabaseService {
   }
 
   async signOut() {
-    return await this.client.auth.signOut()
+    try {
+      return await this.client.auth.signOut()
+    } finally {
+      this.invalidateSessionCache()
+    }
   }
 
   async getUser() {

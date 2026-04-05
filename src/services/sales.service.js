@@ -1,6 +1,7 @@
 import supabaseService from './supabase.service'
 import salesForecastService from './sales-forecast.service'
 import queryCache from '@/utils/queryCache'
+import tenantBillingService from './tenantBilling.service'
 
 class SalesService {
   constructor() {
@@ -15,7 +16,10 @@ class SalesService {
     const message = String(error?.message || error || '').toLowerCase()
     return message.includes('p_sold_at') || (
       message.includes('sp_create_sale') &&
-      message.includes('schema cache')
+      (
+        message.includes('schema cache') ||
+        message.includes('could not choose the best candidate function')
+      )
     )
   }
 
@@ -26,6 +30,14 @@ class SalesService {
   // Crear venta usando SP atómico
   async createSale(tenantId, saleData) {
     try {
+      const billingResult = await tenantBillingService.getTenantBillingSummary(tenantId)
+      if (billingResult.success && billingResult.data && billingResult.data.can_operate_sales === false) {
+        return {
+          success: false,
+          error: billingResult.data.banner_message || 'La suscripción actual no permite registrar ventas',
+        }
+      }
+
       const soldAt = saleData?.sold_at ? new Date(saleData.sold_at) : null
       const normalizedSoldAt = soldAt && !Number.isNaN(soldAt.getTime())
         ? soldAt.toISOString()
@@ -44,7 +56,9 @@ class SalesService {
           p_third_party: saleData.third_party_id || null
         }
 
-        if (includeSoldAt && normalizedSoldAt) {
+        if (includeSoldAt) {
+          // Siempre enviar p_sold_at para desambiguar la sobrecarga del RPC
+          // cuando coexisten versiones legacy y extendidas de sp_create_sale.
           payload.p_sold_at = normalizedSoldAt
         }
 

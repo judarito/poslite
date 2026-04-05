@@ -1,8 +1,8 @@
 # CONTEXTO_ULTIMO
 
-Fecha de actualizacion: 2026-03-19
+Fecha de actualizacion: 2026-04-05
 Owner: Equipo POSLite
-Ultimo cambio registrado: `ListView` ahora centraliza el cambio `lista/tabla` con persistencia local y se migraron modulos pendientes (`BulkImports`, `TenantManagement`, `SuperAdminRolesMenus`, `Cartera`, `CashRegisterAssignments`, `BatchManagement`) al patron comun
+Ultimo cambio registrado: se incorporo la primera implementacion web de billing multi-tenant con UI superadmin, resumen por tenant y enforcement comercial en router, POS, `App.vue`, `TenantConfig` y `About`
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -28,6 +28,49 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 ```
 
 ## Estado tecnico actual
+
+### Billing multi-tenant web (implementado 2026-04-05)
+
+- Se porto al repo web la base SQL del dominio comercial:
+  - `migrations/ADD_TENANT_BILLING_MONETIZATION.sql`
+  - `migrations/ADD_FREEMIUM_6M_TENANT_SUBSCRIPTIONS.sql`
+- Se agrego una migracion complementaria orientada a workflows web/superadmin:
+  - `migrations/ADD_TENANT_BILLING_SUPERADMIN_WORKFLOWS.sql`
+- El dominio comercial queda separado de `tenant_settings` y modela:
+  - catalogo de planes
+  - precios por periodicidad
+  - features y limites por plan
+  - suscripciones por tenant
+  - periodos, eventos, invoices y pagos
+- Se agregaron capacidades web de datos:
+  - `src/services/tenantBilling.service.js`
+  - `src/composables/useTenantBilling.js`
+- Nueva UI de superadmin:
+  - ruta `/superadmin/billing`
+  - vista `src/views/SuperAdminBilling.vue`
+  - menu superadmin expuesto desde `src/App.vue`
+- La vista superadmin ya permite:
+  - listar y editar catalogo de planes
+  - listar estado comercial por tenant
+  - asignar plan/precio a un tenant
+  - cambiar estado de suscripcion
+  - ver historial de suscripciones
+- UI tenant incorporada:
+  - `src/views/TenantConfig.vue` ahora incluye tab `Suscripcion`
+  - `src/views/About.vue` ahora muestra plan, estado y vigencia
+  - `src/App.vue` muestra banner global cuando billing expone mensaje operativo
+- Enforcement vigente:
+  - `src/router/index.js` consulta billing summary y bloquea navegacion segun `can_operate_sales` y `can_operate_admin`
+  - `src/services/sales.service.js` impide registrar ventas si billing no permite operar ventas
+  - `src/views/TenantConfig.vue` bloquea guardar cambios administrativos cuando billing no permite operar admin
+- Regla operativa vigente:
+  - `/`, `/about`, `/help` y `/tenant-config` quedan como rutas seguras de consulta ante restricciones comerciales
+  - POS, historial de ventas y sesiones de caja se consideran superficie de operacion comercial
+  - el resto de modulos tenant se tratan como administracion para enforcement inicial
+- Estado de producto:
+  - ya existe visibilidad y enforcement base
+  - aun no existe checkout real, webhooks, renovacion automatica ni pantalla de pago para tenant
+  - los limites cuantitativos y feature flags ya se exponen en UI, pero su enforcement fino por modulo sigue siendo fase siguiente
 
 ### Onboarding operativo v2 (implementado 2026-03-18)
 

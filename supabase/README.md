@@ -109,7 +109,7 @@ Comportamiento:
 
 - La cola contable corre en `pg_cron` directamente sobre Postgres.
 - El push dispatcher se dispara con `pg_cron + pg_net`.
-- GitHub Actions queda solo como respaldo manual, no como scheduler principal.
+- GitHub Actions ya no participa en la ejecucion programada de estos jobs.
 
 Secrets requeridos en Vault para push dispatcher:
 
