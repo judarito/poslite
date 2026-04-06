@@ -1,5 +1,6 @@
 import supabaseService from './supabase.service'
 import queryCache from '@/utils/queryCache'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 const VARIANT_SEARCH_TTL_MS = 45 * 1000
 const ACTIVE_VARIANTS_TTL_MS = 2 * 60 * 1000
@@ -116,7 +117,7 @@ class ProductsService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -171,7 +172,7 @@ class ProductsService {
 
       return { success: true, data: allRows }
     } catch (error) {
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -195,7 +196,7 @@ class ProductsService {
       if (error) throw error
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -230,7 +231,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -270,7 +271,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -283,7 +284,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -312,7 +313,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -338,7 +339,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -351,7 +352,7 @@ class ProductsService {
       queryCache.invalidateByTags(['products', 'product-variants'], { tenantId })
       return { success: true }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -404,7 +405,7 @@ class ProductsService {
 
       return { success: false, error: 'Producto no encontrado' }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -492,7 +493,7 @@ class ProductsService {
         }
       )
     } catch (error) {
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -539,7 +540,7 @@ class ProductsService {
         }
       )
     } catch (error) {
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -583,7 +584,7 @@ class ProductsService {
         }
       )
     } catch (error) {
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 

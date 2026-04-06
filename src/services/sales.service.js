@@ -2,7 +2,8 @@ import supabaseService from './supabase.service'
 import salesForecastService from './sales-forecast.service'
 import queryCache from '@/utils/queryCache'
 import tenantBillingService from './tenantBilling.service'
-import { calculateDiscount, validateDiscount } from '@/utils/discountCalculator'
+import { validateSalePayloadDiscounts } from '@/utils/saleCalculator'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 class SalesService {
   constructor() {
@@ -34,44 +35,7 @@ class SalesService {
   }
 
   validateSaleDiscounts(lines = []) {
-    let invoiceSubtotal = 0
-    let invoiceDiscount = 0
-
-    for (const line of lines) {
-      const qty = Number(line?.qty) || 0
-      const unitPrice = Number(line?.unit_price) || 0
-      const discountValue = Number(line?.discount) || 0
-      const discountType = line?.discount_type || 'AMOUNT'
-      const lineSubtotal = Math.max(0, qty * unitPrice)
-
-      const validation = validateDiscount(lineSubtotal, discountValue, discountType)
-      if (!validation.valid) {
-        return {
-          valid: false,
-          error: validation.error || 'Hay descuentos inválidos en la venta',
-        }
-      }
-
-      const discountAmount = calculateDiscount(lineSubtotal, discountValue, discountType)
-      if (discountAmount > lineSubtotal) {
-        return {
-          valid: false,
-          error: 'El descuento no puede ser mayor al valor del producto',
-        }
-      }
-
-      invoiceSubtotal += lineSubtotal
-      invoiceDiscount += discountAmount
-    }
-
-    if (invoiceDiscount > invoiceSubtotal) {
-      return {
-        valid: false,
-        error: 'El descuento no puede ser mayor al valor de la factura',
-      }
-    }
-
-    return { valid: true, error: null }
+    return validateSalePayloadDiscounts(lines)
   }
 
   // Crear venta usando SP atómico
@@ -145,7 +109,7 @@ class SalesService {
           error: 'La base de datos bloqueó el consecutivo de venta por RLS en sale_counters. Ejecuta la migración FIX_SALE_COUNTERS_RLS.sql y vuelve a intentar.',
         }
       }
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -178,7 +142,7 @@ class SalesService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -211,7 +175,7 @@ class SalesService {
       if (error) throw error
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -226,7 +190,7 @@ class SalesService {
       this.invalidateOperationalCaches(tenantId)
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -249,7 +213,7 @@ class SalesService {
       this.invalidateOperationalCaches(tenantId)
       return { success: true, data: { return_id: data } }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -268,7 +232,7 @@ class SalesService {
       this.invalidateOperationalCaches(tenantId)
       return { success: true, data: { return_id: data } }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -293,7 +257,7 @@ class SalesService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -316,7 +280,7 @@ class SalesService {
       return { success: true, data: data || [] }
     } catch (error) {
       console.error('Error obteniendo datos de pronóstico:', error)
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -373,11 +337,7 @@ class SalesService {
       }
     } catch (error) {
       console.error('Error generando pronóstico:', error)
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      }
+      return serviceErrorResult(error, { data: null })
     }
   }
 }

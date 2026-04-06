@@ -1513,6 +1513,7 @@ import batchesService from '@/services/batches.service'
 import thirdPartiesService from '@/services/thirdParties.service'
 import ListView from '@/components/ListView.vue'
 import ContextHelpCard from '@/components/ContextHelpCard.vue'
+import { humanizeAppError } from '@/utils/appErrors'
 import { formatMoney, formatDateTime as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
 
@@ -1716,6 +1717,38 @@ const formatVariantLabel = (variantRow, fallbackId) => {
   return `${productName}${variantName}${sku}`
 }
 
+const buildPurchaseLineLabel = (line, fallbackId) => {
+  if (!line) return fallbackId ? `producto ${fallbackId}` : null
+  if (line.label) return line.label
+  const productName = line.product_name || line.productName || line.product?.name || line.product_id?.name || 'Producto'
+  const variantName = line.variant_name || line.variantName || line.variant?.variant_name || ''
+  const sku = line.sku || line.variant?.sku || ''
+  const suffixVariant = variantName ? ` - ${variantName}` : ''
+  const suffixSku = sku ? ` (${sku})` : ''
+  return `${productName}${suffixVariant}${suffixSku}`.trim()
+}
+
+const buildPurchaseErrorContext = (lines = purchaseData.value.lines) => {
+  const idLabels = new Map()
+
+  ;(lines || []).forEach((line) => {
+    if (!line?.variant_id) return
+    const label = buildPurchaseLineLabel(line, line.variant_id)
+    if (label) idLabels.set(String(line.variant_id).toLowerCase(), label)
+  })
+
+  ;(variants.value || []).forEach((variantRow) => {
+    if (!variantRow?.variant_id) return
+    const label = formatVariantLabel(variantRow, variantRow.variant_id)
+    if (label) idLabels.set(String(variantRow.variant_id).toLowerCase(), label)
+  })
+
+  return {
+    idLabels,
+    defaultMessage: 'Ocurrió un error al procesar la compra.',
+  }
+}
+
 const loadVariantMetadata = async (variantIds = []) => {
   const uniqueVariantIds = [...new Set((variantIds || []).filter(Boolean))]
   if (!tenantId.value || uniqueVariantIds.length === 0) {
@@ -1748,7 +1781,11 @@ const loadVariantMetadata = async (variantIds = []) => {
 
     return { success: true, byVariant }
   } catch (error) {
-    return { success: false, error: error.message, byVariant: new Map() }
+    return {
+      success: false,
+      error: humanizeAppError(error, buildPurchaseErrorContext()),
+      byVariant: new Map()
+    }
   }
 }
 
@@ -1892,7 +1929,7 @@ const loadAIAnalysis = async (forceRefresh = false) => {
     }
   } catch (error) {
     console.error('Error loading AI analysis:', error)
-    aiAnalysisError.value = `Error: ${error.message}`
+    aiAnalysisError.value = humanizeAppError(`Error: ${error.message}`, buildPurchaseErrorContext())
   } finally {
     loadingAIAnalysis.value = false
   }
@@ -2172,7 +2209,7 @@ const openPurchaseDetailByPurchaseId = async (purchaseId) => {
     }
   } catch (error) {
     console.error('Error loading purchase detail:', error)
-    detailError.value = 'Error al cargar detalle: ' + error.message
+    detailError.value = humanizeAppError('Error al cargar detalle: ' + error.message, buildPurchaseErrorContext())
   } finally {
     loadingDetail.value = false
   }
@@ -2616,18 +2653,6 @@ const savePurchase = async () => {
     dialog.value = false
     await loadPurchases()
   } catch (error) {
-    const errorMessage = String(error?.message || '')
-    const missingExpirationMatch = errorMessage.match(/variante\s+([0-9a-f-]{36})\s+requiere fecha de vencimiento/i)
-    if (missingExpirationMatch) {
-      const variantId = missingExpirationMatch[1]
-      const line = formattedLines.find(item => item.variant_id === variantId)
-      if (line) {
-        showMsg(
-          `Error lote: variante ${variantId.slice(0, 8)} enviada con expiration_date=${line.expiration_date || 'NULL'}`,
-          'error'
-        )
-      }
-    }
     showMsg('Error al guardar compra: ' + error.message, 'error')
   } finally {
     saving.value = false
@@ -2784,7 +2809,9 @@ const confirmReceivePurchaseOrder = async () => {
 }
 
 const showMsg = (msg, color = 'success') => {
-  snackbarMessage.value = msg
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, buildPurchaseErrorContext())
+    : msg
   snackbarColor.value = color
   snackbar.value = true
 }
@@ -2916,9 +2943,6 @@ const showMsg = (msg, color = 'success') => {
   border-color: rgba(var(--v-theme-primary), 0.2) !important;
 }
 </style>
-
-
-
 
 
 

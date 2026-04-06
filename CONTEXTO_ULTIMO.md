@@ -2,7 +2,7 @@
 
 Fecha de actualizacion: 2026-04-05
 Owner: Equipo POSLite
-Ultimo cambio registrado: se consolidaron fixes operativos/UX sobre logout, POS, superadmin, billing y modales teletransportados por Vuetify; ademas se agrego migracion pendiente para corregir RLS de `sale_counters`
+Ultimo cambio registrado: se agrego un sanitizador central de errores de negocio (`humanizeAppError`) y se conecto en servicios/vistas clave para evitar exponer UUIDs, nombres de constraints o mensajes crudos de base de datos
 
 ## Regla de versionado de contexto (obligatoria)
 
@@ -30,6 +30,39 @@ mv CONTEXTO_ULTIMO.md CONTEXTO_2026-03-11.md
 ## Estado tecnico actual
 
 ### Ajustes recientes de operacion y UX (actualizado 2026-04-05)
+
+- Calculos de venta centralizados:
+  - archivos:
+    - `src/utils/saleCalculator.js`
+    - `src/views/PointOfSale.vue`
+    - `src/services/sales.service.js`
+  - cambio aplicado:
+    - se creo `saleCalculator.js` como fuente canonica para subtotal por linea, normalizacion de descuentos, distribucion de descuento global, validacion de factura, resumen de totales y armado del payload de venta
+    - `PointOfSale.vue` ya no mantiene calculos paralelos para esos casos; ahora consume el modulo compartido
+    - `sales.service.js` valida descuentos usando la misma logica compartida antes de invocar `sp_create_sale`
+  - objetivo operativo:
+    - reducir duplicidad entre UI y backend-facing service
+    - facilitar soporte y auditoria de diferencias en subtotales, descuentos, impuestos y total
+    - asegurar que lo que se muestra en POS y lo que se guarda sigan las mismas reglas
+
+- Sanitizacion central de errores:
+  - archivos principales:
+    - `src/utils/appErrors.js`
+    - `src/composables/useNotification.js`
+  - helpers nuevos:
+    - `humanizeAppError(error, context)`
+    - `serviceErrorResult(error, extra, context)`
+  - comportamiento vigente:
+    - normaliza mensajes tecnicos de PostgREST/SQL antes de llevarlos a la UI
+    - reemplaza campos internos (`tenant_id`, `variant_id`, `location_id`, etc.) por lenguaje de negocio
+    - detecta patrones frecuentes como RLS, unique constraint, foreign key, UUID invalido y schema cache
+    - puede reemplazar UUIDs por etiquetas reales cuando la vista aporta contexto local (`idLabels`)
+  - cobertura aplicada en esta ronda:
+    - servicios: `sales.service.js`, `products.service.js`, `inventory.service.js`, `cash.service.js`, `layaway.service.js`, `tenants.service.js`
+    - vistas: `PointOfSale.vue`, `Purchases.vue`, `LayawayDetail.vue`, `ProductionOrders.vue`, `TenantManagement.vue`, `Products.vue`, `CashSessions.vue`, `SuperAdminRolesMenus.vue`
+  - nota operativa:
+    - POS y compras ya humanizan UUIDs de variantes con nombres reales cuando esa metadata existe en memoria
+    - aun puede haber modulos legacy sin migrar al sanitizador; la estrategia vigente es extender `humanizeAppError` y conectar `showMsg`/servicios por superficie de uso
 
 - Logout corregido:
   - archivos: `src/composables/useAuth.js`, `src/services/supabase.service.js`, `src/App.vue`

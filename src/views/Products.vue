@@ -719,6 +719,7 @@ import productsService from '@/services/products.service'
 import categoriesService from '@/services/categories.service'
 import manufacturingService from '@/services/manufacturing.service'
 import unitsOfMeasureService from '@/services/unitsOfMeasure.service'
+import { humanizeAppError } from '@/utils/appErrors'
 import { generateSKU, generateShortSKU } from '@/utils/skuGenerator'
 import { utils, writeFileXLSX } from 'xlsx'
 import { useI18n } from '@/i18n'
@@ -1346,7 +1347,13 @@ const onBOMSaved = async (bomData) => {
   }
 }
 
-const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+const showMsg = (msg, color = 'success') => {
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, { defaultMessage: 'Ocurrió un error en productos.' })
+    : msg
+  snackbarColor.value = color
+  snackbar.value = true
+}
 
 const sanitizeForExcel = (value) => {
   if (value === null || value === undefined) return ''

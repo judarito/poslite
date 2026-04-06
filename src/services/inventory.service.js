@@ -1,4 +1,5 @@
 import supabaseService from './supabase.service'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 class InventoryService {
   constructor() {
@@ -113,7 +114,7 @@ class InventoryService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -149,7 +150,7 @@ class InventoryService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -201,7 +202,7 @@ class InventoryService {
       
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -225,7 +226,7 @@ class InventoryService {
 
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -265,7 +266,7 @@ class InventoryService {
       if (error) throw error
       return { success: true, data: data || [] }
     } catch (error) {
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -284,7 +285,7 @@ class InventoryService {
 
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -317,7 +318,7 @@ class InventoryService {
 
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -391,7 +392,7 @@ class InventoryService {
       
       return { success: true }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -418,10 +419,10 @@ class InventoryService {
         try {
           return await this._getStockAlertsFallback(tenantId, filters)
         } catch (fallbackError) {
-          return { success: false, error: fallbackError.message, data: [] }
+          return serviceErrorResult(fallbackError, { data: [] })
         }
       }
-      return { success: false, error: error.message, data: [] }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -452,7 +453,7 @@ class InventoryService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 }

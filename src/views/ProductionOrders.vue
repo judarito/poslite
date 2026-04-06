@@ -457,6 +457,7 @@ import { useI18n } from '@/i18n'
 import ListView from '@/components/ListView.vue'
 import manufacturingService from '@/services/manufacturing.service'
 import locationsService from '@/services/locations.service'
+import { humanizeAppError } from '@/utils/appErrors'
 
 export default {
   name: 'ProductionOrders',
@@ -571,7 +572,9 @@ export default {
 
     // Método para mostrar mensajes
     const showMsg = (message, color = 'success') => {
-      snackbarMessage.value = message
+      snackbarMessage.value = color === 'error'
+        ? humanizeAppError(message, { defaultMessage: 'Ocurrió un error en producción.' })
+        : message
       snackbarColor.value = color
       snackbar.value = true
     }

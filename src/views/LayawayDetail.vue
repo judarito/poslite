@@ -342,6 +342,7 @@ import layawayService from '@/services/layaway.service'
 import paymentMethodsService from '@/services/paymentMethods.service'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
+import { humanizeAppError } from '@/utils/appErrors'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
 
@@ -550,7 +551,9 @@ const cancelContract = async () => {
 }
 
 const showMsg = (msg, color = 'success') => {
-  snackbarMessage.value = msg
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, { defaultMessage: 'Ocurrió un error en plan separe.' })
+    : msg
   snackbarColor.value = color
   snackbar.value = true
 }

@@ -1,4 +1,5 @@
 import supabaseService from './supabase.service'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 class CashService {
   constructor() {
@@ -26,7 +27,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -45,7 +46,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data || [] }
     } catch (error) {
-      return { success: false, data: [], error: error.message }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -60,7 +61,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -74,7 +75,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -86,7 +87,7 @@ class CashService {
       if (error) throw error
       return { success: true }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -114,7 +115,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, error: error.message, data: [], total: 0 }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -131,7 +132,7 @@ class CashService {
       if (error) throw error
       return { success: true, data }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -147,7 +148,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -205,7 +206,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -223,7 +224,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 
@@ -241,7 +242,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data || [] }
     } catch (error) {
-      return { success: false, data: [], error: error.message }
+      return serviceErrorResult(error, { data: [] })
     }
   }
 
@@ -262,7 +263,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
-      return { success: false, data: [], total: 0, error: error.message }
+      return serviceErrorResult(error, { data: [], total: 0 })
     }
   }
 
@@ -280,7 +281,7 @@ class CashService {
       if (error) throw error
       return { success: true, data: data[0] }
     } catch (error) {
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 }

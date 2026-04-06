@@ -1,4 +1,5 @@
 import supabaseService from './supabase.service'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 const layawayService = {
   /**
@@ -26,7 +27,7 @@ const layawayService = {
       return { success: true, data: data || [], total: count || 0 }
     } catch (error) {
       console.error('Error loading layaway contracts:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -100,7 +101,7 @@ const layawayService = {
       }
     } catch (error) {
       console.error('Error loading layaway detail:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -127,7 +128,7 @@ const layawayService = {
       return { success: true, data }
     } catch (error) {
       console.error('Error creating layaway:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -152,7 +153,7 @@ const layawayService = {
       return { success: true }
     } catch (error) {
       console.error('Error adding layaway payment:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -174,7 +175,7 @@ const layawayService = {
       return { success: true, data } // retorna sale_id
     } catch (error) {
       console.error('Error completing layaway:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -197,7 +198,7 @@ const layawayService = {
       return { success: true }
     } catch (error) {
       console.error('Error cancelling layaway:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -219,7 +220,7 @@ const layawayService = {
       return { success: true, data }
     } catch (error) {
       console.error('Error getting stock available:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -275,7 +276,7 @@ const layawayService = {
       return { success: true, data: alerts }
     } catch (error) {
       console.error('Error getting layaway alerts:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   }
 }

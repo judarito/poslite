@@ -342,6 +342,7 @@ import { useTheme } from '@/composables/useTheme'
 import ListView from '@/components/ListView.vue'
 import cashService from '@/services/cash.service'
 import supabaseService from '@/services/supabase.service'
+import { humanizeAppError } from '@/utils/appErrors'
 import { formatMoney, formatDateTimeFull as formatDate } from '@/utils/formatters'
 import { useI18n } from '@/i18n'
 
@@ -613,7 +614,13 @@ const doForceClose = async () => {
   }
 }
 
-const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+const showMsg = (msg, color = 'success') => {
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, { defaultMessage: 'Ocurrió un error en caja.' })
+    : msg
+  snackbarColor.value = color
+  snackbar.value = true
+}
 
 onMounted(async () => {
   await loadSettings()

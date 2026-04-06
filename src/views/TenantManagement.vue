@@ -374,6 +374,7 @@ import { ref, onMounted } from 'vue'
 import { useSuperAdmin } from '@/composables/useSuperAdmin'
 import ListView from '@/components/ListView.vue'
 import tenantsService from '@/services/tenants.service'
+import { humanizeAppError } from '@/utils/appErrors'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
@@ -534,7 +535,9 @@ const closeResultDialog = () => {
 }
 
 const showMsg = (msg, color = 'success') => {
-  snackbarMessage.value = msg
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, { defaultMessage: 'Ocurrió un error en gestión de tenants.' })
+    : msg
   snackbarColor.value = color
   snackbar.value = true
 }

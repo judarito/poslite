@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { humanizeAppError } from '@/utils/appErrors'
 
 const snackbar = ref(false)
 const snackbarMessage = ref('')
@@ -12,7 +13,7 @@ export function useNotification() {
   }
 
   const showError = (message) => {
-    snackbarMessage.value = message
+    snackbarMessage.value = humanizeAppError(message)
     snackbarColor.value = 'error'
     snackbar.value = true
   }
@@ -30,7 +31,7 @@ export function useNotification() {
   }
 
   const show = (message, color = 'success') => {
-    snackbarMessage.value = message
+    snackbarMessage.value = color === 'error' ? humanizeAppError(message) : message
     snackbarColor.value = color
     snackbar.value = true
   }

@@ -426,6 +426,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import ListView from '@/components/ListView.vue'
 import superAdminRolesService from '@/services/superAdminRoles.service'
+import { humanizeAppError } from '@/utils/appErrors'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
@@ -658,7 +659,9 @@ async function toggleMenu(item) {
 // HELPERS
 // ============================================================
 function showMsg(msg, color = 'success') {
-  snackbarMessage.value = msg
+  snackbarMessage.value = color === 'error'
+    ? humanizeAppError(msg, { defaultMessage: 'Ocurrió un error en gestión global.' })
+    : msg
   snackbarColor.value = color
   snackbar.value = true
 }

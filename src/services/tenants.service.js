@@ -2,6 +2,7 @@
  * Servicio para gestión de Tenants
  */
 import supabaseService from './supabase.service'
+import { serviceErrorResult } from '@/utils/appErrors'
 
 const isDev = import.meta.env.DEV
 const debugLog = (...args) => {
@@ -24,7 +25,7 @@ const tenantsService = {
       return { success: true, data }
     } catch (error) {
       console.error('Error obteniendo template de tenant:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -125,7 +126,7 @@ const tenantsService = {
       }
     } catch (error) {
       console.error('Error creando tenant:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -158,7 +159,7 @@ const tenantsService = {
       return { success: true, data: fallbackData || [] }
     } catch (error) {
       console.error('Error obteniendo tenants:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -178,7 +179,7 @@ const tenantsService = {
       return { success: true, data }
     } catch (error) {
       console.error('Error obteniendo tenant:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 
@@ -199,7 +200,7 @@ const tenantsService = {
       return { success: true, data }
     } catch (error) {
       console.error('Error actualizando tenant:', error)
-      return { success: false, error: error.message }
+      return serviceErrorResult(error)
     }
   },
 

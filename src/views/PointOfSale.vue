@@ -205,7 +205,7 @@
                   </div>
                   <div class="pos-cart-field">
                     <div class="pos-cart-field__label">Subtotal</div>
-                    <div class="pos-cart-field__value">{{ formatMoney(line.quantity * line.unit_price) }}</div>
+                    <div class="pos-cart-field__value">{{ formatMoney(getLineSubtotal(line)) }}</div>
                   </div>
                   <div v-if="canManageDiscounts" class="pos-cart-field">
                     <div class="pos-cart-field__label">Descuento</div>
@@ -221,7 +221,7 @@
                         density="compact"
                         hide-details
                         min="0"
-                        :max="line.discount_line_type === 'PERCENT' ? 100 : Math.max(0, line.quantity * line.unit_price)"
+                        :max="line.discount_line_type === 'PERCENT' ? 100 : getLineSubtotal(line)"
                         class="pos-cart-discount-value"
                         @update:model-value="recalculate"
                       />
@@ -630,9 +630,19 @@ import electronicInvoicingService from '@/services/electronicInvoicing.service'
 import creditService from '@/services/credit.service'
 import ListView from '@/components/ListView.vue'
 import ContextHelpCard from '@/components/ContextHelpCard.vue'
-import { calculateDiscount, validateDiscount } from '@/utils/discountCalculator'
 import { formatMoney } from '@/utils/formatters'
 import { applyLineTaxes } from '@/utils/taxCalculator'
+import { humanizeAppError } from '@/utils/appErrors'
+import {
+  allocateGlobalDiscountAcrossLines,
+  buildSalePayloadLines,
+  getCartLineTotalDiscountAmount,
+  getDocumentLineSubtotal,
+  getMaxGlobalDiscountAmount,
+  normalizeCartLineDiscount,
+  summarizeCartTotals,
+  validateCartDiscounts as validateCartDiscountsShared,
+} from '@/utils/saleCalculator'
 import { useI18n } from '@/i18n'
 
 const { tenantId } = useTenant()
@@ -724,37 +734,23 @@ const canManageDiscounts = computed(() => {
   return roles.includes('ADMINISTRADOR') || roles.includes('GERENTE')
 })
 const canSelectSaleDateTime = computed(() => canManageDiscounts.value && posAllowManualSaleDatetime.value)
-
-const getLineSubtotal = (line) => {
-  return Math.max(0, (Number(line?.quantity) || 0) * (Number(line?.unit_price) || 0))
-}
+const getLineSubtotal = (line) => getDocumentLineSubtotal(line, {
+  quantityField: 'quantity',
+  unitPriceField: 'unit_price',
+})
 
 const normalizeLineDiscountValue = (line, options = {}) => {
   if (!line) return { valid: true, adjusted: false, error: null }
 
-  const discountType = line.discount_line_type || 'AMOUNT'
-  const subtotal = getLineSubtotal(line)
-  const rawValue = Number(line.discount_line || 0)
-  const nextValue = Number.isFinite(rawValue) ? rawValue : 0
-  line.discount_line = nextValue < 0 ? 0 : nextValue
+  const validation = normalizeCartLineDiscount(line)
+  line.discount_line = validation.sanitizedValue
 
-  const validation = validateDiscount(subtotal, line.discount_line, discountType)
   if (validation.valid) {
     return { valid: true, adjusted: false, error: null }
   }
 
-  let sanitizedValue = line.discount_line
-  if (discountType === 'PERCENT') {
-    sanitizedValue = Math.min(100, Math.max(0, line.discount_line))
-  } else {
-    sanitizedValue = Math.min(subtotal, Math.max(0, line.discount_line))
-  }
-
-  const adjusted = sanitizedValue !== line.discount_line
-  line.discount_line = sanitizedValue
-
-  if (!options.silent && adjusted) {
-    const targetLabel = discountType === 'PERCENT'
+  if (!options.silent && validation.adjusted) {
+    const targetLabel = validation.discountType === 'PERCENT'
       ? 'El descuento porcentual no puede ser mayor a 100%'
       : 'El descuento de la línea no puede ser mayor al valor del producto'
     showMsg(targetLabel, 'warning')
@@ -762,116 +758,41 @@ const normalizeLineDiscountValue = (line, options = {}) => {
 
   return {
     valid: false,
-    adjusted,
+    adjusted: validation.adjusted,
     error: validation.error || null,
   }
 }
 
-const getLineDiscountAmount = (line) => {
-  const subtotal = getLineSubtotal(line)
-  const discountType = line?.discount_line_type || 'AMOUNT'
-  let discountValue = Number(line?.discount_line || 0)
-
-  if (!Number.isFinite(discountValue) || discountValue <= 0) {
-    return 0
-  }
-
-  discountValue = Math.max(0, discountValue)
-  discountValue = discountType === 'PERCENT'
-    ? Math.min(100, discountValue)
-    : Math.min(subtotal, discountValue)
-
-  return calculateDiscount(subtotal, discountValue, discountType)
-}
-
-const getLineNetSubtotal = (line) => {
-  const subtotal = getLineSubtotal(line)
-  const lineDiscountAmount = getLineDiscountAmount(line)
-  return Math.max(0, subtotal - lineDiscountAmount)
-}
-
 const allocateGlobalDiscountAcrossCart = async (requestedDiscountAmount) => {
-  const lineBases = cart.value.map((line) => ({
-    line,
-    available: getLineNetSubtotal(line),
-  }))
-  const invoiceBase = lineBases.reduce((sum, entry) => sum + entry.available, 0)
-  const discountToApply = Math.min(Math.max(0, requestedDiscountAmount || 0), invoiceBase)
+  const allocation = allocateGlobalDiscountAcrossLines(cart.value, requestedDiscountAmount)
 
-  if (invoiceBase <= 0 || discountToApply <= 0) {
-    await Promise.all(cart.value.map(async (line) => {
-      line.discount_global = 0
+  if (allocation.invoiceBase <= 0 || allocation.appliedAmount <= 0) {
+    await Promise.all(allocation.allocations.map(async ({ line, amount }) => {
+      line.discount_global = amount
       await recalculateTaxes(line)
     }))
     return {
       appliedAmount: 0,
-      invoiceBase,
+      invoiceBase: allocation.invoiceBase,
       capped: requestedDiscountAmount > 0,
     }
   }
 
-  let remaining = Math.round(discountToApply * 100) / 100
-
-  for (let index = 0; index < lineBases.length; index += 1) {
-    const entry = lineBases[index]
-    const isLast = index === lineBases.length - 1
-    let allocated = 0
-
-    if (isLast) {
-      allocated = remaining
-    } else {
-      const proportion = entry.available / invoiceBase
-      allocated = Math.round(discountToApply * proportion * 100) / 100
-      allocated = Math.min(allocated, remaining, entry.available)
-    }
-
-    entry.line.discount_global = Math.max(0, allocated)
-    remaining = Math.max(0, Math.round((remaining - allocated) * 100) / 100)
-    await recalculateTaxes(entry.line)
-  }
+  await Promise.all(allocation.allocations.map(async ({ line, amount }) => {
+    line.discount_global = amount
+    await recalculateTaxes(line)
+  }))
 
   return {
-    appliedAmount: discountToApply,
-    invoiceBase,
-    capped: discountToApply < requestedDiscountAmount,
+    appliedAmount: allocation.appliedAmount,
+    invoiceBase: allocation.invoiceBase,
+    capped: allocation.capped,
   }
 }
 
 const validateCartDiscounts = () => {
-  let invoiceSubtotal = 0
-  let invoiceDiscount = 0
-
-  for (const line of cart.value) {
-    const lineValidation = normalizeLineDiscountValue(line, { silent: true })
-    if (!lineValidation.valid && !lineValidation.adjusted) {
-      return {
-        valid: false,
-        error: lineValidation.error || 'Hay descuentos inválidos en la venta',
-      }
-    }
-
-    const lineSubtotal = getLineSubtotal(line)
-    const lineDiscount = getLineDiscountAmount(line) + (Number(line.discount_global) || 0)
-
-    if (lineDiscount > lineSubtotal) {
-      return {
-        valid: false,
-        error: 'El descuento total de una línea no puede superar el valor del producto',
-      }
-    }
-
-    invoiceSubtotal += lineSubtotal
-    invoiceDiscount += lineDiscount
-  }
-
-  if (invoiceDiscount > invoiceSubtotal) {
-    return {
-      valid: false,
-      error: 'El descuento total no puede superar el valor de la factura',
-    }
-  }
-
-  return { valid: true, error: null }
+  cart.value.forEach((line) => normalizeLineDiscountValue(line, { silent: true }))
+  return validateCartDiscountsShared(cart.value)
 }
 
 const getCurrentSaleDateTimeLocal = () => {
@@ -949,53 +870,10 @@ const updateFloatingHeaderActions = () => {
 }
 
 const totals = computed(() => {
-  let subtotal = 0, discountLine = 0, discountGlobal = 0, tax = 0, total = 0
-  const taxDetails = new Map() // Para agrupar impuestos por código
-  
-  cart.value.forEach(l => {
-    // Subtotal = suma de bases gravables (después de descuentos, antes de impuestos)
-    // Para IVA incluido: base_amount es la base descompuesta
-    // Para IVA adicional: base_amount es el precio después de descuento
-    subtotal += l.base_amount || 0
-    
-    // Calcular descuentos para mostrar por separado
-    const lineDiscountAmount = getLineDiscountAmount(l)
-    discountLine += lineDiscountAmount
-    // Descuentos globales distribuidos
-    discountGlobal += l.discount_global || 0
-    // Impuestos ya calculados
-    tax += l.tax_amount || 0
-    
-    // Agrupar impuestos por código/nombre
-    if (l.tax_code && l.tax_amount > 0) {
-      const key = l.tax_code
-      if (!taxDetails.has(key)) {
-        taxDetails.set(key, { code: l.tax_code, name: l.tax_name, amount: 0 })
-      }
-      taxDetails.get(key).amount += l.tax_amount
-    }
-    
-    // Total de la línea
-    total += l.line_total || 0
-  })
-  
-  // Aplicar redondeo al total final según configuración del tenant
-  total = applyRounding(total)
-  
-  const discount = discountLine + discountGlobal
-  
-  // Obtener el primer impuesto para mostrar en label
-  const firstTax = Array.from(taxDetails.values())[0]
-  const taxLabel = firstTax?.code 
-    ? `${firstTax.code} (${firstTax.name || ''})`.trim() 
-    : 'Impuestos'
-  
-  return { subtotal, discountLine, discountGlobal, discount, tax, taxLabel, taxDetails, total }
+  return summarizeCartTotals(cart.value, { applyRounding })
 })
 
-const maxGlobalDiscountAmount = computed(() => {
-  return cart.value.reduce((sum, line) => sum + getLineNetSubtotal(line), 0)
-})
+const maxGlobalDiscountAmount = computed(() => getMaxGlobalDiscountAmount(cart.value))
 
 const cartTotalPages = computed(() => Math.max(1, Math.ceil(cart.value.length / CART_LIST_PAGE_SIZE)))
 const paginatedCart = computed(() => {
@@ -1149,10 +1027,8 @@ const recalculateTaxes = async (line) => {
   const taxResult = await taxesService.getTaxInfoForVariant(tenantId.value, line.variant_id)
   normalizeLineDiscountValue(line)
 
-  const subtotal = line.quantity * line.unit_price
-  const discountLineAmount = getLineDiscountAmount(line)
-  const discountGlobalAmount = line.discount_global || 0
-  const discountAmount = discountLineAmount + discountGlobalAmount
+  const subtotal = getLineSubtotal(line)
+  const discountAmount = getCartLineTotalDiscountAmount(line)
 
   // Actualizar campo discount para compatibilidad con backend
   line.discount = discountAmount
@@ -1199,7 +1075,7 @@ const applyGlobalDiscount = async () => {
   }
   
   // Calcular subtotal actual (después de descuentos de línea)
-  const totalBeforeGlobalDiscount = cart.value.reduce((sum, line) => sum + getLineNetSubtotal(line), 0)
+  const totalBeforeGlobalDiscount = getMaxGlobalDiscountAmount(cart.value)
 
   if (totalBeforeGlobalDiscount <= 0) {
     showMsg('No hay base disponible para aplicar descuento en esta factura', 'warning')
@@ -1526,23 +1402,16 @@ const buildVariantLabel = (line) => {
 }
 
 const humanizeSaleError = (message) => {
-  const fallbackMessage = String(message || 'Error al procesar venta')
-  const uuidRegex = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi
   const variantLabels = new Map(
     cart.value
       .filter((line) => line?.variant_id)
       .map((line) => [String(line.variant_id).toLowerCase(), buildVariantLabel(line)])
   )
 
-  let normalizedMessage = fallbackMessage.replace(uuidRegex, (match) => {
-    return variantLabels.get(String(match).toLowerCase()) || match
+  return humanizeAppError(message, {
+    defaultMessage: 'Error al procesar venta',
+    idLabels: variantLabels,
   })
-
-  normalizedMessage = normalizedMessage
-    .replace(/variante\s+/gi, 'producto ')
-    .replace(/variant\s+/gi, 'producto ')
-
-  return normalizedMessage
 }
 
 const saveSaleOnHold = () => {
@@ -1647,22 +1516,7 @@ const processSale = async () => {
 
   processing.value = true
   try {
-    const lines = cart.value.map(l => {
-      // When price_includes_tax=true, the stored price already contains tax.
-      // The SP (sp_create_sale) always treats unit_price as pre-tax base and adds
-      // tax on top, so we must decompose the price before sending it.
-      const taxRate = l.tax_rate || 0
-      const inclTax = l.price_includes_tax && taxRate > 0
-      const factor = inclTax ? (1 + taxRate) : 1
-      return {
-        variant_id: l.variant_id,
-        qty: l.quantity,
-        unit_price: inclTax ? Math.round(l.unit_price / factor) : l.unit_price,
-        // Discount is a total-line amount; also decompose it to base terms
-        discount: inclTax ? Math.round((l.discount || 0) / factor) : (l.discount || 0),
-        discount_type: 'AMOUNT'
-      }
-    })
+    const lines = buildSalePayloadLines(cart.value)
 
     // Ajustar pagos: si hay cambio, reducir el monto del último pago al total exacto
     const adjustedPayments = [...payments.value]
@@ -1724,7 +1578,7 @@ const processSale = async () => {
       // ─────────────────────────────────────────────────────────────
       clearSale()
     } else {
-      showMsg(humanizeSaleError(r.error), 'error')
+      showMsg(r.error, 'error')
     }
   } catch (error) {
     showMsg('Error al procesar venta', 'error')
@@ -1755,7 +1609,11 @@ watch(cartTotalPages, (total) => {
   if (cartListPage.value > total) cartListPage.value = total
 })
 
-const showMsg = (msg, color = 'success') => { snackbarMessage.value = msg; snackbarColor.value = color; snackbar.value = true }
+const showMsg = (msg, color = 'success') => {
+  snackbarMessage.value = color === 'error' ? humanizeSaleError(msg) : msg
+  snackbarColor.value = color
+  snackbar.value = true
+}
 
 // Inicialización
 onMounted(async () => {
